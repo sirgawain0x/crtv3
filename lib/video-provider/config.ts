@@ -1,6 +1,10 @@
+import { serverLogger } from "@/lib/utils/logger";
+
 export type VideoProviderId = "livepeer" | "frameworks";
 
 const DEFAULT_PROVIDER: VideoProviderId = "livepeer";
+
+let lastInvalidVideoProviderWarning: string | undefined;
 
 /** Server-side selector for the video backend (default: Livepeer, unchanged in prod). */
 export function resolveVideoProviderId(): VideoProviderId {
@@ -8,7 +12,21 @@ export function resolveVideoProviderId(): VideoProviderId {
   if (raw === "frameworks" || raw === "livepeer") {
     return raw;
   }
+  if (raw) {
+    if (lastInvalidVideoProviderWarning !== raw) {
+      lastInvalidVideoProviderWarning = raw;
+      serverLogger.warn(
+        "[video-provider] Ignoring invalid VIDEO_PROVIDER; falling back to livepeer",
+        { provided: process.env.VIDEO_PROVIDER?.trim(), fallback: DEFAULT_PROVIDER },
+      );
+    }
+  }
   return DEFAULT_PROVIDER;
+}
+
+/** Test helper — reset invalid-provider warning dedupe. */
+export function resetInvalidVideoProviderWarningForTests(): void {
+  lastInvalidVideoProviderWarning = undefined;
 }
 
 export function frameworksGraphqlUrl(): string {

@@ -114,8 +114,12 @@ async function studioCreateStream(
         : typeof data.message === "string"
           ? data.message
           : `Failed to create stream (${res.status})`;
-    const err = new Error(message) as Error & { status?: number };
+    const err = new Error(message) as Error & {
+      status?: number;
+      details?: unknown;
+    };
     err.status = res.status;
+    err.details = data;
     throw err;
   }
 

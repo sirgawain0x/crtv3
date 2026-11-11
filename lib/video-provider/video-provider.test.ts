@@ -9,10 +9,22 @@ import {
   FrameWorksUploadsAssetsUnavailableError,
 } from "./uploads-assets-guard";
 
+const mockLoggerWarn = vi.fn();
+
+vi.mock("@/lib/utils/logger", () => ({
+  serverLogger: {
+    warn: (...args: unknown[]) => mockLoggerWarn(...args),
+    error: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
 describe("video provider selection", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     resetVideoProviderForTests();
+    mockLoggerWarn.mockReset();
   });
 
   it("defaults to livepeer when VIDEO_PROVIDER is unset", () => {
@@ -27,6 +39,17 @@ describe("video provider selection", () => {
     vi.stubEnv("FRAMEWORKS_API_TOKEN", "token");
     resetVideoProviderForTests();
     expect(getVideoProvider().id).toBe("frameworks");
+  });
+
+  it("falls back to livepeer for invalid VIDEO_PROVIDER with a warning", () => {
+    vi.stubEnv("VIDEO_PROVIDER", "frameworkz");
+    resetVideoProviderForTests();
+    expect(getVideoProviderId()).toBe("livepeer");
+    expect(getVideoProvider().id).toBe("livepeer");
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining("invalid VIDEO_PROVIDER"),
+      expect.objectContaining({ provided: "frameworkz", fallback: "livepeer" }),
+    );
   });
 });
 
@@ -60,6 +83,31 @@ describe("livepeer provider (HTTP)", () => {
         }),
       }),
     );
+  });
+
+  it("create stream error matches staging shape (status, message, details)", async () => {
+    const errorBody = { error: "quota exceeded", hint: "upgrade plan" };
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      json: async () => errorBody,
+    });
+
+    try {
+      await getVideoProvider().streams.create({
+        name: "test",
+        profiles: [],
+        record: true,
+        playbackPolicy: { type: "jwt" },
+        creatorId: "0xabc",
+      });
+      expect.fail("expected create to throw");
+    } catch (error) {
+      const err = error as Error & { status?: number; details?: unknown };
+      expect(err.message).toBe("quota exceeded");
+      expect(err.status).toBe(422);
+      expect(err.details).toEqual(errorBody);
+    }
   });
 
   it("create stream maps identifiers from Studio response", async () => {

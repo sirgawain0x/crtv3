@@ -1,5 +1,9 @@
 import type { VideoProvider } from "./interface";
-import { resolveVideoProviderId, type VideoProviderId } from "./config";
+import {
+  resetInvalidVideoProviderWarningForTests,
+  resolveVideoProviderId,
+  type VideoProviderId,
+} from "./config";
 import { livepeerVideoProvider } from "./livepeer-provider";
 import { frameworksVideoProvider } from "./frameworks-provider";
 import { assertUploadsAndAssetsAvailable } from "./uploads-assets-guard";
@@ -57,4 +61,5 @@ export function getVideoProvider(): VideoProvider {
 /** Test helper — reset singleton between cases. */
 export function resetVideoProviderForTests(): void {
   cached = undefined;
+  resetInvalidVideoProviderWarningForTests();
 }
