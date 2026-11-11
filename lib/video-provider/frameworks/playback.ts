@@ -1,9 +1,8 @@
 import jwt from "jsonwebtoken";
 import type { PlaybackInfoResult } from "../types";
-import { frameworksGraphqlRequest } from "../frameworks-graphql";
 import { frameworksPlayHlsUrl } from "./constants";
 
-type ResolveViewerEndpointQuery = {
+export type ResolveViewerEndpointQuery = {
   resolveViewerEndpoint: {
     primary?: {
       url?: string;
@@ -22,41 +21,57 @@ type ResolveViewerEndpointQuery = {
   } | null;
 };
 
-const RESOLVE_VIEWER_ENDPOINT = `
-  query ResolveViewerEndpoint($contentId: String!) {
-    resolveViewerEndpoint(contentId: $contentId) {
-      primary {
-        url
-        protocol
-        baseUrl
-        outputs
-      }
-      fallbacks {
-        url
-        protocol
-      }
-      metadata {
-        status
-        isLive
-        title
-        contentId
-        contentType
-      }
-    }
-  }
-`;
+function isHlsProtocol(protocol: string | undefined): boolean {
+  return protocol?.toUpperCase() === "HLS";
+}
 
-function pickHlsUrl(data: ResolveViewerEndpointQuery): string | undefined {
+function isM3u8Url(url: string): boolean {
+  try {
+    return new URL(url).pathname.toLowerCase().endsWith(".m3u8");
+  } catch {
+    return /\.m3u8(?:\?|#|$)/i.test(url);
+  }
+}
+
+function isHlsPlaybackUrl(url: string | undefined, protocol?: string): boolean {
+  if (!url) return false;
+  if (isHlsProtocol(protocol)) return true;
+  return isM3u8Url(url);
+}
+
+/**
+ * Maps a resolveViewerEndpoint catalog entry to an HLS URL only.
+ * Intended for browser-side resolve (#405 app layer); server playback uses Foghorn /play.
+ */
+export function pickHlsUrl(data: ResolveViewerEndpointQuery): string | undefined {
   const primary = data.resolveViewerEndpoint?.primary;
-  if (primary?.outputs?.HLS?.url) return primary.outputs.HLS.url;
-  if (primary?.url) return primary.url;
+  const hlsOutput = primary?.outputs?.HLS;
+  if (hlsOutput?.url) {
+    return hlsOutput.url;
+  }
+  if (primary?.url && isHlsPlaybackUrl(primary.url, primary.protocol)) {
+    return primary.url;
+  }
   const outputs = primary?.outputs;
   if (outputs) {
     for (const value of Object.values(outputs)) {
-      if (value?.url) return value.url;
+      if (value?.url && isHlsPlaybackUrl(value.url, value.protocol)) {
+        return value.url;
+      }
     }
   }
-  return data.resolveViewerEndpoint?.fallbacks?.find((f) => f.url)?.url;
+  const fallback = data.resolveViewerEndpoint?.fallbacks?.find((f) =>
+    isHlsPlaybackUrl(f.url, f.protocol),
+  );
+  return fallback?.url;
+}
+
+function viewerPlayHlsUrl(playbackId: string, jwtToken: string | null): string {
+  const url = frameworksPlayHlsUrl(playbackId);
+  if (!jwtToken) return url;
+  const parsed = new URL(url);
+  parsed.searchParams.set("jwt", jwtToken);
+  return parsed.toString();
 }
 
 function toPlaybackInfo(playbackId: string, hlsUrl?: string): PlaybackInfoResult {
@@ -109,17 +124,7 @@ export function signFrameworksPlaybackToken(
 export const frameworksPlayback = {
   get: async (playbackId: string): Promise<PlaybackInfoResult> => {
     const token = signFrameworksPlaybackToken({ expiresInSeconds: 300 });
-    const headers: Record<string, string> | undefined = token
-      ? { "X-Frameworks-Playback-JWT": token }
-      : undefined;
-
-    const data = await frameworksGraphqlRequest<ResolveViewerEndpointQuery>(
-      RESOLVE_VIEWER_ENDPOINT,
-      { contentId: playbackId },
-      headers,
-    );
-
-    const hlsUrl = pickHlsUrl(data);
-    return toPlaybackInfo(playbackId, hlsUrl);
+    const url = viewerPlayHlsUrl(playbackId, token);
+    return toPlaybackInfo(playbackId, url);
   },
 };
