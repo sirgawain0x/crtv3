@@ -80,7 +80,7 @@ Your Livepeer webhook ID for video processing callbacks.
 Server-only gate for Livepeer AI **translation** (`translate`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound Livepeer AI calls and shows a calm “Captions coming soon” state in the upload flow. Unrecognized values are treated as `false` (fail closed) with a one-time server warning.
 
 #### `LIVEPEER_AI_TEXT_TO_IMAGE_ENABLED`
-Server-only gate for Livepeer AI **text-to-image** (`livepeerAiActions`, `textToImage`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound calls and shows a calm “Text-to-image coming soon” state on the Livepeer text-to-image entry only (follow-up: #432). Unrecognized values fail closed with a one-time server warning.
+Server-only gate for Livepeer AI **text-to-image** (`livepeerAiActions`, `textToImage`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound calls. On staging there is no UI that invokes these server actions (upload thumbnails use Gemini via `/api/ai/generate-thumbnail`). Unrecognized values fail closed with a one-time server warning. Replacement UI tracked in #432.
 
 ### 3. Supabase Configuration
 
