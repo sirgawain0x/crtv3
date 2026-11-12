@@ -237,23 +237,17 @@ Alchemy Gas Manager policy ID for Story Protocol (chain IDs 1315 testnet / 1514 
 2. Create a new policy and select **Story** (Aeneid testnet and/or Story mainnet)
 3. Configure spending rules and copy the Policy ID
 
-**Note:** This works when the Story tx is sent as a UserOp (e.g. via the prepare-mint flow and client-side signing on Story chain). If you use the server-side mint flow with `STORY_PROTOCOL_PRIVATE_KEY`, that wallet pays gas; set `NEXT_PUBLIC_STORY_POLICY_ID` to have Alchemy sponsor gas when using the creator-sign flow instead.
+**Note:** This works when the Story tx is sent as a UserOp (e.g. via the prepare-mint flow and client-side signing on Story chain). `POST /api/story/mint` no longer performs server-side minting (503); sponsor gas for the **creator-signed** path instead.
 
 #### `STORY_PROTOCOL_PRIVATE_KEY` (Optional, Server-side only)
-Private key for a wallet that will fund Story Protocol transactions (minting NFTs, IP registration, etc.). This wallet must have IP tokens for gas fees on Story Protocol. If you use `NEXT_PUBLIC_STORY_POLICY_ID` with the creator-sign (UserOp) flow, you can avoid setting this.
+Private key used to construct Story SDK clients on the server for **non-disabled** routes (e.g. `prepare-mint` collection setup, `register-stream`, `mint-derivative`, `mint-license`, license-term reads). It is **not** used to sign `POST /api/story/mint` or `POST /api/story/transfer` (those routes return 503 without reading this variable).
 
-**NFT minting step:** The upload flow checks `/api/story/mint-configured`. When `STORY_PROTOCOL_PRIVATE_KEY` is not set, the NFT minting step shows "NFT minting unavailable" instead of the mint UI. Set this variable to enable the step.
+**Upload UI gate:** `/api/story/mint-configured` returns `{ configured: true }` when this variable is set, which shows the NFT minting step. That flag does **not** mean server-side `/api/story/mint` works — see [docs/story-protocol-api.md](./docs/story-protocol-api.md).
 
 **Important:**
-- This is a **funding wallet** - it pays for gas fees but doesn't need to match the creator's address
-- The wallet must have IP tokens on Story Protocol (testnet or mainnet depending on your configuration)
-- This is a sensitive credential - never commit to version control
-- For production, use a dedicated service wallet with limited funds
-
-**How to get IP tokens:**
-1. Get the funding wallet address by calling `/api/story/funding-wallet` (after setting the private key)
-2. Transfer IP tokens to that address using Story Protocol's testnet faucet or mainnet bridge
-3. For testnet: Use the Aeneid testnet faucet to get IP tokens
+- Prefer `NEXT_PUBLIC_STORY_POLICY_ID` + `prepare-mint` so creators sign and (optionally) get sponsored gas
+- If this key is used for routes that still broadcast server-side (license mint, stream registration), fund that wallet with IP tokens on the configured network
+- Never commit this to version control; use a dedicated service wallet in production
 
 **Warning:** This is a sensitive credential. Never commit this to version control. Use environment variables and secure key management in production.
 
@@ -321,10 +315,8 @@ NEXT_PUBLIC_STORY_RPC_URL=https://rpc.aeneid.story.foundation
 # Optional: Use Alchemy for Story Protocol (better reliability)
 # NEXT_PUBLIC_STORY_ALCHEMY_API_KEY=your_story_alchemy_key
 
-# Story Protocol Funding Wallet (Required for NFT minting and IP registration)
-# This wallet must have IP tokens for gas fees on Story Protocol
-# Get IP tokens from testnet faucet or mainnet bridge
-STORY_PROTOCOL_PRIVATE_KEY=0x...  # Server-side only - funding wallet private key
+# Story Protocol server SDK key (optional — see docs/story-protocol-api.md)
+# STORY_PROTOCOL_PRIVATE_KEY=0x...  # Not used by disabled /api/story/mint or /transfer routes
 
 # Factory Configuration (Optional - for factory-based collection deployment)
 # If provided, uses factory to deploy collections; otherwise falls back to SPG
