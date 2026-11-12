@@ -37,6 +37,7 @@ import {
   type CreationStatus,
 } from '@/lib/hooks/metokens/useMeTokenCreation';
 import { useMeTokenHubs } from '@/lib/hooks/metokens/useMeTokenHubs';
+import { getCreationHubs } from '@/lib/metokens/creation-hubs';
 import {
   HUB_ASSET_CONFIGS,
   DEFAULT_HUB_ASSET,
@@ -86,6 +87,8 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
   const [assetsDeposited, setAssetsDeposited] = useState('');
   const [assetBalances, setAssetBalances] = useState<Record<string, bigint>>({});
   const [showPendingTransactions, setShowPendingTransactions] = useState(false);
+  const [backingSearch, setBackingSearch] = useState('');
+  const [backingCategory, setBackingCategory] = useState<'all' | 'stablecoin' | 'stock'>('all');
 
   // Keep the latest callback in a ref so the success effect below can depend on
   // a stable value instead of re-firing every time the parent re-renders with a
@@ -97,7 +100,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
 
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
-  const { activeHubs, defaultHub, loading: hubsLoading, error: hubsError } = useMeTokenHubs();
+  const { activeHubs, loading: hubsLoading, error: hubsError } = useMeTokenHubs();
 
   const {
     state,
@@ -109,7 +112,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
   } = useMeTokenCreation();
 
   const hubOptions = useMemo(() => {
-    return activeHubs.map((hub) => {
+    return getCreationHubs(activeHubs).map((hub) => {
       const config =
         hub.symbol !== 'UNKNOWN'
           ? HUB_ASSET_CONFIGS[hub.symbol as HubAssetSymbol]
@@ -133,13 +136,15 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
   const [selectedHubId, setSelectedHubId] = useState<number>(fallbackHubId);
 
   useEffect(() => {
-    if (defaultHub && selectedHubId === fallbackHubId) {
-      setSelectedHubId(defaultHub.hubId);
+    if (hubOptions.length && !hubOptions.some((hub) => hub.hubId === selectedHubId)) {
+      setSelectedHubId(hubOptions.find((hub) => hub.hubId === fallbackHubId)?.hubId ?? hubOptions[0].hubId);
     }
-  }, [defaultHub, fallbackHubId, selectedHubId]);
+  }, [hubOptions, selectedHubId, fallbackHubId]);
 
-  const selectedHubOption =
-    hubOptions.find((hub) => hub.hubId === selectedHubId) ?? hubOptions[0];
+  const selectedHubOption = hubOptions.find((hub) => hub.hubId === selectedHubId);
+  const filteredHubOptions = backingCategory === 'stock' ? [] : hubOptions.filter((hub) =>
+    `${hub.symbol} ${hub.displayName}`.toLowerCase().includes(backingSearch.trim().toLowerCase())
+  );
   const selectedAsset = selectedHubOption
     ? resolveHubAsset(selectedHubOption.hubId)
     : resolveHubAsset(fallbackHubId);
@@ -185,7 +190,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
       setName('');
       setSymbol('');
       setAssetsDeposited('');
-      setSelectedHubId(defaultHub?.hubId ?? fallbackHubId);
+      setSelectedHubId(fallbackHubId);
       fetchBalances();
     }
   }, [
@@ -199,7 +204,6 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
     symbol,
     toast,
     fetchBalances,
-    defaultHub,
     fallbackHubId,
   ]);
 
@@ -211,6 +215,11 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
         description: 'Please enter a name and symbol for your MeToken.',
         variant: 'destructive',
       });
+      return;
+    }
+
+    if (!selectedHubOption) {
+      toast({ title: 'Backing unavailable', description: 'Select an available backing asset.', variant: 'destructive' });
       return;
     }
 
@@ -240,7 +249,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
       await createMeToken({
         name: name.trim(),
         symbol: symbol.trim().toUpperCase(),
-        hubId: selectedHubId,
+        hubId: selectedHubOption.hubId,
         assetsDeposited: assetsDeposited || '0',
       });
     } catch (err) {
@@ -432,12 +441,28 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                   ) : hubOptions.length === 0 ? (
                     <Alert>
                       <AlertDescription>
-                        No active MeToken hubs are registered on-chain yet.
+                        No supported backing assets are currently available.
                       </AlertDescription>
                     </Alert>
                   ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {hubOptions.map((hub) => {
+                  <div className="space-y-3">
+                    <div role="group" aria-label="Backing asset type" className="flex flex-wrap gap-2">
+                      {([['all', 'All'], ['stablecoin', 'Stablecoins'], ['stock', 'Tokenized stocks']] as const).map(([value, label]) => (
+                        <button key={value} type="button" aria-pressed={backingCategory === value}
+                          onClick={() => setBackingCategory(value)} disabled={isProcessing}
+                          className={cn('rounded-full border px-3 py-1 text-sm', backingCategory === value && 'border-primary bg-primary/10')}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <Label htmlFor="backing-search">Search backing assets</Label>
+                    <Input id="backing-search" type="search" value={backingSearch} onChange={(event) => setBackingSearch(event.target.value)}
+                      placeholder="Search by name or symbol" disabled={isProcessing} />
+                    {filteredHubOptions.length === 0 && <p className="text-sm text-muted-foreground" role="status">
+                      {backingCategory === 'stock' ? 'No tokenized stocks are available yet.' : 'No backing assets match your search.'}
+                    </p>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {filteredHubOptions.map((hub) => {
                       const config =
                         hub.symbol !== 'UNKNOWN'
                           ? HUB_ASSET_CONFIGS[hub.symbol as HubAssetSymbol]
@@ -449,6 +474,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                         type="button"
                         onClick={() => setSelectedHubId(hub.hubId)}
                         disabled={isProcessing}
+                        aria-pressed={selectedHubId === hub.hubId}
                         className={cn(
                           'flex items-start gap-3 p-3 border rounded-lg text-left transition-colors',
                           selectedHubId === hub.hubId
@@ -495,6 +521,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                         </div>
                       </button>
                     );})}
+                    </div>
                   </div>
                   )}
                 </div>
@@ -542,7 +569,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                     isProcessing ||
                     !name ||
                     !symbol ||
-                    hubOptions.length === 0 ||
+                    !selectedHubOption ||
                     !meetsMinDeposit ||
                     !hasEnoughCollateral
                   }
