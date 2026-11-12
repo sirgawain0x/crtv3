@@ -104,7 +104,7 @@ describe("streams create guard (#404)", () => {
           json: async () => ({
             data: {
               createStream: {
-                __typename: "StreamWithKey",
+                __typename: "Stream",
                 id: "stream-gql",
                 playbackId: "pb",
                 streamKey: "sk",

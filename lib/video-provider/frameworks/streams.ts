@@ -66,7 +66,7 @@ type StorageArtifactsQuery = {
       kind?: string;
       status?: string;
       createdAt?: string;
-      durationMs?: number;
+      durationSeconds?: number;
     }>;
   };
 };
@@ -104,7 +104,7 @@ const CREATE_STREAM = `
   mutation CreateStream($input: CreateStreamInput!) {
     createStream(input: $input) {
       __typename
-      ... on StreamWithKey {
+      ... on Stream {
         id
         playbackId
         streamKey
@@ -112,6 +112,9 @@ const CREATE_STREAM = `
       ... on ValidationError {
         message
         field
+      }
+      ... on AuthError {
+        message
       }
     }
   }
@@ -185,7 +188,7 @@ const LIST_RECORDING_ARTIFACTS = `
         kind
         status
         createdAt
-        durationMs
+        durationSeconds
       }
     }
   }
@@ -225,6 +228,12 @@ const CREATE_CLIP = `
       ... on ValidationError {
         message
         field
+      }
+      ... on NotFoundError {
+        message
+      }
+      ... on AuthError {
+        message
       }
     }
   }
@@ -322,7 +331,7 @@ function mapArtifactToSession(node: StorageArtifactsQuery["storageArtifactsConne
       ? frameworksPlayHlsUrl(node.playbackId).replace("/hls/index.m3u8", ".mp4")
       : undefined,
     sourceSegmentsDuration:
-      node.durationMs != null ? Math.round(node.durationMs / 1000) : undefined,
+      node.durationSeconds != null ? Math.round(node.durationSeconds) : undefined,
     createdAt,
   };
 }
@@ -366,6 +375,9 @@ export const frameworksStreams = {
     const result = data.createStream;
     if (result.__typename === "ValidationError") {
       throw new Error(result.message ?? "FrameWorks validation error");
+    }
+    if (result.__typename === "AuthError") {
+      throw new Error(result.message ?? "FrameWorks createStream auth error");
     }
     if (!result.id || !result.playbackId || !result.streamKey) {
       throw new Error("FrameWorks createStream missing identifiers");
@@ -493,12 +505,16 @@ export const frameworksStreams = {
         },
       });
       const result = data.createClip;
-      if (result.__typename === "ValidationError") {
+      if (
+        result.__typename === "ValidationError" ||
+        result.__typename === "NotFoundError" ||
+        result.__typename === "AuthError"
+      ) {
         return {
           playbackUrl: "",
           assetId: "",
           newPlaybackId: "",
-          error: result.message ?? "Validation error",
+          error: result.message ?? `${result.__typename}`,
         };
       }
       const playbackId = result.playbackId ?? "";

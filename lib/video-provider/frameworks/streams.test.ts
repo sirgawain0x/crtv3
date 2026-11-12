@@ -33,7 +33,7 @@ describe("frameworks streams (#404)", () => {
                 kind: "CHAPTER",
                 status: "ready",
                 createdAt: "2024-01-01T00:00:00Z",
-                durationMs: 60000,
+                durationSeconds: 60,
               },
             ],
           },
@@ -48,6 +48,7 @@ describe("frameworks streams (#404)", () => {
     expect(sessions[0]?.id).toBe("artifact-1");
     expect(sessions[0]?.recordingStatus).toBe("ready");
     expect(sessions[0]?.recordingUrl).toContain("pb-1");
+    expect(sessions[0]?.sourceSegmentsDuration).toBe(60);
   });
 
   it("getWithMultistream returns Livepeer-shaped multistream targets", async () => {
@@ -112,7 +113,7 @@ describe("frameworks streams (#404)", () => {
         json: async () => ({
           data: {
             createStream: {
-              __typename: "StreamWithKey",
+              __typename: "Stream",
               id: "s1",
               playbackId: "p1",
               streamKey: "secret-key",
@@ -142,6 +143,77 @@ describe("frameworks streams (#404)", () => {
       playbackId: "p1",
       streamKey: "secret-key",
     });
+  });
+
+  it("create throws on AuthError from createStream", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          createStream: {
+            __typename: "AuthError",
+            message: "missing streams:write scope",
+          },
+        },
+      }),
+    });
+
+    await expect(
+      getVideoProvider().streams.create({
+        name: "Show",
+        profiles: [],
+        record: true,
+        playbackPolicy: {},
+        creatorId: "0x1",
+      }),
+    ).rejects.toThrow("missing streams:write scope");
+  });
+
+  it("createClip surfaces NotFoundError and AuthError as failures", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          createClip: {
+            __typename: "NotFoundError",
+            message: "stream not found",
+          },
+        },
+      }),
+    });
+
+    const notFound = await getVideoProvider().streams.createClip({
+      playbackId: "live-pb",
+      sessionId: "missing",
+      startTime: 1_700_000_000,
+      endTime: 1_700_000_060,
+    });
+    expect(notFound.error).toBe("stream not found");
+    expect(notFound.newPlaybackId).toBe("");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          createClip: {
+            __typename: "AuthError",
+            message: "unauthorized clip create",
+          },
+        },
+      }),
+    });
+
+    const auth = await getVideoProvider().streams.createClip({
+      playbackId: "live-pb",
+      sessionId: "stream-global",
+      startTime: 1_700_000_000,
+      endTime: 1_700_000_060,
+    });
+    expect(auth.error).toBe("unauthorized clip create");
+    expect(auth.error).not.toContain("playback ID not ready");
   });
 
   it("createClip maps Clip result to CreateClipResult", async () => {

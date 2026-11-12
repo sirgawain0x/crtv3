@@ -163,7 +163,7 @@ describe("frameworks provider", () => {
         json: async () => ({
           data: {
             createStream: {
-              __typename: "StreamWithKey",
+              __typename: "Stream",
               id: "c3RyZWFtOjE",
               playbackId: "playback-1",
               streamKey: "key-1",
