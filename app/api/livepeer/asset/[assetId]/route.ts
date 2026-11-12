@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
+import {
+  FrameWorksUploadsAssetsUnavailableError,
+  requireVideoProviderForUploadsAndAssets,
+} from '@/lib/video-provider';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
 
@@ -29,8 +32,10 @@ export async function GET(
       );
     }
 
-    const client = getFullLivepeer();
-    if (!client) {
+    const provider = requireVideoProviderForUploadsAndAssets(
+      "asset.[assetId].GET",
+    );
+    if (!provider.isConfigured()) {
       return NextResponse.json(
         {
           error: 'Livepeer is not configured',
@@ -40,10 +45,14 @@ export async function GET(
       );
     }
 
-    const assetResponse = await client.asset.get(assetId);
+    const assetResponse = (await provider.assets.getById(assetId)) as {
+      errors?: string[];
+      asset?: unknown;
+    } | null;
 
     if (
       assetResponse &&
+      typeof assetResponse === "object" &&
       'errors' in assetResponse &&
       Array.isArray(assetResponse.errors) &&
       assetResponse.errors.length > 0
@@ -67,6 +76,10 @@ export async function GET(
 
     return NextResponse.json(assetResponse);
   } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
+
     serverLogger.error('Error fetching asset:', error);
 
     const err = error as { errors?: string[]; message?: string };

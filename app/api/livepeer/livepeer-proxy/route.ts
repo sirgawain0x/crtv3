@@ -7,6 +7,7 @@ import { resolveStreamForCreator } from "@/services/streams";
 import { ensureLivepeerStreamForCreator } from "@/lib/livepeer/ensure-stream";
 import { hasLivepeerPrivateApiKey } from "@/lib/sdk/livepeer/studioAuth";
 import { serverLogger } from "@/lib/utils/logger";
+import { FrameWorksStreamsCreateUnavailableError } from "@/lib/video-provider";
 
 const streamProfileSchema = z.object({
   name: z.string(),
@@ -122,6 +123,9 @@ export async function POST(req: NextRequest) {
       replaced: ensured.replaced,
     });
   } catch (error) {
+    if (error instanceof FrameWorksStreamsCreateUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
     if (error instanceof Error && error.message === "MISSING_API_KEY") {
       return NextResponse.json(
         { error: "Missing Livepeer API key", code: "MISSING_API_KEY" },

@@ -1,5 +1,6 @@
 "use server";
 
+import { getVideoProviderId } from "@/lib/video-provider";
 import { createClient } from "../lib/sdk/supabase/server";
 import { createServiceClient } from "../lib/sdk/supabase/service";
 import {
@@ -334,6 +335,7 @@ export async function replaceStreamLivepeerCredentials(
     }
 
     serverLogger.info("[replaceStreamLivepeerCredentials] credentials replaced", {
+        provider: getVideoProviderId(),
         creatorId: normalizedCreator,
         streamId: credentials.stream_id,
         playbackId: credentials.playback_id,

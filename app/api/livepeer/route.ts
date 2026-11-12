@@ -1,6 +1,10 @@
 "use server";
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  assertUploadsAndAssetsAvailable,
+  FrameWorksUploadsAssetsUnavailableError,
+} from "@/lib/video-provider";
 import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 
@@ -32,6 +36,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    assertUploadsAndAssetsAvailable("livepeer.route.POST.request-upload");
+  } catch (error) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
+    throw error;
+  }
+
   const verification = await checkBotIdDeep();
   if (verification.isBot) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
