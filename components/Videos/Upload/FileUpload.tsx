@@ -3,9 +3,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Clapperboard, CopyIcon, ExternalLink } from "lucide-react";
 import {
+  completeFrameworksVodUpload,
   getLivepeerUploadUrl,
   getLivepeerAsset,
 } from "@/app/api/livepeer/assetUploadActions";
+import { uploadFileViaPresignedParts } from "@/lib/video-provider/frameworks/vod-multipart-upload";
 import * as tus from "tus-js-client";
 import PreviewVideo from "./PreviewVideo";
 import { Progress } from "@/components/ui/progress";
@@ -221,7 +223,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       const uploadRequestResult = await getLivepeerUploadUrl(
         newAssetTitle || fileToUpload.name || "new file name",
-        address
+        address,
+        fileToUpload.size,
+        undefined,
+        undefined,
+        false,
+        {
+          filename: fileToUpload.name,
+          contentType: fileToUpload.type || "application/octet-stream",
+        },
       );
 
       // Store asset in both state and ref for persistence
@@ -236,8 +246,63 @@ const FileUpload: React.FC<FileUploadProps> = ({
         return;
       }
 
+      const finishSuccessfulUpload = () => {
+        logger.debug("Upload completed");
+        setUploadComplete(true);
+        setUploadState("complete");
+
+        if (uploadRequestResult?.asset) {
+          livepeerAssetRef.current = uploadRequestResult.asset;
+        }
+
+        const uploadedAssetId = uploadRequestResult?.asset?.id;
+        if (uploadedAssetId) {
+          onFileUploaded(uploadedAssetId);
+
+          void (async () => {
+            try {
+              const metadataUri = await pollForMetadataUri(uploadedAssetId);
+              setUploadedUri(metadataUri);
+            } catch (pollErr) {
+              logger.warn("Failed to resolve metadata URI:", pollErr);
+            }
+          })();
+
+          if (onAssetReady && uploadRequestResult?.asset) {
+            onAssetReady(uploadRequestResult.asset);
+          }
+        } else {
+          setError("Upload succeeded but asset ID is missing.");
+        }
+      };
+
+      const presignedParts = uploadRequestResult?.presignedParts;
+      if (presignedParts?.length) {
+        const uploadedParts = await uploadFileViaPresignedParts(
+          fileToUpload,
+          presignedParts,
+          {
+            partSize: uploadRequestResult.partSize,
+            onProgress: setProgress,
+          },
+        );
+
+        if (uploadRequestResult.uploadId) {
+          await completeFrameworksVodUpload(uploadRequestResult.uploadId, uploadedParts);
+        }
+
+        finishSuccessfulUpload();
+        return;
+      }
+
+      if (!uploadRequestResult?.tusEndpoint) {
+        setError("No upload endpoint returned for this provider");
+        setUploadState("idle");
+        return;
+      }
+
       const tusUpload = new tus.Upload(fileToUpload, {
-        endpoint: uploadRequestResult?.tusEndpoint,
+        endpoint: uploadRequestResult.tusEndpoint,
         retryDelays: [0, 1000, 3000, 5000], // Retry configuration for mobile reliability
         chunkSize: 5 * 1024 * 1024, // 5MB chunks for better mobile handling
         overridePatchMethod: true, // Use POST instead of PATCH for better mobile compatibility
@@ -250,7 +315,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
           logger.error("Error uploading file:", err);
           let errorMessage = "Failed to upload file. Please try again.";
 
-          // Enhance error message if possible
           if (err.originalRequest) {
             errorMessage += ` (Network error: ${err.originalRequest.status})`;
           } else if (err.message) {
@@ -265,34 +329,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setProgress(percentage);
         },
         onSuccess() {
-          logger.debug("Upload completed");
-          setUploadComplete(true);
-          setUploadState("complete");
-
-          // Ensure asset is still in ref
-          if (uploadRequestResult?.asset) {
-            livepeerAssetRef.current = uploadRequestResult.asset;
-          }
-
-          const uploadedAssetId = uploadRequestResult?.asset?.id;
-          if (uploadedAssetId) {
-            onFileUploaded(uploadedAssetId);
-
-            void (async () => {
-              try {
-                const metadataUri = await pollForMetadataUri(uploadedAssetId);
-                setUploadedUri(metadataUri);
-              } catch (pollErr) {
-                logger.warn("Failed to resolve metadata URI:", pollErr);
-              }
-            })();
-
-            if (onAssetReady && uploadRequestResult?.asset) {
-              onAssetReady(uploadRequestResult.asset);
-            }
-          } else {
-            setError("Upload succeeded but asset ID is missing.");
-          }
+          finishSuccessfulUpload();
         },
       });
 

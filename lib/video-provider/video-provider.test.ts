@@ -4,10 +4,7 @@ import {
   getVideoProviderId,
   resetVideoProviderForTests,
 } from "./index";
-import {
-  assertUploadsAndAssetsAvailable,
-  FrameWorksUploadsAssetsUnavailableError,
-} from "./uploads-assets-guard";
+import { assertUploadsAndAssetsAvailable } from "./uploads-assets-guard";
 import { assertStreamCreationAvailable } from "./streams-create-guard";
 
 const mockLoggerWarn = vi.fn();
@@ -221,13 +218,8 @@ describe("frameworks provider", () => {
     ).rejects.toThrow("record not allowed");
   });
 
-  it("assets are blocked by uploads guard before provider stub", () => {
-    expect(() => assertUploadsAndAssetsAvailable("test")).toThrow(/#406/);
-    try {
-      assertUploadsAndAssetsAvailable("test");
-    } catch (e) {
-      expect(e).toBeInstanceOf(FrameWorksUploadsAssetsUnavailableError);
-    }
+  it("uploads guard is a no-op in frameworks mode after #406 wiring", () => {
+    expect(() => assertUploadsAndAssetsAvailable("test")).not.toThrow();
   });
 
   it("ai.isEnabled is false on frameworks provider surface", () => {

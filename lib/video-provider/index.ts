@@ -25,6 +25,7 @@ export {
   VideoProviderNotConfiguredError,
   VideoProviderNotImplementedError,
 } from "./errors";
+export { verifyFrameworksWebhookSignature } from "./frameworks/webhooks";
 export {
   resolveVideoProviderId,
   frameworksGraphqlUrl,

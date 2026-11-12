@@ -1,4 +1,3 @@
-import { serverLogger } from "@/lib/utils/logger";
 import { resolveVideoProviderId } from "./config";
 
 /** Raised when upload/asset APIs are invoked while `VIDEO_PROVIDER=frameworks` (#406). */
@@ -11,18 +10,9 @@ export class FrameWorksUploadsAssetsUnavailableError extends Error {
   }
 }
 
-export function assertUploadsAndAssetsAvailable(operation: string): void {
+/** No-op after #406 wires FrameWorks assets (VOD upload/import/CRUD). */
+export function assertUploadsAndAssetsAvailable(_operation: string): void {
   if (resolveVideoProviderId() !== "frameworks") {
     return;
   }
-  serverLogger.warn(
-    "[video-provider] Refusing upload/asset operation in frameworks mode",
-    {
-      operation,
-      videoProvider: "frameworks",
-      reason:
-        "Uploads and VOD assets are not wired for FrameWorks in this PR; blocked until #406.",
-    },
-  );
-  throw new FrameWorksUploadsAssetsUnavailableError();
 }
