@@ -19,6 +19,14 @@ import {
   normalizeCreatorSocialProfileUrl,
   type CreatorSocialPlatform,
 } from '@/lib/creator/social-profile-urls';
+import { CreatorStockPickEditor } from '@/components/UserProfile/CreatorStockPickEditor';
+import {
+  stockPickEditorValueFromStored,
+  type StockPickEditorValue,
+} from '@/lib/creator-stock-picks/stock-pick-form-state';
+import { CreatorStockPickDisplay } from '@/components/UserProfile/CreatorStockPickDisplay';
+import { isCreatorStockPicksRuntimeEnabled } from '@/lib/creator-stock-picks/runtime-policy';
+import { parseCreatorStockPickFromRow } from '@/lib/creator-stock-picks/parse-stock-pick';
 
 interface CreatorProfileManagerProps {
   targetAddress?: string;
@@ -31,6 +39,9 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
   const { smartAccountAddress } = useWalletStatus();
   const { profile, loading, error, updateProfile, upsertProfile } = useCreatorProfile(targetAddress);
 
+  const stockPicksEnabled = isCreatorStockPicksRuntimeEnabled();
+  const savedStockPick = parseCreatorStockPickFromRow(profile?.stock_pick);
+
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -42,6 +53,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [stockPickForm, setStockPickForm] = useState<StockPickEditorValue>({
+    ticker: '',
+    note: '',
+    video_asset_id: '',
+  });
 
   const validateSocialField = (platform: CreatorSocialPlatform, value: string) => {
     const fieldKey =
@@ -81,6 +97,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         social_instagram_url: profile.social_instagram_url || '',
         social_x_url: profile.social_x_url || '',
       });
+      setStockPickForm(
+        stockPickEditorValueFromStored(
+          parseCreatorStockPickFromRow(profile.stock_pick),
+        ),
+      );
     }
   }, [profile]);
 
@@ -124,6 +145,14 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
+          ...(stockPicksEnabled
+            ? {
+                stock_pick_ticker: stockPickForm.ticker || null,
+                stock_pick_note: stockPickForm.note || null,
+                stock_pick_video_asset_id:
+                  stockPickForm.video_asset_id || null,
+              }
+            : {}),
         });
         toast({
           title: "Profile Updated",
@@ -137,6 +166,14 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
+          ...(stockPicksEnabled
+            ? {
+                stock_pick_ticker: stockPickForm.ticker || null,
+                stock_pick_note: stockPickForm.note || null,
+                stock_pick_video_asset_id:
+                  stockPickForm.video_asset_id || null,
+              }
+            : {}),
         });
         toast({
           title: "Profile Created",
@@ -167,6 +204,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         social_x_url: profile.social_x_url || '',
       });
       setFieldErrors({});
+      setStockPickForm(
+        stockPickEditorValueFromStored(
+          parseCreatorStockPickFromRow(profile.stock_pick),
+        ),
+      );
     }
     setIsEditing(false);
   };
@@ -334,6 +376,20 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                 'x',
               )}
             </div>
+
+            {stockPicksEnabled && (
+              <div className="space-y-4 pt-2 border-t">
+                <p className="text-sm font-medium">Creator stock pick</p>
+                {isEditing && isOwner ? (
+                  <CreatorStockPickEditor
+                    initial={savedStockPick}
+                    onChange={setStockPickForm}
+                  />
+                ) : (
+                  savedStockPick && <CreatorStockPickDisplay stockPick={savedStockPick} />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
