@@ -274,12 +274,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
             livepeerAssetRef.current = uploadRequestResult.asset;
           }
 
-          if (uploadRequestResult?.asset?.id) {
-            onFileUploaded(uploadRequestResult.asset.id);
+          const uploadedAssetId = uploadRequestResult?.asset?.id;
+          if (uploadedAssetId) {
+            onFileUploaded(uploadedAssetId);
 
             void (async () => {
               try {
-                const metadataUri = await pollForMetadataUri(uploadRequestResult.asset.id);
+                const metadataUri = await pollForMetadataUri(uploadedAssetId);
                 setUploadedUri(metadataUri);
               } catch (pollErr) {
                 logger.warn("Failed to resolve metadata URI:", pollErr);
