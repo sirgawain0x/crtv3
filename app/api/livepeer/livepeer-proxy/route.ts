@@ -27,7 +27,9 @@ const bodySchema = z.object({
   name: z.string().min(1),
   profiles: z.array(streamProfileSchema).min(1),
   record: z.boolean(),
-  playbackPolicy: z.record(z.unknown()),
+  playbackPolicy: z
+    .object({ type: z.literal("jwt") })
+    .passthrough(),
 });
 
 export async function POST(req: NextRequest) {

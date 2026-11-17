@@ -27,7 +27,6 @@ type GetStreamQuery = {
     name?: string;
     playbackId?: string;
     streamKey?: string;
-    isActive?: boolean;
     pushTargets?: Array<{
       id: string;
       name?: string;
@@ -127,7 +126,6 @@ const GET_STREAM = `
       name
       playbackId
       streamKey
-      isActive
     }
   }
 `;
@@ -210,6 +208,20 @@ const CREATE_PUSH_TARGET = `
   }
 `;
 
+const DELETE_STREAM = `
+  mutation DeleteStream($id: ID!) {
+    deleteStream(id: $id) {
+      __typename
+      ... on NotFoundError {
+        message
+      }
+      ... on AuthError {
+        message
+      }
+    }
+  }
+`;
+
 const DELETE_PUSH_TARGET = `
   mutation DeletePushTarget($id: ID!) {
     deletePushTarget(id: $id) {
@@ -287,10 +299,7 @@ function mapLivepeerPlaybackPolicy(
         type: "WEBHOOK",
         webhook: {
           url,
-          secret:
-            typeof policy.secret === "string"
-              ? policy.secret
-              : process.env.FRAMEWORKS_WEBHOOK_SECRET,
+          secret: typeof policy.secret === "string" ? policy.secret : undefined,
           context:
             typeof policy.webhookContext === "object" && policy.webhookContext
               ? (policy.webhookContext as Record<string, unknown>)
@@ -357,7 +366,6 @@ export const frameworksStreams = {
         playbackId: data.stream.playbackId,
         streamKey: data.stream.streamKey,
         name: data.stream.name,
-        isActive: data.stream.isActive,
       };
     } catch (err) {
       if (err instanceof VideoProviderNotConfiguredError) throw err;
@@ -386,7 +394,29 @@ export const frameworksStreams = {
       throw new Error("FrameWorks createStream missing identifiers");
     }
     if (params.playbackPolicy && Object.keys(params.playbackPolicy).length > 0) {
-      await applyPlaybackPolicy(result.id, params.playbackPolicy);
+      try {
+        await applyPlaybackPolicy(result.id, params.playbackPolicy);
+      } catch (policyErr) {
+        // Best-effort cleanup so a policy failure does not leave an orphaned upstream stream.
+        try {
+          const del = await frameworksGraphqlRequest<{ deleteStream: { __typename: string; message?: string } }>(
+            DELETE_STREAM,
+            { id: result.id },
+          );
+          if (del.deleteStream.__typename !== "DeleteSuccess") {
+            console.error("[frameworks] orphan stream cleanup failed", {
+              streamId: result.id,
+              result: del.deleteStream.__typename,
+            });
+          }
+        } catch (cleanupErr) {
+          console.error("[frameworks] orphan stream cleanup failed", {
+            streamId: result.id,
+            error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+          });
+        }
+        throw policyErr;
+      }
     }
     return {
       streamId: result.id,

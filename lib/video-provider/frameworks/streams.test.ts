@@ -19,6 +19,34 @@ describe("frameworks streams (#404)", () => {
     fetchMock.mockReset();
   });
 
+  const FRAMEWORKS_STREAM_QUERY_FIELDS = ["id", "name", "playbackId", "streamKey"] as const;
+
+  it("GET_STREAM query selects only published Stream fields (no isActive)", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          stream: {
+            id: "stream-1",
+            name: "Show",
+            playbackId: "pb",
+            streamKey: "sk",
+          },
+        },
+      }),
+    });
+
+    await getVideoProvider().streams.getOrNull("stream-1");
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      query: string;
+    };
+    expect(body.query).not.toMatch(/\bisActive\b/);
+    for (const field of FRAMEWORKS_STREAM_QUERY_FIELDS) {
+      expect(body.query).toMatch(new RegExp(`\\b${field}\\b`));
+    }
+  });
+
   it("getSessions maps ready recording artifacts", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -177,12 +205,14 @@ describe("frameworks streams (#404)", () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            data: { createStream: {
-              __typename: "Stream",
-              id: "s1",
-              playbackId: "p1",
-              streamKey: "secret-key",
-            } },
+            data: {
+              createStream: {
+                __typename: "Stream",
+                id: "s1",
+                playbackId: "p1",
+                streamKey: "secret-key",
+              },
+            },
           }),
         })
         .mockResolvedValueOnce({
@@ -190,17 +220,117 @@ describe("frameworks streams (#404)", () => {
           json: async () => ({
             data: { setPlaybackPolicy: { __typename, message: "Policy rejected" } },
           }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            data: { deleteStream: { __typename: "DeleteSuccess" } },
+          }),
         });
 
-      await expect(getVideoProvider().streams.create({
+      await expect(
+        getVideoProvider().streams.create({
+          name: "Show",
+          profiles: [],
+          record: true,
+          playbackPolicy: { type: "jwt" },
+          creatorId: "0x1",
+        }),
+      ).rejects.toThrow("Policy rejected");
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      const deleteBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body)) as {
+        variables: { id: string };
+        query: string;
+      };
+      expect(deleteBody.query).toContain("deleteStream");
+      expect(deleteBody.variables.id).toBe("s1");
+    },
+  );
+
+  it("create rethrows policy error when deleteStream cleanup fails", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            createStream: {
+              __typename: "Stream",
+              id: "orphan-1",
+              playbackId: "p1",
+              streamKey: "sk",
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            setPlaybackPolicy: {
+              __typename: "ValidationError",
+              message: "Policy rejected",
+            },
+          },
+        }),
+      })
+      .mockRejectedValueOnce(new Error("delete network error"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(
+      getVideoProvider().streams.create({
         name: "Show",
         profiles: [],
         record: true,
         playbackPolicy: { type: "jwt" },
         creatorId: "0x1",
-      })).rejects.toThrow("Policy rejected");
-    },
-  );
+      }),
+    ).rejects.toThrow("Policy rejected");
+
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it("webhook playback policy does not fall back to FRAMEWORKS_WEBHOOK_SECRET", async () => {
+    vi.stubEnv("FRAMEWORKS_WEBHOOK_SECRET", "env-secret-should-not-leak");
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            createStream: {
+              __typename: "Stream",
+              id: "s-wh",
+              playbackId: "p1",
+              streamKey: "sk",
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: { setPlaybackPolicy: { __typename: "Stream", id: "s-wh" } },
+        }),
+      });
+
+    await getVideoProvider().streams.create({
+      name: "Show",
+      profiles: [],
+      record: true,
+      playbackPolicy: {
+        type: "webhook",
+        url: "https://example.com/hook",
+      },
+      creatorId: "0x1",
+    });
+
+    const policyBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as {
+      variables: { input: { policy: { webhook?: { secret?: string } } } };
+    };
+    expect(policyBody.variables.input.policy.webhook?.secret).toBeUndefined();
+  });
 
   it("createClip rejects an unresolved stream ID without a mutation", async () => {
     const result = await getVideoProvider().streams.createClip({
