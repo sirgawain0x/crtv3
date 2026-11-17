@@ -3,7 +3,14 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const MIGRATIONS_DIR = path.join(__dirname);
-const TARGET_MIGRATION = "2026111700_streams_hide_stream_key.sql";
+const TARGET_MIGRATION = "20261117234351_streams_hide_stream_key.sql";
+
+const APPLIED_VERBATIM_STATEMENTS = [
+  "REVOKE SELECT ON public.streams FROM anon, authenticated;",
+  "GRANT SELECT (id, creator_id, stream_id, playback_id, thumbnail_url, name, is_live, last_live_at, created_at, updated_at, allow_clipping, story_ip_id, story_license_terms_id, story_ip_registration_tx, story_ip_registered_at, story_commercial_rev_share, requires_metoken, metoken_price, lens_live_post_id, save_recording) ON public.streams TO anon, authenticated;",
+  "REVOKE INSERT, UPDATE, DELETE, TRUNCATE, TRIGGER ON public.streams FROM anon;",
+  'DROP POLICY IF EXISTS "Creators can view their own stream key" ON public.streams;',
+] as const;
 
 const STREAMS_SCHEMA_MIGRATION_HINT =
   /create\s+table\s+(?:if\s+not\s+exists\s+)?public\.streams|alter\s+table\s+public\.streams/i;
@@ -73,7 +80,7 @@ function parseGrantSelectColumns(migrationSql: string): string[] {
     .map((name) => name.toLowerCase());
 }
 
-describe("2026111700_streams_hide_stream_key.sql", () => {
+describe("20261117234351_streams_hide_stream_key.sql", () => {
   const migrationSql = readFileSync(
     path.join(MIGRATIONS_DIR, TARGET_MIGRATION),
     "utf8",
@@ -83,10 +90,21 @@ describe("2026111700_streams_hide_stream_key.sql", () => {
   const grantColumns = parseGrantSelectColumns(migrationSql);
   const grantSet = new Set(grantColumns);
 
-  it("documents column-level grant requirement for new streams columns", () => {
+  it("documents column-level grant requirement and production apply record", () => {
     expect(migrationSql).toMatch(/new column on public\.streams/i);
-    expect(migrationSql).toMatch(/GRANT SELECT/i);
-    expect(migrationSql).toMatch(/invisible to anon/i);
+    expect(migrationSql).toMatch(/column-level SELECT grant to anon\/authenticated/i);
+    expect(migrationSql).toMatch(/invisible to those roles/i);
+    expect(migrationSql).toMatch(
+      /Applied to production creative-tv on 2026-11-17 as migration streams_hide_stream_key/i,
+    );
+  });
+
+  it("matches the four production statements verbatim", () => {
+    const lines = migrationSql
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .filter((line) => line.length > 0 && !line.startsWith("--"));
+    expect(lines).toEqual([...APPLIED_VERBATIM_STATEMENTS]);
   });
 
   it("excludes stream_key from GRANT SELECT", () => {
