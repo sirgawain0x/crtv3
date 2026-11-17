@@ -27,7 +27,6 @@ type GetStreamQuery = {
     name?: string;
     playbackId?: string;
     streamKey?: string;
-    isActive?: boolean;
     pushTargets?: Array<{
       id: string;
       name?: string;
@@ -127,7 +126,6 @@ const GET_STREAM = `
       name
       playbackId
       streamKey
-      isActive
     }
   }
 `;
@@ -171,6 +169,9 @@ const SET_PLAYBACK_POLICY = `
       ... on Stream {
         id
       }
+      ... on AuthError {
+        message
+      }
       ... on ValidationError {
         message
         field
@@ -203,6 +204,20 @@ const CREATE_PUSH_TARGET = `
       targetUri
       isEnabled
       status
+    }
+  }
+`;
+
+const DELETE_STREAM = `
+  mutation DeleteStream($id: ID!) {
+    deleteStream(id: $id) {
+      __typename
+      ... on NotFoundError {
+        message
+      }
+      ... on AuthError {
+        message
+      }
     }
   }
 `;
@@ -284,10 +299,7 @@ function mapLivepeerPlaybackPolicy(
         type: "WEBHOOK",
         webhook: {
           url,
-          secret:
-            typeof policy.secret === "string"
-              ? policy.secret
-              : process.env.FRAMEWORKS_WEBHOOK_SECRET,
+          secret: typeof policy.secret === "string" ? policy.secret : undefined,
           context:
             typeof policy.webhookContext === "object" && policy.webhookContext
               ? (policy.webhookContext as Record<string, unknown>)
@@ -314,8 +326,8 @@ async function applyPlaybackPolicy(
     },
   );
   const result = data.setPlaybackPolicy;
-  if (result.__typename === "ValidationError") {
-    throw new Error(result.message ?? "FrameWorks setPlaybackPolicy validation error");
+  if (result.__typename !== "Stream") {
+    throw new Error(result.message ?? `FrameWorks setPlaybackPolicy failed (${result.__typename})`);
   }
 }
 
@@ -354,7 +366,6 @@ export const frameworksStreams = {
         playbackId: data.stream.playbackId,
         streamKey: data.stream.streamKey,
         name: data.stream.name,
-        isActive: data.stream.isActive,
       };
     } catch (err) {
       if (err instanceof VideoProviderNotConfiguredError) throw err;
@@ -383,7 +394,29 @@ export const frameworksStreams = {
       throw new Error("FrameWorks createStream missing identifiers");
     }
     if (params.playbackPolicy && Object.keys(params.playbackPolicy).length > 0) {
-      await applyPlaybackPolicy(result.id, params.playbackPolicy);
+      try {
+        await applyPlaybackPolicy(result.id, params.playbackPolicy);
+      } catch (policyErr) {
+        // Best-effort cleanup so a policy failure does not leave an orphaned upstream stream.
+        try {
+          const del = await frameworksGraphqlRequest<{ deleteStream: { __typename: string; message?: string } }>(
+            DELETE_STREAM,
+            { id: result.id },
+          );
+          if (del.deleteStream.__typename !== "DeleteSuccess") {
+            console.error("[frameworks] orphan stream cleanup failed", {
+              streamId: result.id,
+              result: del.deleteStream.__typename,
+            });
+          }
+        } catch (cleanupErr) {
+          console.error("[frameworks] orphan stream cleanup failed", {
+            streamId: result.id,
+            error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+          });
+        }
+        throw policyErr;
+      }
     }
     return {
       streamId: result.id,
@@ -474,7 +507,7 @@ export const frameworksStreams = {
   },
 
   createClip: async (params: CreateClipParams): Promise<CreateClipResult> => {
-    if (!params.sessionId || params.startTime == null || params.endTime == null) {
+    if (!params.playbackId || !params.streamId || params.startTime == null || params.endTime == null) {
       return {
         playbackUrl: "",
         assetId: "",
@@ -497,7 +530,7 @@ export const frameworksStreams = {
     try {
       const data = await frameworksGraphqlRequest<CreateClipMutation>(CREATE_CLIP, {
         input: {
-          streamId: params.sessionId,
+          streamId: params.streamId,
           title: params.name ?? "Clip",
           mode: "ABSOLUTE",
           startUnix: startSec,
