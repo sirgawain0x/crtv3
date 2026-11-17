@@ -171,6 +171,9 @@ const SET_PLAYBACK_POLICY = `
       ... on Stream {
         id
       }
+      ... on AuthError {
+        message
+      }
       ... on ValidationError {
         message
         field
@@ -314,8 +317,8 @@ async function applyPlaybackPolicy(
     },
   );
   const result = data.setPlaybackPolicy;
-  if (result.__typename === "ValidationError") {
-    throw new Error(result.message ?? "FrameWorks setPlaybackPolicy validation error");
+  if (result.__typename !== "Stream") {
+    throw new Error(result.message ?? `FrameWorks setPlaybackPolicy failed (${result.__typename})`);
   }
 }
 
@@ -474,7 +477,7 @@ export const frameworksStreams = {
   },
 
   createClip: async (params: CreateClipParams): Promise<CreateClipResult> => {
-    if (!params.sessionId || params.startTime == null || params.endTime == null) {
+    if (!params.playbackId || !params.streamId || params.startTime == null || params.endTime == null) {
       return {
         playbackUrl: "",
         assetId: "",
@@ -497,7 +500,7 @@ export const frameworksStreams = {
     try {
       const data = await frameworksGraphqlRequest<CreateClipMutation>(CREATE_CLIP, {
         input: {
-          streamId: params.sessionId,
+          streamId: params.streamId,
           title: params.name ?? "Clip",
           mode: "ABSOLUTE",
           startUnix: startSec,

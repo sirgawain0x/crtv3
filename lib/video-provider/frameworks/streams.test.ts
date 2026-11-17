@@ -170,6 +170,49 @@ describe("frameworks streams (#404)", () => {
     ).rejects.toThrow("missing streams:write scope");
   });
 
+  it.each(["AuthError", "ValidationError", "NotFoundError", "UnexpectedResult"])(
+    "create rejects a stream when playback policy returns %s",
+    async (__typename) => {
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            data: { createStream: {
+              __typename: "Stream",
+              id: "s1",
+              playbackId: "p1",
+              streamKey: "secret-key",
+            } },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            data: { setPlaybackPolicy: { __typename, message: "Policy rejected" } },
+          }),
+        });
+
+      await expect(getVideoProvider().streams.create({
+        name: "Show",
+        profiles: [],
+        record: true,
+        playbackPolicy: { type: "jwt" },
+        creatorId: "0x1",
+      })).rejects.toThrow("Policy rejected");
+    },
+  );
+
+  it("createClip rejects an unresolved stream ID without a mutation", async () => {
+    const result = await getVideoProvider().streams.createClip({
+      playbackId: "live-pb",
+      sessionId: "session-live-pb",
+      startTime: 1_700_000_000,
+      endTime: 1_700_000_060,
+    });
+    expect(result.error).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("createClip surfaces NotFoundError and AuthError as failures", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -186,6 +229,7 @@ describe("frameworks streams (#404)", () => {
 
     const notFound = await getVideoProvider().streams.createClip({
       playbackId: "live-pb",
+      streamId: "stream-global",
       sessionId: "missing",
       startTime: 1_700_000_000,
       endTime: 1_700_000_060,
@@ -208,7 +252,8 @@ describe("frameworks streams (#404)", () => {
 
     const auth = await getVideoProvider().streams.createClip({
       playbackId: "live-pb",
-      sessionId: "stream-global",
+      streamId: "stream-global",
+      sessionId: "session-live-pb",
       startTime: 1_700_000_000,
       endTime: 1_700_000_060,
     });
@@ -234,11 +279,16 @@ describe("frameworks streams (#404)", () => {
 
     const created = await getVideoProvider().streams.createClip({
       playbackId: "live-pb",
-      sessionId: "stream-global",
+      streamId: "stream-global",
+      sessionId: "session-live-pb",
       startTime: 1_700_000_000_000,
       endTime: 1_700_000_060_000,
       name: "Highlight",
     });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.variables.input.streamId).toBe("stream-global");
+    expect(body.variables.input.startUnix).toBe(1_700_000_000);
+    expect(body.variables.input.stopUnix).toBe(1_700_000_060);
     expect(created.newPlaybackId).toBe("clip-pb");
     expect(created.playbackUrl).toContain("clip-pb");
   });
