@@ -47,7 +47,7 @@ async function fetchCreatorProfile(address: string): Promise<CreatorProfile | nu
       return null;
     }
 
-    return data as CreatorProfile;
+    return data as unknown as CreatorProfile;
   } catch (error) {
     logger.error("Unexpected error fetching creator profile:", error);
     return null;
