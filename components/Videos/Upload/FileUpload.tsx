@@ -302,7 +302,26 @@ const FileUpload: React.FC<FileUploadProps> = ({
           },
         );
 
-        await completeFrameworksVodUpload(uploadId, uploadedParts);
+        try {
+          await completeFrameworksVodUpload(uploadId, uploadedParts);
+        } catch (completeErr) {
+          try {
+            await abortFrameworksVodUpload(uploadId);
+          } catch (abortErr) {
+            logger.error("abortVodUpload after completeFrameworksVodUpload failed", {
+              uploadId,
+              error: abortErr instanceof Error ? abortErr.message : String(abortErr),
+            });
+          }
+          const message =
+            completeErr instanceof Error
+              ? completeErr.message
+              : "Failed to complete VOD upload";
+          setError(message);
+          setUploadState("idle");
+          return;
+        }
+
         finishSuccessfulUpload({ skipIpfsMetadataPoll: true });
         return;
       }

@@ -179,14 +179,14 @@ describe("FileUpload FrameWorks multipart completion", () => {
     expect(container.textContent).not.toContain("Upload Complete!");
   });
 
-  it("does not finish upload when completeFrameworksVodUpload fails", async () => {
+  it("aborts session and surfaces complete error without finishing upload", async () => {
     mocks.getLivepeerUploadUrl.mockResolvedValue({
       asset: { id: "artifact-3" },
       uploadId: "session-3",
       partSize: 5_242_880,
       presignedParts: [{ partNumber: 1, url: "https://parts.example/1" }],
     });
-    mocks.completeFrameworksVodUpload.mockRejectedValue(new Error("ValidationError"));
+    mocks.completeFrameworksVodUpload.mockRejectedValue(new Error("complete rejected"));
 
     await renderUpload();
     await selectFile();
@@ -195,8 +195,33 @@ describe("FileUpload FrameWorks multipart completion", () => {
     await vi.waitFor(() => {
       expect(mocks.completeFrameworksVodUpload).toHaveBeenCalled();
     });
+    await vi.waitFor(() => {
+      expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledTimes(1);
+      expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith("session-3");
+    });
     expect(onFileUploaded).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("Upload Complete!");
-    expect(container.textContent).toMatch(/Failed to upload/i);
+    expect(container.textContent).toContain("complete rejected");
+  });
+
+  it("surfaces complete error when abort after complete failure also throws", async () => {
+    mocks.getLivepeerUploadUrl.mockResolvedValue({
+      asset: { id: "artifact-4" },
+      uploadId: "session-4",
+      partSize: 5_242_880,
+      presignedParts: [{ partNumber: 1, url: "https://parts.example/1" }],
+    });
+    mocks.completeFrameworksVodUpload.mockRejectedValue(new Error("complete rejected"));
+    mocks.abortFrameworksVodUpload.mockRejectedValue(new Error("abort network error"));
+
+    await renderUpload();
+    await selectFile();
+    await clickUpload();
+
+    await vi.waitFor(() => {
+      expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith("session-4");
+    });
+    expect(container.textContent).toContain("complete rejected");
+    expect(onFileUploaded).not.toHaveBeenCalled();
   });
 });
