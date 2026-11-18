@@ -62,7 +62,7 @@ export const CREATOR_PROFILE_TWIN_ROUTING_SELECT =
 
 /** Service-role only: twin connection status checks (gateway token not returned in API). */
 export const CREATOR_PROFILE_TWIN_STATUS_SELECT =
-  "twin_enabled, twin_pinata_agent_id, twin_pinata_agent_name, twin_pinata_base_url, twin_pinata_snapshot_cid, twin_pinata_connected_at, twin_pinata_gateway_token";
+  "twin_pinata_agent_id, twin_pinata_agent_name, twin_pinata_snapshot_cid, twin_pinata_connected_at, twin_pinata_gateway_token";
 
 export const CREATOR_PROFILE_FORBIDDEN_PUBLIC_PINATA_COLUMNS = [
   "twin_pinata_gateway_token",
