@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseService } from "@/lib/sdk/supabase/service";
-import { createClient } from "@/lib/sdk/supabase/server";
+import { createServiceClient } from "@/lib/sdk/supabase/service";
 import { serverLogger } from "@/lib/utils/logger";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
@@ -39,7 +38,16 @@ export async function POST(request: NextRequest) {
     throw authErr;
   }
 
-  const supabase = supabaseService ?? (await createClient());
+  let supabase;
+  try {
+    supabase = createServiceClient();
+  } catch (err) {
+    serverLogger.error("twin/disconnect: service client unavailable:", err);
+    return NextResponse.json(
+      { success: false, error: "Twin disconnect is not configured" },
+      { status: 503 },
+    );
+  }
   const { error } = await supabase
     .from("creator_profiles")
     .update({

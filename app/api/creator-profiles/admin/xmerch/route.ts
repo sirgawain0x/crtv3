@@ -7,6 +7,7 @@ import {
 } from "@/lib/access/require-platform-admin";
 import { validateAndNormalizeXmerchProfileInput } from "@/lib/creator/xmerch-profile";
 import { supabaseService } from "@/lib/sdk/supabase/service";
+import { CREATOR_PROFILE_PUBLIC_SELECT } from "@/lib/sdk/supabase/creator-profiles-select";
 import { serverLogger } from "@/lib/utils/logger";
 
 /**
@@ -117,7 +118,7 @@ export async function PATCH(request: NextRequest) {
       .from("creator_profiles")
       .update(updatePayload)
       .eq("owner_address", ownerAddress)
-      .select();
+      .select(CREATOR_PROFILE_PUBLIC_SELECT);
 
     if (error) {
       serverLogger.error("[creator-profiles/admin/xmerch] update error:", error);

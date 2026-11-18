@@ -1,10 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  CREATOR_PROFILE_PUBLIC_SELECT,
+  CREATOR_PROFILE_PUBLIC_SELECT_WITHOUT_XMERCH,
+  CREATOR_PROFILE_SELECT_LEGACY,
+  CREATOR_PROFILE_SELECT_WITH_XMERCH,
+} from "@/lib/sdk/supabase/creator-profiles-select";
 
-export const CREATOR_PROFILE_SELECT_WITH_XMERCH =
-  "id, owner_address, username, bio, avatar_url, brand_channel_slug, social_orb_url, social_instagram_url, social_x_url, social_xmerch, created_at, updated_at";
-
-export const CREATOR_PROFILE_SELECT_LEGACY =
-  "id, owner_address, username, bio, avatar_url, brand_channel_slug, social_orb_url, social_instagram_url, social_x_url, created_at, updated_at";
+export {
+  CREATOR_PROFILE_SELECT_LEGACY,
+  CREATOR_PROFILE_SELECT_WITH_XMERCH,
+} from "@/lib/sdk/supabase/creator-profiles-select";
 
 export function isSocialXmerchColumnMissingError(error: {
   message?: string;
@@ -30,7 +35,7 @@ export async function fetchCreatorProfileForPage(
   const normalized = ownerAddress.toLowerCase();
   const withXmerch = await supabase
     .from("creator_profiles")
-    .select(CREATOR_PROFILE_SELECT_WITH_XMERCH)
+    .select(CREATOR_PROFILE_PUBLIC_SELECT)
     .eq("owner_address", normalized)
     .single();
 
@@ -48,7 +53,7 @@ export async function fetchCreatorProfileForPage(
 
   return supabase
     .from("creator_profiles")
-    .select(CREATOR_PROFILE_SELECT_LEGACY)
+    .select(CREATOR_PROFILE_PUBLIC_SELECT_WITHOUT_XMERCH)
     .eq("owner_address", normalized)
     .single();
 }
