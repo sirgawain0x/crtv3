@@ -33,6 +33,17 @@ vi.mock("@/lib/hooks/accountkit/useUniversalAccount", () => ({
   useUniversalAccount: () => ({ address: CREATOR, type: "sca", loading: false }),
 }));
 
+vi.mock("@/lib/auth/useWalletAuth", () => ({
+  useWalletAuth: () => ({
+    isReady: true,
+    getAuthHeaders: vi.fn().mockResolvedValue({
+      "X-Wallet-Address": CREATOR,
+      "X-Wallet-Timestamp": "1700000000",
+      "X-Wallet-Signature": "0x" + "22".repeat(65),
+    }),
+  }),
+}));
+
 vi.mock("@/lib/utils/logger", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
@@ -117,10 +128,13 @@ describe("FileUpload FrameWorks multipart completion", () => {
     container.remove();
   });
 
+  const uploadTicket = "mock-upload-ticket";
+
   it("marks success only after completeFrameworksVodUpload succeeds", async () => {
     mocks.getLivepeerUploadUrl.mockResolvedValue({
       asset: { id: "artifact-1", playbackId: "pb-1" },
       uploadId: "session-1",
+      uploadTicket,
       partSize: 5_242_880,
       presignedParts: [{ partNumber: 1, url: "https://parts.example/1" }],
     });
@@ -131,9 +145,12 @@ describe("FileUpload FrameWorks multipart completion", () => {
     await clickUpload();
 
     await vi.waitFor(() => {
-      expect(mocks.completeFrameworksVodUpload).toHaveBeenCalledWith("session-1", [
-        { partNumber: 1, etag: "etag-1" },
-      ]);
+      expect(mocks.completeFrameworksVodUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ address: CREATOR }),
+        "session-1",
+        [{ partNumber: 1, etag: "etag-1" }],
+        uploadTicket,
+      );
     });
     await vi.waitFor(() => {
       expect(onFileUploaded).toHaveBeenCalledWith("artifact-1");
@@ -183,6 +200,7 @@ describe("FileUpload FrameWorks multipart completion", () => {
     mocks.getLivepeerUploadUrl.mockResolvedValue({
       asset: { id: "artifact-3" },
       uploadId: "session-3",
+      uploadTicket,
       partSize: 5_242_880,
       presignedParts: [{ partNumber: 1, url: "https://parts.example/1" }],
     });
@@ -197,7 +215,11 @@ describe("FileUpload FrameWorks multipart completion", () => {
     });
     await vi.waitFor(() => {
       expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledTimes(1);
-      expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith("session-3");
+      expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ address: CREATOR }),
+        "session-3",
+        uploadTicket,
+      );
     });
     expect(onFileUploaded).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("Upload Complete!");
@@ -208,6 +230,7 @@ describe("FileUpload FrameWorks multipart completion", () => {
     mocks.getLivepeerUploadUrl.mockResolvedValue({
       asset: { id: "artifact-4" },
       uploadId: "session-4",
+      uploadTicket,
       partSize: 5_242_880,
       presignedParts: [{ partNumber: 1, url: "https://parts.example/1" }],
     });
@@ -219,7 +242,11 @@ describe("FileUpload FrameWorks multipart completion", () => {
     await clickUpload();
 
     await vi.waitFor(() => {
-      expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith("session-4");
+      expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ address: CREATOR }),
+        "session-4",
+        uploadTicket,
+      );
     });
     expect(container.textContent).toContain("complete rejected");
     expect(onFileUploaded).not.toHaveBeenCalled();

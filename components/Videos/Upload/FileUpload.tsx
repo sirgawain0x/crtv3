@@ -16,8 +16,23 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { updateVideoAsset } from "@/services/video-assets";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 // import { useTranscoder } from "@/lib/hooks/useTranscoder";
 import { logger } from "@/lib/utils/logger";
+
+function uploadAuthErrorMessage(err: unknown): string {
+  if (err instanceof Error && "status" in err) {
+    const status = (err as Error & { status?: number }).status;
+    if (status === 401) {
+      return "Wallet authentication required. Reconnect your wallet and try again.";
+    }
+    if (status === 403) {
+      return "This wallet is not authorized for this upload session.";
+    }
+  }
+  return err instanceof Error ? err.message : "Failed to upload file.";
+}
 
 const CREATIVE_PIXELS_URL =
   process.env.NEXT_PUBLIC_CREATIVE_PIXELS_URL ||
@@ -114,6 +129,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   // Use Universal Account to get smart account address (SCA), not controller wallet
   const { address, type, loading } = useUniversalAccount();
+  const { getAuthHeaders, isReady: walletAuthReady } = useWalletAuth();
 
   // Persist upload state to recover from page reloads
   useEffect(() => {
@@ -213,6 +229,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
 
+    if (!walletAuthReady) {
+      setError("Wallet authorization is still loading. Please try again in a moment.");
+      return;
+    }
+
     setError(null);
     setUploadState("loading");
     setProgress(0);
@@ -222,7 +243,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
     try {
       logger.debug("Start upload - using smart account address:", address, "type:", type);
 
+      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+
       const uploadRequestResult = await getLivepeerUploadUrl(
+        auth,
         newAssetTitle || fileToUpload.name || "new file name",
         address,
         fileToUpload.size,
@@ -291,6 +315,19 @@ const FileUpload: React.FC<FileUploadProps> = ({
           return;
         }
 
+        const uploadTicket = uploadRequestResult.uploadTicket?.trim();
+        if (!uploadTicket) {
+          const message =
+            "Upload session is missing an ownership ticket; cannot complete securely.";
+          logger.error(message, { uploadId });
+          setError(message);
+          setUploadState("idle");
+          return;
+        }
+
+        const boundAbortVodUpload = (id: string) =>
+          abortFrameworksVodUpload(auth, id, uploadTicket);
+
         const uploadedParts = await uploadFileViaPresignedParts(
           fileToUpload,
           presignedParts,
@@ -298,26 +335,22 @@ const FileUpload: React.FC<FileUploadProps> = ({
             partSize: uploadRequestResult.partSize,
             uploadId,
             onProgress: setProgress,
-            abortVodUpload: abortFrameworksVodUpload,
+            abortVodUpload: boundAbortVodUpload,
           },
         );
 
         try {
-          await completeFrameworksVodUpload(uploadId, uploadedParts);
+          await completeFrameworksVodUpload(auth, uploadId, uploadedParts, uploadTicket);
         } catch (completeErr) {
           try {
-            await abortFrameworksVodUpload(uploadId);
+            await boundAbortVodUpload(uploadId);
           } catch (abortErr) {
             logger.error("abortVodUpload after completeFrameworksVodUpload failed", {
               uploadId,
               error: abortErr instanceof Error ? abortErr.message : String(abortErr),
             });
           }
-          const message =
-            completeErr instanceof Error
-              ? completeErr.message
-              : "Failed to complete VOD upload";
-          setError(message);
+          setError(uploadAuthErrorMessage(completeErr));
           setUploadState("idle");
           return;
         }
@@ -367,7 +400,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       tusUpload.start();
     } catch (err) {
       logger.error("Error uploading file:", err);
-      setError("Failed to upload file. Please try again.");
+      setError(uploadAuthErrorMessage(err));
       setUploadState("idle");
     }
   };

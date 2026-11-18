@@ -7,6 +7,14 @@ import {
   requireVideoProviderForUploadsAndAssets,
 } from "@/lib/video-provider";
 import { serverLogger } from "@/lib/utils/logger";
+import {
+  walletAuthHeadersToArgs,
+  WalletAuthError,
+} from "@/lib/auth/require-wallet";
+import {
+  maybeMintUploadSessionTicket,
+  requireUploadCreatorWallet,
+} from "@/lib/video-provider/upload-session-auth";
 
 export default async function handler(
   req: NextApiRequest,
@@ -25,6 +33,9 @@ export default async function handler(
         return;
       }
 
+      const auth = walletAuthHeadersToArgs(req.headers as Record<string, string>);
+      const creator = await requireUploadCreatorWallet(auth);
+
       const asset = (await requireVideoProviderForUploadsAndAssets(
         "asset.request-upload",
       ).assets.create({
@@ -32,6 +43,7 @@ export default async function handler(
         filename,
         contentType: filetype,
         sizeBytes,
+        creatorId: { type: "unverified", value: creator },
       })) as {
         data?: {
           tusEndpoint?: string;
@@ -41,13 +53,23 @@ export default async function handler(
         };
       };
 
+      const uploadId = asset.data?.uploadId;
+      const uploadTicket = uploadId
+        ? maybeMintUploadSessionTicket(uploadId, creator)
+        : undefined;
+
       res.status(200).json({
         uploadUrl: asset.data?.tusEndpoint,
-        uploadId: asset.data?.uploadId,
+        uploadId,
         partSize: asset.data?.partSize,
         presignedParts: asset.data?.presignedParts,
+        uploadTicket,
       });
     } catch (error) {
+      if (error instanceof WalletAuthError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
         res.status(503).json({ error: error.message });
         return;
