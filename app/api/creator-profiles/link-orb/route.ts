@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkBotIdDeep } from '@/lib/middleware/botIdGuard';
 import { getOrbLogin } from '@/lib/sdk/orb/login';
 import { supabaseService } from '@/lib/sdk/supabase/service';
+import { CREATOR_PROFILE_PUBLIC_SELECT } from '@/lib/sdk/supabase/creator-profiles-select';
 import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
@@ -174,7 +175,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabaseService
       .from('creator_profiles')
       .upsert(payload, { onConflict: 'owner_address' })
-      .select()
+      .select(CREATOR_PROFILE_PUBLIC_SELECT)
       .single();
 
     if (error) {

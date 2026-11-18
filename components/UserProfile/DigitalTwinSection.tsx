@@ -72,7 +72,6 @@ interface ConnectionStatus {
   verified?: boolean;
   agentId?: string;
   agentName?: string;
-  baseUrl?: string;
   connectedAt?: string;
   templateSnapshotCid?: string | null;
   agentSnapshotCid?: string | null;
@@ -524,9 +523,6 @@ export function DigitalTwinSection({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground break-all">
-                      {status.baseUrl}
-                    </p>
                     {!status.verified && status.templateSnapshotCid && (
                       <p className="text-[11px] text-amber-600 dark:text-amber-400">
                         Snapshot doesn't match the marketplace template — still works,

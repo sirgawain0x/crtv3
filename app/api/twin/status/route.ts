@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseService } from "@/lib/sdk/supabase/service";
-import { createClient } from "@/lib/sdk/supabase/server";
+import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { CREATOR_PROFILE_TWIN_STATUS_SELECT } from "@/lib/sdk/supabase/creator-profiles-select";
 import { findCreativeTwinTemplate } from "@/lib/pinata/api";
 import { serverLogger } from "@/lib/utils/logger";
 
@@ -19,12 +19,19 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const supabase = supabaseService ?? (await createClient());
+  let supabase;
+  try {
+    supabase = createServiceClient();
+  } catch (err) {
+    serverLogger.error("twin/status: service client unavailable:", err);
+    return NextResponse.json(
+      { success: false, error: "Twin status is not configured" },
+      { status: 503 },
+    );
+  }
   const { data, error } = await supabase
     .from("creator_profiles")
-    .select(
-      "twin_enabled, twin_pinata_agent_id, twin_pinata_agent_name, twin_pinata_base_url, twin_pinata_snapshot_cid, twin_pinata_connected_at, twin_pinata_gateway_token"
-    )
+    .select(CREATOR_PROFILE_TWIN_STATUS_SELECT)
     .eq("owner_address", ownerAddress.toLowerCase())
     .maybeSingle();
 
@@ -57,7 +64,6 @@ export async function GET(request: NextRequest) {
     verified,
     agentId: data.twin_pinata_agent_id,
     agentName: data.twin_pinata_agent_name,
-    baseUrl: data.twin_pinata_base_url,
     connectedAt: data.twin_pinata_connected_at,
     templateSnapshotCid: template?.snapshotCid ?? null,
     agentSnapshotCid: data.twin_pinata_snapshot_cid,
