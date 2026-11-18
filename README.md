@@ -243,6 +243,7 @@ This application can be deployed on Vercel or any other Next.js-compatible hosti
 - [Dear Creative newsletter strip](./docs/dear-creative-newsletter.md) — CTA surfaces and copy source
 - [Membership pass cancel](./docs/membership-pass-cancel.md) — crypto pass renewal acknowledgment (no on-chain refund)
 - [Brand channel events (proposal)](./docs/brand-events-proposal.md) — future self-serve event schema
+- [Story Protocol API routes](./docs/story-protocol-api.md) — signing model, route matrix, env pitfalls
 
 ### External
 

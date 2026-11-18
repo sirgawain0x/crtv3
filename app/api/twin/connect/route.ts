@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseService } from "@/lib/sdk/supabase/service";
-import { createClient } from "@/lib/sdk/supabase/server";
+import { createServiceClient } from "@/lib/sdk/supabase/service";
 import { serverLogger } from "@/lib/utils/logger";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import {
@@ -127,7 +126,16 @@ export async function POST(request: NextRequest) {
   const publicBaseUrl = resolvePinataAgentPublicBaseUrl(agentId);
   const wsUrl = resolvePinataAgentGatewayWsUrl(agentId);
 
-  const supabase = supabaseService ?? (await createClient());
+  let supabase;
+  try {
+    supabase = createServiceClient();
+  } catch (err) {
+    serverLogger.error("Pinata connect: service client unavailable:", err);
+    return NextResponse.json(
+      { success: false, error: "Twin connect is not configured" },
+      { status: 503 },
+    );
+  }
   const payload = {
     owner_address: ownerAddress.toLowerCase(),
     twin_enabled: true,

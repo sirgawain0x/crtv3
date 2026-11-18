@@ -29,6 +29,8 @@ import { OrbLoginModal } from "@/components/auth/OrbLoginModal";
 import { OrbLinkingOverlay } from "@/components/auth/OrbLinkingOverlay";
 import NoSSR from "@/components/NoSSR";
 import { MembershipProvider } from "@/lib/context/MembershipContext";
+import { LivepeerAiFeatureProvider } from "@/context/LivepeerAiFeatureContext";
+import type { LivepeerAiClientFeatureFlags } from "@/lib/livepeer/livepeer-ai-gating";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (
@@ -41,7 +43,9 @@ function ErrorFallback({ error }: { error: Error }) {
   );
 }
 
-export const Providers = (props: PropsWithChildren) => {
+export const Providers = (
+  props: PropsWithChildren & { livepeerAiFeatures: LivepeerAiClientFeatureFlags },
+) => {
   const [isReady, setIsReady] = useState(false);
   const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   const privyClientId = process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID;
@@ -95,6 +99,7 @@ export const Providers = (props: PropsWithChildren) => {
                           <RadixProvider>
                             <HeliaProvider>
                               <VideoProvider>
+                                <LivepeerAiFeatureProvider value={props.livepeerAiFeatures}>
                                 <MembershipProvider>
                                   <WalletReadyGuard>
                                     <AuthErrorMonitor />
@@ -106,6 +111,7 @@ export const Providers = (props: PropsWithChildren) => {
                                     </OrbSessionProvider>
                                   </WalletReadyGuard>
                                 </MembershipProvider>
+                                </LivepeerAiFeatureProvider>
                               </VideoProvider>
                             </HeliaProvider>
                           </RadixProvider>

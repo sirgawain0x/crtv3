@@ -7,6 +7,7 @@ import {
   ensureLivepeerStreamForCreator,
 } from "@/lib/livepeer/ensure-stream";
 import { serverLogger } from "@/lib/utils/logger";
+import { FrameWorksStreamsCreateUnavailableError } from "@/lib/video-provider";
 
 /**
  * Owner-only: return RTMP/WHIP stream key for the authenticated creator's channel.
@@ -78,6 +79,9 @@ export async function GET(req: NextRequest) {
       synced: ensured.synced,
     });
   } catch (error) {
+    if (error instanceof FrameWorksStreamsCreateUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
     if (error instanceof Error && error.message === "MISSING_API_KEY") {
       return NextResponse.json(
         { error: "Missing Livepeer API key", code: "MISSING_API_KEY" },

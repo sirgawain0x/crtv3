@@ -16,22 +16,25 @@ import {
   markStreamOfflineByStreamId,
 } from "@/services/streams";
 import { serverLogger } from "@/lib/utils/logger";
+import { resolveVideoProviderId } from "@/lib/video-provider/config";
+import { verifyFrameworksWebhookSignature } from "@/lib/video-provider/frameworks/webhooks";
+import {
+  handleFrameworksWebhookEvent,
+  type FrameworksWebhookEvent,
+} from "@/lib/video-provider/frameworks/handle-frameworks-webhook";
 
-export async function POST(request: NextRequest) {
-  const rawBody = await request.text();
-  const signature = request.headers.get("Livepeer-Signature");
-
-  if (!verifyLivepeerWebhookSignature(rawBody, signature)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+function headerRecord(request: NextRequest): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const key of ["webhook-id", "webhook-timestamp", "webhook-signature"]) {
+    out[key] = request.headers.get(key);
   }
+  return out;
+}
 
-  let payload: LivepeerWebhookPayload;
-  try {
-    payload = JSON.parse(rawBody);
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
+async function handleLivepeerWebhook(
+  rawBody: string,
+  payload: LivepeerWebhookPayload,
+): Promise<NextResponse> {
   const event = payload.event;
   const streamId = extractStreamIdFromWebhook(payload);
 
@@ -67,4 +70,58 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function handleFrameworksWebhook(
+  rawBody: string,
+  request: NextRequest,
+): Promise<NextResponse> {
+  if (!verifyFrameworksWebhookSignature(rawBody, headerRecord(request))) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  let event: FrameworksWebhookEvent;
+  try {
+    event = JSON.parse(rawBody) as FrameworksWebhookEvent;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  try {
+    const result = await handleFrameworksWebhookEvent(event);
+    if (result === "duplicate") {
+      return new NextResponse(null, { status: 204 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    serverLogger.error("FrameWorks webhook handler error", {
+      type: event.type,
+      eventId: event.id,
+      err,
+    });
+    return NextResponse.json({ error: "Handler failed" }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const rawBody = await request.text();
+  const providerId = resolveVideoProviderId();
+
+  if (providerId === "frameworks") {
+    return handleFrameworksWebhook(rawBody, request);
+  }
+
+  const signature = request.headers.get("Livepeer-Signature");
+  if (!verifyLivepeerWebhookSignature(rawBody, signature)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  let payload: LivepeerWebhookPayload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  return handleLivepeerWebhook(rawBody, payload);
 }

@@ -25,6 +25,7 @@ import { useAutoDeployContentCoin } from "@/lib/hooks/marketplace/useAutoDeployC
 import { useSmartAccountClient } from "@/lib/wallet/react";
 import { createSplitForVideo } from "@/services/splits";
 import { logger } from "@/lib/utils/logger";
+import { UploadCaptionsNotice } from "@/components/Videos/Upload/UploadCaptionsNotice";
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -161,6 +162,8 @@ const HookMultiStepForm = () => {
 
       {/* Step 2: Create Thumbnail (Formerly Step 3) */}
       {activeStep === 2 && livepeerAsset?.id && (
+        <>
+        <UploadCaptionsNotice />
         <CreateThumbnailWrapper
           livePeerAssetId={livepeerAsset.id}
           thumbnailUri={thumbnailUri}
@@ -485,6 +488,7 @@ const HookMultiStepForm = () => {
             // }
           }}
         />
+        </>
       )}
     </>
   );

@@ -2,6 +2,8 @@
 
 This document describes the Story Protocol integration for registering video IP assets and managing licensing on-chain.
 
+> **API & security (current):** Server-side signing on `POST /api/story/mint` and `POST /api/story/transfer` is **hard-disabled** (503). `GET /api/story/funding-wallet` is removed (404). Use the route inventory, env matrix, and upload pitfalls in **[docs/story-protocol-api.md](./docs/story-protocol-api.md)** before changing Story env vars or upload mint behavior.
+
 ## Overview
 
 The Story Protocol integration allows users to register their music videos as IP Assets on the Story Protocol blockchain, enabling on-chain IP management, licensing, and royalty distribution.

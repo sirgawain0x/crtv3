@@ -48,7 +48,7 @@ Remaining considerations: optional error monitoring (Sentry), subgraph optimizat
 ## ✅ Completed Fixes (January 2025)
 
 ### 1. Rate Limiting
-- **Strict (5/min)**: `swap/execute`, `story/mint`, `story/transfer`, `story/factory/deploy-collection`
+- **Strict (5/min)**: `swap/execute`, `story/prepare-mint`, `story/mint-derivative`, `story/factory/deploy-collection` (`story/mint` and `story/transfer` are disabled stubs but may still be rate-limited if re-enabled)
 - **Standard (10/min)**: AI, IPFS, creator-profiles, POAP, membership, unlock, metokens, video-assets sync-views, livepeer
 - **Generous (20/min)**: `poap-proxy` POST, `reality-eth-subgraph`, `metokens-subgraph`
 - **Token-gate**: Skipped (Livepeer webhook); relies on `accessKey` + timestamp validation

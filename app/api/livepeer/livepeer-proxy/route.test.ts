@@ -79,6 +79,37 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
     process.env.LIVEPEER_FULL_API_KEY = "test-full-key";
   });
 
+  it("rejects non-jwt playbackPolicy with 400", async () => {
+    const res = await POST(
+      streamRequest({
+        ...validBody,
+        playbackPolicy: { type: "public" },
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_REQUEST");
+    expect(mockEnsureLivepeerStreamForCreator).not.toHaveBeenCalled();
+  });
+
+  it("accepts jwt playbackPolicy", async () => {
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({
+      streamId: "stream-1",
+      playbackId: "playback-1",
+      streamKey: "secret-key",
+      reused: false,
+      replaced: false,
+    });
+
+    const res = await POST(streamRequest(validBody));
+    expect(res.status).toBe(200);
+    expect(mockEnsureLivepeerStreamForCreator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playbackPolicy: expect.objectContaining({ type: "jwt" }),
+      }),
+    );
+  });
+
   it("returns MISSING_API_KEY when full key is absent", async () => {
     delete process.env.LIVEPEER_FULL_API_KEY;
 

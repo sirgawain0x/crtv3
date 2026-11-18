@@ -8,6 +8,7 @@ import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet
 import { addressHasBrandPass } from '@/lib/channels/brand-channel-access';
 import { isValidBrandChannelSlug } from '@/lib/channels/brand-channels';
 import { validateAndNormalizeSocialPayload } from '@/lib/creator/validate-social-payload';
+import { CREATOR_PROFILE_PUBLIC_SELECT } from '@/lib/sdk/supabase/creator-profiles-select';
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest) {
       const result = await supabaseService
         .from('creator_profiles')
         .upsert(payload, { onConflict: 'owner_address' })
-        .select();
+        .select(CREATOR_PROFILE_PUBLIC_SELECT);
 
       data = result.data;
       error = result.error;
@@ -155,7 +156,7 @@ export async function POST(request: NextRequest) {
       const result = await supabase
         .from('creator_profiles')
         .upsert(payload, { onConflict: 'owner_address' })
-        .select();
+        .select(CREATOR_PROFILE_PUBLIC_SELECT);
 
       data = result.data;
       error = result.error;
