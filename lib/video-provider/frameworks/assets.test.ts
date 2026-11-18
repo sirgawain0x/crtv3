@@ -62,6 +62,7 @@ describe("frameworks assets (#406)", () => {
             nodes: [
               {
                 id: "chapter-1",
+                artifactHash: "chapter-hash",
                 playbackId: "pb-ch",
                 title: "Broadcast part",
                 kind: "CHAPTER",
@@ -76,7 +77,7 @@ describe("frameworks assets (#406)", () => {
     });
 
     const asset = await getVideoProvider().assets.get("chapter-hash");
-    expect(asset?.id).toBe("chapter-1");
+    expect(asset?.id).toBe("chapter-hash");
     expect(asset?.source?.type).toBe("recording");
     expect(asset?.videoSpec?.duration).toBe(95);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -130,6 +131,83 @@ describe("frameworks assets (#406)", () => {
       /sizeBytes/i,
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  const chapterArtifactNode = {
+    id: "chapter-node-id",
+    artifactHash: "0xchapterhash1111",
+    playbackId: "pb-ch-round",
+    title: "Chapter clip",
+    kind: "CHAPTER" as const,
+    status: "ready",
+    streamId: "stream-ch",
+    durationSeconds: 12,
+  };
+
+  const dvrArtifactNode = {
+    id: "dvr-node-id",
+    artifactHash: "0xdvrhash2222",
+    playbackId: "pb-dvr-round",
+    title: "DVR clip",
+    kind: "DVR" as const,
+    status: "ready",
+    streamId: "stream-dvr",
+    durationSeconds: 45,
+  };
+
+  async function expectStorageArtifactRoundTrip(node: typeof chapterArtifactNode) {
+    const hash = node.artifactHash;
+    const assetsApi = getVideoProvider().assets;
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          storageArtifactsConnection: { nodes: [node] },
+        },
+      }),
+    });
+    const listed = await assetsApi.listRecentRecordings(5);
+    expect(listed[0]?.id).toBe(hash);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          storageArtifactsConnection: { nodes: [node] },
+        },
+      }),
+    });
+    const got = await assetsApi.get(hash);
+    expect(got?.id).toBe(hash);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          deleteVodAsset: { __typename: "DeleteSuccess", success: true },
+        },
+      }),
+    });
+    await assetsApi.delete(hash);
+
+    const getCall = fetchMock.mock.calls.at(-2);
+    const deleteCall = fetchMock.mock.calls.at(-1);
+    const getBody = JSON.parse(String((getCall?.[1] as RequestInit).body));
+    const deleteBody = JSON.parse(String((deleteCall?.[1] as RequestInit).body));
+    expect(getBody.variables.input.artifactHash).toBe(hash);
+    expect(deleteBody.variables.id).toBe(hash);
+  }
+
+  it("CHAPTER storage artifact list → get → delete round-trip uses artifactHash", async () => {
+    await expectStorageArtifactRoundTrip(chapterArtifactNode);
+  });
+
+  it("DVR storage artifact list → get → delete round-trip uses artifactHash", async () => {
+    await expectStorageArtifactRoundTrip(dvrArtifactNode);
   });
 
   it("getAll returns { data: Asset[] } shape for fetchAllAssets", async () => {

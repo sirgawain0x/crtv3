@@ -50,6 +50,7 @@ type StorageArtifactsQuery = {
   storageArtifactsConnection: {
     nodes: Array<{
       id: string;
+      artifactHash?: string;
       playbackId?: string;
       title?: string;
       kind?: string;
@@ -148,6 +149,7 @@ const LIST_ARTIFACTS = `
       totalCount
       nodes {
         id
+        artifactHash
         playbackId
         title
         kind
@@ -291,13 +293,20 @@ function mapVodToSummary(node: VodAssetNode, kind = "vod"): AssetSummary {
   };
 }
 
+function storageArtifactCanonicalId(
+  node: StorageArtifactsQuery["storageArtifactsConnection"]["nodes"][number],
+): string {
+  const hash = node.artifactHash?.trim();
+  return hash && hash.length > 0 ? hash : node.id;
+}
+
 function mapArtifactToSummary(
   node: StorageArtifactsQuery["storageArtifactsConnection"]["nodes"][number],
 ): AssetSummary {
   const kind = (node.kind ?? "VOD").toLowerCase();
   const summary = mapVodToSummary(
     {
-      id: node.id,
+      id: storageArtifactCanonicalId(node),
       playbackId: node.playbackId,
       title: node.title,
       status: node.status,

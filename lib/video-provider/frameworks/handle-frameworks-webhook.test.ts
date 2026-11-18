@@ -90,30 +90,35 @@ describe("handleFrameworksWebhookEvent", () => {
     expect(retry).toBe("processed");
   });
 
-  it("resolves recording.ready via artifactId lookup", async () => {
+  it("resolves recording.ready via artifactHash lookup and persists hash as asset id", async () => {
+    const artifactHash = "0xrecordinghash9999";
+    const assetsGet = vi.fn().mockResolvedValue({
+      id: artifactHash,
+      playbackId: "pb-1",
+      status: { phase: "ready" },
+      source: { type: "recording", streamId: "stream-3" },
+    });
     vi.mocked(getVideoProvider).mockReturnValue({
       streams: { getSessions },
-      assets: {
-        get: vi.fn().mockResolvedValue({
-          id: "chapter-1",
-          playbackId: "pb-1",
-          status: { phase: "ready" },
-          source: { type: "recording", streamId: "stream-3" },
-        }),
-      },
+      assets: { get: assetsGet },
     } as never);
 
     await handleFrameworksWebhookEvent({
       id: "evt-rec",
       type: "recording.ready",
       data: {
-        artifact: { artifactId: "art-1", playbackId: "" },
+        artifact: {
+          artifactHash,
+          artifactId: "chapter-internal-id",
+          playbackId: "",
+        },
         streamId: "stream-3",
       },
     });
 
+    expect(assetsGet).toHaveBeenCalledWith(artifactHash);
     expect(persistRecordingAsset).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "chapter-1", playbackId: "pb-1" }),
+      expect.objectContaining({ id: artifactHash, playbackId: "pb-1" }),
       { streamId: "stream-3" },
     );
   });

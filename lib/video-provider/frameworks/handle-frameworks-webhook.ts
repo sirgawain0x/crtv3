@@ -30,8 +30,13 @@ function readString(data: Record<string, unknown>, key: string): string | undefi
 function extractArtifactId(data: Record<string, unknown>): string | undefined {
   const artifact = data.artifact;
   if (artifact && typeof artifact === "object") {
-    const artifactId = (artifact as { artifactId?: string }).artifactId;
-    if (typeof artifactId === "string" && artifactId.trim()) return artifactId.trim();
+    const record = artifact as { artifactHash?: string; artifactId?: string };
+    const artifactHash =
+      typeof record.artifactHash === "string" ? record.artifactHash.trim() : "";
+    if (artifactHash) return artifactHash;
+    const artifactId =
+      typeof record.artifactId === "string" ? record.artifactId.trim() : "";
+    if (artifactId) return artifactId;
   }
   return undefined;
 }
