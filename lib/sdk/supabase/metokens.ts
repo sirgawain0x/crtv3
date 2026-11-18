@@ -261,7 +261,8 @@ export class MeTokenSupabaseService {
 
   // Create a new MeToken
   async createMeToken(meTokenData: CreateMeTokenData): Promise<MeToken> {
-    const { data, error } = await supabase
+    const serviceClient = createServiceClient();
+    const { data, error } = await serviceClient
       .from('metokens')
       .insert({
         ...meTokenData,
@@ -280,7 +281,8 @@ export class MeTokenSupabaseService {
 
   // Update MeToken data
   async updateMeToken(address: string, updateData: UpdateMeTokenData): Promise<MeToken> {
-    const { data, error } = await supabase
+    const serviceClient = createServiceClient();
+    const { data, error } = await serviceClient
       .from('metokens')
       .update({
         ...updateData,
