@@ -1,5 +1,5 @@
 import type { VideoProvider } from "./interface";
-import type { AssetSummary, PlaybackInfoResult } from "./types";
+import type { AssetSummary } from "./types";
 import { VideoProviderNotImplementedError } from "./errors";
 import { isFrameworksConfigured, frameworksGraphqlUrl } from "./config";
 import { frameworksPlayback } from "./frameworks/playback";

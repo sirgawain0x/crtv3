@@ -2,7 +2,12 @@ import { createPrivateKey, generateKeyPairSync } from "crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { frameworksPlayHlsUrl } from "./constants";
 import { resetVideoProviderForTests, getVideoProvider } from "../index";
-import { pickHlsUrl, signFrameworksPlaybackToken } from "./playback";
+import {
+  buildAuthorizedViewerPlayHlsUrl,
+  pickHlsUrl,
+  signAuthorizedFrameworksPlaybackToken,
+  signFrameworksPlaybackToken,
+} from "./playback";
 
 describe("frameworks playback (#405)", () => {
   const fetchMock = vi.fn();
@@ -22,33 +27,58 @@ describe("frameworks playback (#405)", () => {
     fetchMock.mockReset();
   });
 
-  it("playback.get returns Foghorn /play HLS (viewer geo routing)", async () => {
-    const result = await getVideoProvider().playback.get("pb-1");
-    const sources = result.playbackInfo?.meta?.source ?? [];
-    expect(sources[0]?.type).toBe("application/x-mpegURL");
-    expect(sources[0]?.url).toBe(frameworksPlayHlsUrl("pb-1"));
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("playback.get attaches signed viewer JWT as jwt query param on /play URL", async () => {
+  it("playback.get returns unsigned Foghorn /play HLS (viewer geo routing)", async () => {
     const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
     const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
     vi.stubEnv("FRAMEWORKS_SIGNING_PRIVATE_KEY", pem);
     vi.stubEnv("FRAMEWORKS_SIGNING_KID", "kid-test");
 
-    const result = await getVideoProvider().playback.get("pb-jwt");
-    const url = result.playbackInfo?.meta?.source?.[0]?.url ?? "";
+    const result = await getVideoProvider().playback.get("pb-1");
+    const sources = result.playbackInfo?.meta?.source ?? [];
+    expect(sources[0]?.type).toBe("application/x-mpegURL");
+    expect(sources[0]?.url).toBe(frameworksPlayHlsUrl("pb-1"));
+    expect(new URL(String(sources[0]?.url)).searchParams.has("jwt")).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("signAuthorizedFrameworksPlaybackToken binds aud to playbackId with exp/iat", () => {
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+    vi.stubEnv("FRAMEWORKS_SIGNING_PRIVATE_KEY", pem);
+    vi.stubEnv("FRAMEWORKS_SIGNING_KID", "kid-test");
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const token = signAuthorizedFrameworksPlaybackToken({
+      playbackId: "pb-scoped",
+      subject: "viewer-1",
+      expiresInSeconds: 120,
+    });
+    expect(token).toBeTruthy();
+    const decoded = JSON.parse(
+      Buffer.from(String(token).split(".")[1] ?? "", "base64url").toString("utf8"),
+    ) as { sub?: string; aud?: string; iat?: number; exp?: number };
+    expect(decoded.sub).toBe("viewer-1");
+    expect(decoded.aud).toBe("pb-scoped");
+    expect(decoded.iat).toBeGreaterThanOrEqual(nowSec - 5);
+    expect(decoded.exp).toBeGreaterThan(decoded.iat ?? 0);
+    expect((decoded.exp ?? 0) - (decoded.iat ?? 0)).toBe(120);
+  });
+
+  it("buildAuthorizedViewerPlayHlsUrl attaches scoped jwt query param on /play URL", () => {
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+    vi.stubEnv("FRAMEWORKS_SIGNING_PRIVATE_KEY", pem);
+    vi.stubEnv("FRAMEWORKS_SIGNING_KID", "kid-test");
+
+    const url = buildAuthorizedViewerPlayHlsUrl({ playbackId: "pb-jwt" });
     expect(url).toMatch(
       /^https:\/\/foghorn\.frameworks\.network\/play\/pb-jwt\/hls\/index\.m3u8\?jwt=/,
     );
     const jwtParam = new URL(url).searchParams.get("jwt");
-    expect(jwtParam).toBeTruthy();
-    const header = JSON.parse(
-      Buffer.from(String(jwtParam).split(".")[0] ?? "", "base64url").toString("utf8"),
-    ) as { kid?: string; alg?: string };
-    expect(header.kid).toBe("kid-test");
-    expect(header.alg).toBe("ES256");
-    expect(fetchMock).not.toHaveBeenCalled();
+    const decoded = JSON.parse(
+      Buffer.from(String(jwtParam).split(".")[1] ?? "", "base64url").toString("utf8"),
+    ) as { aud?: string };
+    expect(decoded.aud).toBe("pb-jwt");
   });
 
   it.each([
@@ -62,9 +92,8 @@ describe("frameworks playback (#405)", () => {
       },
     });
     expect(resolved).toBeUndefined();
-    expect(resolved ?? frameworksPlayHlsUrl("pb-whep")).toBe(
-      frameworksPlayHlsUrl("pb-whep"),
-    );
+    const foghornFallback = frameworksPlayHlsUrl("pb-whep");
+    expect(foghornFallback).toContain("/play/pb-whep/hls/index.m3u8");
   });
 
   it("pickHlsUrl ignores non-m3u8 primary.url without HLS protocol", () => {
@@ -77,7 +106,7 @@ describe("frameworks playback (#405)", () => {
       },
     });
     expect(resolved).toBeUndefined();
-    expect(resolved ?? frameworksPlayHlsUrl("pb-2")).toBe(frameworksPlayHlsUrl("pb-2"));
+    expect(frameworksPlayHlsUrl("pb-2")).toMatch(/\/play\/pb-2\/hls\/index\.m3u8$/);
   });
 
   it("pickHlsUrl accepts outputs.HLS and m3u8 primary", () => {
@@ -132,9 +161,21 @@ describe("frameworks playback (#405)", () => {
     createPrivateKey(pem);
   });
 
-  it("returns null token when signing env is missing", () => {
+  it("normalizes escaped PEM newlines before signing", () => {
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+    vi.stubEnv("FRAMEWORKS_SIGNING_PRIVATE_KEY", pem.replace(/\n/g, "\\n"));
+    vi.stubEnv("FRAMEWORKS_SIGNING_KID", "kid-test");
+
+    expect(signFrameworksPlaybackToken({ audience: "pb-env" })).toBeTruthy();
+  });
+
+  it("returns null token when signing env is missing and warns", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     delete process.env.FRAMEWORKS_SIGNING_PRIVATE_KEY;
     delete process.env.FRAMEWORKS_SIGNING_KID;
     expect(signFrameworksPlaybackToken()).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

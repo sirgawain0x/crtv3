@@ -1,3 +1,4 @@
+import "server-only";
 import jwt from "jsonwebtoken";
 import type { PlaybackInfoResult } from "../types";
 import { frameworksPlayHlsUrl } from "./constants";
@@ -97,13 +98,29 @@ export type FrameworksPlaybackTokenOptions = {
   claims?: Record<string, unknown>;
 };
 
+function resolveSigningMaterial(): { privateKey: string; kid: string } | null {
+  const privateKeyEnv = process.env.FRAMEWORKS_SIGNING_PRIVATE_KEY?.trim();
+  const kid = process.env.FRAMEWORKS_SIGNING_KID?.trim();
+  if (!privateKeyEnv) {
+    console.warn("[frameworks] playback JWT signing disabled: FRAMEWORKS_SIGNING_PRIVATE_KEY is unset");
+    return null;
+  }
+  if (!kid) {
+    console.warn("[frameworks] playback JWT signing disabled: FRAMEWORKS_SIGNING_KID is unset");
+    return null;
+  }
+  return {
+    privateKey: privateKeyEnv.replace(/\\n/g, "\n"),
+    kid,
+  };
+}
+
 /** ES256 viewer JWT for gated playback (env: FRAMEWORKS_SIGNING_*). */
 export function signFrameworksPlaybackToken(
   options: FrameworksPlaybackTokenOptions = {},
 ): string | null {
-  const privateKey = process.env.FRAMEWORKS_SIGNING_PRIVATE_KEY?.trim();
-  const kid = process.env.FRAMEWORKS_SIGNING_KID?.trim();
-  if (!privateKey || !kid) return null;
+  const material = resolveSigningMaterial();
+  if (!material) return null;
 
   const expiresIn = options.expiresInSeconds ?? 300;
   const payload: jwt.JwtPayload = {
@@ -114,17 +131,55 @@ export function signFrameworksPlaybackToken(
     payload.aud = options.audience;
   }
 
-  return jwt.sign(payload, privateKey, {
-    algorithm: "ES256",
-    keyid: kid,
-    expiresIn,
+  try {
+    return jwt.sign(payload, material.privateKey, {
+      algorithm: "ES256",
+      keyid: material.kid,
+      expiresIn,
+    });
+  } catch (err) {
+    console.error("[frameworks] playback JWT signing failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+export type AuthorizedFrameworksPlaybackTokenInput = {
+  /** Playback ID the caller has already authorized for this viewer session. */
+  playbackId: string;
+  subject?: string;
+  expiresInSeconds?: number;
+};
+
+/**
+ * Mint a viewer JWT scoped to a single playback ID (`aud` = playbackId).
+ * Call only from code paths that have already verified the viewer may access this content.
+ */
+export function signAuthorizedFrameworksPlaybackToken(
+  input: AuthorizedFrameworksPlaybackTokenInput,
+): string | null {
+  const playbackId = input.playbackId.trim();
+  if (!playbackId) return null;
+  return signFrameworksPlaybackToken({
+    subject: input.subject,
+    audience: playbackId,
+    expiresInSeconds: input.expiresInSeconds,
   });
+}
+
+/** Foghorn /play HLS URL with an authorized viewer JWT when signing is configured. */
+export function buildAuthorizedViewerPlayHlsUrl(
+  input: AuthorizedFrameworksPlaybackTokenInput,
+): string {
+  const playbackId = input.playbackId.trim();
+  const token = signAuthorizedFrameworksPlaybackToken(input);
+  return viewerPlayHlsUrl(playbackId, token);
 }
 
 export const frameworksPlayback = {
   get: async (playbackId: string): Promise<PlaybackInfoResult> => {
-    const token = signFrameworksPlaybackToken({ expiresInSeconds: 300 });
-    const url = viewerPlayHlsUrl(playbackId, token);
+    const url = viewerPlayHlsUrl(playbackId, null);
     return toPlaybackInfo(playbackId, url);
   },
 };

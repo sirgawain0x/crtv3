@@ -171,6 +171,11 @@ describe("frameworks streams (#404)", () => {
       playbackId: "p1",
       streamKey: "secret-key",
     });
+    const policyBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as {
+      variables: { input: { policy: { jwt?: { allowedKids?: string[]; requiredAudience?: string[] } } } };
+    };
+    expect(policyBody.variables.input.policy.jwt?.allowedKids).toEqual(["kid-abc"]);
+    expect(policyBody.variables.input.policy.jwt?.requiredAudience).toEqual(["p1"]);
   });
 
   it("create throws on AuthError from createStream", async () => {
