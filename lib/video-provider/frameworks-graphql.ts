@@ -12,7 +12,6 @@ type GraphqlResponse<T> = {
 export async function frameworksGraphqlRequest<T>(
   query: string,
   variables?: Record<string, unknown>,
-  extraHeaders?: Record<string, string>,
 ): Promise<T> {
   const token = frameworksApiToken();
   if (!token) {
@@ -24,7 +23,6 @@ export async function frameworksGraphqlRequest<T>(
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
-      ...(extraHeaders ?? {}),
     },
     body: JSON.stringify({ query, variables }),
   });
