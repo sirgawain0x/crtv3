@@ -15,6 +15,19 @@ async function fsyncDirectoryBestEffort(dirPath: string): Promise<void> {
   }
 }
 
+async function writeEntireBuffer(handle: FileHandle, payload: Buffer): Promise<void> {
+  let offset = 0;
+  while (offset < payload.length) {
+    const { bytesWritten } = await handle.write(payload, offset);
+    if (bytesWritten <= 0) {
+      throw new Error(
+        `Incomplete atomic write at offset ${offset}/${payload.length}: write returned ${bytesWritten}`,
+      );
+    }
+    offset += bytesWritten;
+  }
+}
+
 /**
  * Atomically replace a file: write temp in the same directory, fsync, close, rename.
  * On failure, remove the temp file and leave the previous target unchanged.
@@ -30,7 +43,7 @@ export async function writeFileAtomically(targetPath: string, data: string | Buf
   try {
     handle = await open(tempPath, "w", 0o644);
     const payload = typeof data === "string" ? Buffer.from(data, "utf8") : data;
-    await handle.write(payload);
+    await writeEntireBuffer(handle, payload);
     await handle.sync();
     await handle.close();
     handle = undefined;

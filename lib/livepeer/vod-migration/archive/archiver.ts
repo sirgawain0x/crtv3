@@ -96,41 +96,41 @@ export async function archiveStudioAssets(params: {
   const results: ArchiveAssetResult[] = [];
 
   for (const asset of params.assets) {
-    const prior = manifest.entries[asset.assetId];
-    if (prior) {
-      const check = await verifyExistingFile(
-        params.storage,
-        prior.relativePath,
-        prior.sha256,
-      );
-      if (check === "ok") {
-        if (prior.failed) {
-          manifest.entries[asset.assetId] = clearManifestEntryFailed(prior);
-          await params.storage.writeManifest(touchManifest(manifest));
-        }
-        results.push({ assetId: asset.assetId, status: "skipped", bytes: prior.sizeBytes });
-        continue;
-      }
-      if (typeof check === "object" && "mismatch" in check) {
-        await recordMismatchAndQuarantine({
-          storage: params.storage,
-          manifest,
-          prior,
-          relativePath: prior.relativePath,
-          observedSha256: check.mismatch.actual,
-          observedSizeBytes: check.mismatch.sizeBytes,
-        });
-        results.push({
-          assetId: asset.assetId,
-          status: "checksum_mismatch",
-          expected: prior.sha256,
-          actual: check.mismatch.actual,
-        });
-        continue;
-      }
-    }
-
     try {
+      const prior = manifest.entries[asset.assetId];
+      if (prior) {
+        const check = await verifyExistingFile(
+          params.storage,
+          prior.relativePath,
+          prior.sha256,
+        );
+        if (check === "ok") {
+          if (prior.failed) {
+            manifest.entries[asset.assetId] = clearManifestEntryFailed(prior);
+            await params.storage.writeManifest(touchManifest(manifest));
+          }
+          results.push({ assetId: asset.assetId, status: "skipped", bytes: prior.sizeBytes });
+          continue;
+        }
+        if (typeof check === "object" && "mismatch" in check) {
+          await recordMismatchAndQuarantine({
+            storage: params.storage,
+            manifest,
+            prior,
+            relativePath: prior.relativePath,
+            observedSha256: check.mismatch.actual,
+            observedSizeBytes: check.mismatch.sizeBytes,
+          });
+          results.push({
+            assetId: asset.assetId,
+            status: "checksum_mismatch",
+            expected: prior.sha256,
+            actual: check.mismatch.actual,
+          });
+          continue;
+        }
+      }
+
       const { stream, suggestedFilename } = await params.download(asset.assetId);
       const relativePath = relativePathForAsset(
         asset.assetId,
@@ -145,12 +145,13 @@ export async function archiveStudioAssets(params: {
         iterable,
       );
 
-      const expectedSha256 = prior?.sha256;
-      if (prior && expectedSha256 && expectedSha256 !== sha256) {
+      const priorForDownload = manifest.entries[asset.assetId];
+      const expectedSha256 = priorForDownload?.sha256;
+      if (priorForDownload && expectedSha256 && expectedSha256 !== sha256) {
         await recordMismatchAndQuarantine({
           storage: params.storage,
           manifest,
-          prior: { ...prior, relativePath },
+          prior: { ...priorForDownload, relativePath },
           relativePath,
           observedSha256: sha256,
           observedSizeBytes: sizeBytes,

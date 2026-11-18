@@ -227,6 +227,76 @@ describe("archiveStudioAssets", () => {
     expect(storage.files.has("assets/a1/clip.mp4")).toBe(true);
   });
 
+  it("records verify I/O errors per asset and continues the archive run", async () => {
+    const storage = memoryStorage();
+    const threeAssets: StudioAssetRecord[] = ["a1", "a2", "a3"].map((assetId) => ({
+      assetId,
+      playbackId: null,
+      name: assetId,
+      statusPhase: "ready",
+      sizeBytes: 4,
+      durationSeconds: 1,
+      hasDownloadUrl: true,
+      hasSourceUrl: false,
+    }));
+
+    function seedEntry(assetId: string) {
+      const data = Buffer.from(`bytes-${assetId}`);
+      const relativePath = `assets/${assetId}/${assetId}.mp4`;
+      storage.files.set(relativePath, data);
+      return {
+        assetId,
+        relativePath,
+        sha256: sha256Buffer(data),
+        sizeBytes: data.length,
+        completedAt: new Date().toISOString(),
+      };
+    }
+
+    const e1 = seedEntry("a1");
+    const e2 = seedEntry("a2");
+    storage.manifest = {
+      version: 1,
+      destinationRoot: storage.root,
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      entries: { a1: e1, a2: e2 },
+    };
+
+    const sha256FileBase = storage.sha256File.bind(storage);
+    storage.sha256File = async (rel) => {
+      if (rel === e2.relativePath) {
+        throw new Error("sha256 I/O failed");
+      }
+      return sha256FileBase(rel);
+    };
+
+    const download = vi.fn(async (assetId: string) => {
+      async function* gen() {
+        yield new TextEncoder().encode(`new-${assetId}`);
+      }
+      return { stream: gen(), suggestedFilename: `${assetId}.mp4` };
+    });
+
+    const { results } = await archiveStudioAssets({
+      assets: threeAssets,
+      storage,
+      download,
+    });
+
+    expect(results).toHaveLength(3);
+    expect(results[0]?.status).toBe("skipped");
+    expect(results[1]).toMatchObject({
+      assetId: "a2",
+      status: "error",
+      message: "sha256 I/O failed",
+    });
+    expect(results[2]?.status).toBe("archived");
+    expect(download).toHaveBeenCalledTimes(1);
+    expect(download).toHaveBeenCalledWith("a3");
+    expect(archiveHasBlockingFailures(results)).toBe(true);
+  });
+
   it("removes .part temp file when stream pipeline fails", async () => {
     const dir = `/tmp/lp-archive-test-${process.pid}-${Date.now()}`;
     const storage = new LocalFilesystemArchiveStorage(dir);

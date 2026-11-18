@@ -5,11 +5,40 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ArchiveManifest } from "../types";
 
 const renameFailure = vi.hoisted(() => ({ enabled: false }));
+const tempWriteMock = vi.hoisted(() => ({
+  mode: "none" as "none" | "partial" | "zero",
+}));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
+    open: async (...args: Parameters<typeof actual.open>) => {
+      const handle = await actual.open(...args);
+      const target = String(args[0]);
+      if (tempWriteMock.mode !== "none" && target.includes(".tmp-")) {
+        const realWrite = handle.write.bind(handle);
+        handle.write = async (
+          buffer: NodeJS.ArrayBufferView,
+          offset?: number,
+          length?: number,
+          position?: number | null,
+        ) => {
+          if (tempWriteMock.mode === "zero") {
+            return { bytesWritten: 0 };
+          }
+          if (tempWriteMock.mode === "partial") {
+            const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+            const start = offset ?? 0;
+            const remaining = buf.length - start;
+            const writeLen = Math.min(3, remaining);
+            return realWrite(buf, start, writeLen, position ?? null);
+          }
+          return realWrite(buffer, offset, length, position);
+        };
+      }
+      return handle;
+    },
     rename: async (...args: Parameters<typeof actual.rename>) => {
       if (renameFailure.enabled) {
         throw new Error("simulated rename failure");
@@ -30,6 +59,7 @@ import { MANIFEST_FILE } from "./manifest";
 describe("writeFileAtomically", () => {
   afterEach(() => {
     renameFailure.enabled = false;
+    tempWriteMock.mode = "none";
     vi.clearAllMocks();
   });
 
@@ -45,6 +75,26 @@ describe("writeFileAtomically", () => {
     expect(onDisk).toBe(next);
     const files = await listFilesInDirectory(workDir);
     expect(files.some((n) => n.includes(".tmp-"))).toBe(false);
+  });
+
+  it("writes all bytes via partial writes and rejects zero-length write attempts", async () => {
+    const workDir = await mkdtemp(path.join(tmpdir(), "lp-atomic-"));
+    const target = path.join(workDir, MANIFEST_FILE);
+    const payload = '{"version":1,"entries":{"done":true}}\n';
+    await seedFileForTests(target, '{"version":1}\n');
+
+    tempWriteMock.mode = "partial";
+    await writeFileAtomically(target, payload);
+    await expect(readFile(target, "utf8")).resolves.toBe(payload);
+    expect((await listFilesInDirectory(workDir)).some((n) => n.includes(".tmp-"))).toBe(false);
+
+    const original = await readFile(target, "utf8");
+    tempWriteMock.mode = "zero";
+    await expect(writeFileAtomically(target, '{"never":true}\n')).rejects.toThrow(
+      /Incomplete atomic write/,
+    );
+    await expect(readFile(target, "utf8")).resolves.toBe(original);
+    expect((await listFilesInDirectory(workDir)).some((n) => n.includes(".tmp-"))).toBe(false);
   });
 
   it("leaves existing manifest unchanged when commit fails after temp write", async () => {
