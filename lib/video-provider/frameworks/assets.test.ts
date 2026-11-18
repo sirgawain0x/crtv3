@@ -294,8 +294,7 @@ describe("frameworks assets (#406)", () => {
     }
   });
 
-  it("abortUpload calls abortVodUpload and swallows union errors", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  it("abortUpload throws FrameworksGraphqlUnionError on non-DeleteSuccess", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -310,9 +309,17 @@ describe("frameworks assets (#406)", () => {
     });
 
     const assets = getVideoProvider().assets as { abortUpload?: (id: string) => Promise<void> };
-    await expect(assets.abortUpload?.("up-abort")).resolves.toBeUndefined();
-    expect(consoleSpy).toHaveBeenCalled();
-    consoleSpy.mockRestore();
+    await expect(assets.abortUpload?.("up-abort")).rejects.toMatchObject({
+      name: "FrameworksGraphqlUnionError",
+      graphqlTypename: "NotFoundError",
+    });
+  });
+
+  it("abortUpload propagates transport errors", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("network down"));
+
+    const assets = getVideoProvider().assets as { abortUpload?: (id: string) => Promise<void> };
+    await expect(assets.abortUpload?.("up-net")).rejects.toThrow(/network down/i);
   });
 
   it("createViaUrl uses importVodAsset", async () => {

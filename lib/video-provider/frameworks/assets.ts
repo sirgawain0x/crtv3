@@ -464,24 +464,11 @@ export const frameworksAssets = {
   abortUpload: async (uploadId: string): Promise<void> => {
     const trimmed = uploadId.trim();
     if (!trimmed) return;
-    try {
-      const data = await frameworksGraphqlRequest<AbortVodUploadMutation>(ABORT_VOD_UPLOAD, {
-        uploadId: trimmed,
-      });
-      const result = data.abortVodUpload;
-      if (result.__typename !== "DeleteSuccess") {
-        console.error("[frameworks] abortVodUpload failed", {
-          uploadId: trimmed,
-          typename: result.__typename,
-          message: result.message,
-        });
-      }
-    } catch (err) {
-      console.error("[frameworks] abortVodUpload error", {
-        uploadId: trimmed,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const data = await frameworksGraphqlRequest<AbortVodUploadMutation>(ABORT_VOD_UPLOAD, {
+      uploadId: trimmed,
+    });
+    const result = data.abortVodUpload;
+    assertGraphqlUnionSuccess(result, "DeleteSuccess", "abortVodUpload");
   },
 
   update: async (): Promise<unknown> => {
