@@ -11,16 +11,67 @@ import {
 } from "@/lib/video-provider";
 import { WebhookContext } from "./token-gate/route";
 import { serverLogger } from "@/lib/utils/logger";
+import {
+  type WalletAuthArgs,
+  WalletAuthError,
+} from "@/lib/auth/require-wallet";
+import {
+  maybeMintUploadSessionTicket,
+  requireUploadCreatorWallet,
+  requireUploadSessionAbort,
+  requireUploadSessionOwner,
+} from "@/lib/video-provider/upload-session-auth";
+
+export type LivepeerUploadSession = {
+  asset?: Asset;
+  tusEndpoint?: string;
+  uploadId?: string;
+  partSize?: number;
+  uploadTicket?: string;
+  presignedParts?: Array<{ partNumber?: number; url?: string }>;
+};
+
+export type UploadActionError = {
+  status: number;
+  message: string;
+};
+
+function toUploadActionError(err: unknown): never {
+  if (err instanceof WalletAuthError) {
+    throw Object.assign(new Error(err.message), {
+      name: "WalletAuthError",
+      status: err.status,
+    });
+  }
+  throw err;
+}
 
 export const getLivepeerUploadUrl = async (
+  auth: WalletAuthArgs,
   fileName: string,
-  creatorAddress: string,
+  _creatorAddress: string,
+  sizeBytes: number,
   tokenId?: string,
   contractAddress?: string,
-  tokenGated: boolean = false
-): Promise<{ asset?: Asset; tusEndpoint?: string } | undefined> => {
+  tokenGated: boolean = false,
+  fileMeta?: { filename?: string; contentType?: string },
+): Promise<LivepeerUploadSession | undefined> => {
+  let creatorAddress: string;
+  try {
+    creatorAddress = await requireUploadCreatorWallet(auth);
+  } catch (err) {
+    toUploadActionError(err);
+  }
+
+  if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    throw new Error("sizeBytes is required and must be a positive number");
+  }
+
   const createAssetBody: {
     name: string;
+    sizeBytes: number;
+    filename?: string;
+    contentType?: string;
     storage: {
       ipfs: boolean;
     };
@@ -36,6 +87,9 @@ export const getLivepeerUploadUrl = async (
     };
   } = {
     name: fileName,
+    sizeBytes,
+    filename: fileMeta?.filename ?? fileName,
+    contentType: fileMeta?.contentType,
     storage: {
       ipfs: true,
     },
@@ -43,18 +97,14 @@ export const getLivepeerUploadUrl = async (
       type: InputCreatorIdType?.Unverified,
       value: creatorAddress,
     },
-    staticMp4: true, // Enable MP4 generation for downloadUrl and better compatibility
+    staticMp4: true,
   };
 
   if (tokenGated) {
-    if (!creatorAddress)
-      throw new Error("Creator address is required for token gated assets");
-    if (!tokenId)
-      throw new Error("Token ID is required for token gated assets");
-    if (!contractAddress)
-      throw new Error(
-        "Token contract address is required for token gated assets"
-      );
+    if (!tokenId) throw new Error("Token ID is required for token gated assets");
+    if (!contractAddress) {
+      throw new Error("Token contract address is required for token gated assets");
+    }
 
     createAssetBody.playbackPolicy = {
       type: Type.Webhook,
@@ -67,13 +117,75 @@ export const getLivepeerUploadUrl = async (
     };
   }
 
-  const result = (await requireVideoProviderForUploadsAndAssets(
-    "assetUploadActions.getLivepeerUploadUrl",
-  ).assets.create(createAssetBody)) as {
-    data?: unknown;
+  try {
+    const result = (await requireVideoProviderForUploadsAndAssets(
+      "assetUploadActions.getLivepeerUploadUrl",
+    ).assets.create(createAssetBody)) as {
+      data?: LivepeerUploadSession;
+    };
+
+    const session = result.data as LivepeerUploadSession | undefined;
+    if (!session) return session;
+
+    const uploadId = session.uploadId?.trim();
+    const uploadTicket = uploadId
+      ? maybeMintUploadSessionTicket(uploadId, creatorAddress)
+      : undefined;
+
+    return {
+      ...session,
+      uploadTicket,
+    };
+  } catch (err) {
+    toUploadActionError(err);
+  }
+};
+
+export const abortFrameworksVodUpload = async (
+  auth: WalletAuthArgs | undefined,
+  uploadId: string,
+  uploadTicket: string,
+): Promise<void> => {
+  try {
+    await requireUploadSessionAbort(auth, uploadId, uploadTicket);
+  } catch (err) {
+    toUploadActionError(err);
+  }
+
+  const assets = requireVideoProviderForUploadsAndAssets(
+    "assetUploadActions.abortFrameworksVodUpload",
+  ).assets as {
+    abortUpload?: (id: string) => Promise<void>;
+  };
+  if (typeof assets.abortUpload !== "function") {
+    return;
+  }
+  await assets.abortUpload(uploadId);
+};
+
+export const completeFrameworksVodUpload = async (
+  auth: WalletAuthArgs,
+  uploadId: string,
+  parts: Array<{ partNumber: number; etag: string }>,
+  uploadTicket: string,
+) => {
+  try {
+    await requireUploadSessionOwner(auth, uploadId, uploadTicket);
+  } catch (err) {
+    toUploadActionError(err);
+  }
+
+  const assets = requireVideoProviderForUploadsAndAssets(
+    "assetUploadActions.completeFrameworksVodUpload",
+  ).assets as {
+    completeUpload?: (body: unknown) => Promise<unknown>;
   };
 
-  return result.data as { asset?: Asset; tusEndpoint?: string } | undefined;
+  if (typeof assets.completeUpload !== "function") {
+    throw new Error("completeUpload is only available with FrameWorks");
+  }
+
+  return assets.completeUpload({ uploadId, parts });
 };
 
 export const getLivepeerAsset = async (
@@ -81,7 +193,7 @@ export const getLivepeerAsset = async (
 ): Promise<Asset> => {
   try {
     if (!livePeerAssetId) {
-      throw new Error('Asset ID is required');
+      throw new Error("Asset ID is required");
     }
 
     const result = (await requireVideoProviderForUploadsAndAssets(
@@ -91,20 +203,20 @@ export const getLivepeerAsset = async (
     } | null;
 
     if (!result?.asset) {
-      serverLogger.error('No asset found in result:', result);
-      throw new Error('Asset not found or invalid response from Livepeer');
+      serverLogger.error("No asset found in result:", result);
+      throw new Error("Asset not found or invalid response from Livepeer");
     }
 
     return result.asset as Asset;
   } catch (error: unknown) {
     if (error instanceof FrameWorksUploadsAssetsUnavailableError) throw error;
     const err = error as { message?: string; statusCode?: number };
-    serverLogger.error('Error fetching Livepeer asset:', {
+    serverLogger.error("Error fetching Livepeer asset:", {
       assetId: livePeerAssetId,
       error: err?.message,
       statusCode: err?.statusCode,
     });
-    throw new Error(err?.message || 'Failed to fetch video asset');
+    throw new Error(err?.message || "Failed to fetch video asset");
   }
 };
 
