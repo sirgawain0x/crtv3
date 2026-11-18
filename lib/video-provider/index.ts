@@ -22,10 +22,12 @@ export type {
   StreamSummary,
 } from "./types";
 export {
+  FrameworksGraphqlUnionError,
   FrameworksPlaybackSigningError,
   VideoProviderNotConfiguredError,
   VideoProviderNotImplementedError,
 } from "./errors";
+export { verifyFrameworksWebhookSignature } from "./frameworks/webhooks";
 export {
   resolveVideoProviderId,
   frameworksGraphqlUrl,
