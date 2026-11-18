@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const MIGRATIONS_DIR = path.join(__dirname);
+const ROLLBACKS_DIR = path.join(MIGRATIONS_DIR, "../rollbacks");
 
 function findMigrationByGlob(pattern: RegExp): string {
   const matches = readdirSync(MIGRATIONS_DIR)
@@ -42,6 +43,26 @@ describe("security hardening migration", () => {
     );
     expect(migrationSql).toMatch(
       /REVOKE INSERT, UPDATE, DELETE ON TABLE public\.streams FROM authenticated;/,
+    );
+  });
+
+  it("rollback file restores #3 metoken policies and DML grants (not commented)", () => {
+    const rollbackFiles = readdirSync(ROLLBACKS_DIR)
+      .filter((name) => /^\d+_security_hardening_rollback\.sql$/.test(name))
+      .sort();
+    expect(rollbackFiles.length).toBe(1);
+    const rollbackSql = readFileSync(
+      path.join(ROLLBACKS_DIR, rollbackFiles[0]),
+      "utf8",
+    );
+    expect(rollbackSql).toMatch(
+      /^\s*GRANT INSERT, UPDATE, DELETE ON TABLE public\.metokens, public\.metoken_balances, public\.metoken_transactions TO authenticated;/m,
+    );
+    expect(rollbackSql).toMatch(
+      /^\s*CREATE POLICY "Users can insert their own metokens" ON public\.metokens AS PERMISSIVE FOR INSERT TO authenticated/m,
+    );
+    expect(rollbackSql).not.toMatch(
+      /^\s*--\s*CREATE POLICY "Users can insert their own balances"/m,
     );
   });
 

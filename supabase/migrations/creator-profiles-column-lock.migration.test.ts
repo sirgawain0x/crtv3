@@ -137,8 +137,10 @@ describe("creator_profiles column lock migration", () => {
   const grantColumns = parseGrantSelectColumns(migrationSql);
   const grantSet = new Set(grantColumns);
 
-  it("warns not to apply before PR #447 is in production", () => {
-    expect(migrationSql).toMatch(/DO NOT APPLY until PR #447 is merged and deployed to production/i);
+  it("documents apply-after-#447 gate in the header", () => {
+    expect(migrationSql).toMatch(
+      /-- Apply after #447 is merged; verified no runtime anon\/authenticated select\('\*'\) on creator_profiles in prod \(code \+ 24h logs\)/,
+    );
   });
 
   it("excludes twin_pinata secret columns from GRANT SELECT", () => {

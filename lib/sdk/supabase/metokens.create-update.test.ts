@@ -1,33 +1,45 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
-const mockSelect = vi.fn();
-const mockSingle = vi.fn();
-const mockEq = vi.fn();
+const mocks = vi.hoisted(() => {
+  const mockInsert = vi.fn();
+  const mockUpdate = vi.fn();
+  const mockSelect = vi.fn();
+  const mockSingle = vi.fn();
+  const mockEq = vi.fn();
 
-const chain = {
-  insert: mockInsert,
-  update: mockUpdate,
-  select: mockSelect,
-  eq: mockEq,
-  single: mockSingle,
-};
+  const chain = {
+    insert: mockInsert,
+    update: mockUpdate,
+    select: mockSelect,
+    eq: mockEq,
+    single: mockSingle,
+  };
 
-mockInsert.mockReturnValue(chain);
-mockUpdate.mockReturnValue(chain);
-mockSelect.mockReturnValue(chain);
-mockEq.mockReturnValue(chain);
+  mockInsert.mockReturnValue(chain);
+  mockUpdate.mockReturnValue(chain);
+  mockSelect.mockReturnValue(chain);
+  mockEq.mockReturnValue(chain);
 
-const mockServiceClient = { from: vi.fn(() => chain) };
-const mockCreateServiceClient = vi.fn(() => mockServiceClient);
+  const mockAnonClient = { from: vi.fn(() => chain) };
 
-vi.mock("./service", () => ({
-  createServiceClient: (...args: unknown[]) => mockCreateServiceClient(...args),
-}));
+  return {
+    mockInsert,
+    mockUpdate,
+    mockSelect,
+    mockSingle,
+    mockEq,
+    mockAnonClient,
+  };
+});
 
 vi.mock("./client", () => ({
-  supabase: { from: vi.fn() },
+  supabase: mocks.mockAnonClient,
+}));
+
+vi.mock("./service", () => ({
+  createServiceClient: vi.fn(() => {
+    throw new Error("createServiceClient should not be used by create/updateMeToken");
+  }),
 }));
 
 vi.mock("@/lib/utils/logger", () => ({
@@ -39,13 +51,13 @@ import { MeTokenSupabaseService } from "./metokens";
 describe("MeTokenSupabaseService create/update", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSingle.mockResolvedValue({
+    mocks.mockSingle.mockResolvedValue({
       data: { id: "1", address: "0xabc", owner_address: "0xdef" },
       error: null,
     });
   });
 
-  it("createMeToken uses createServiceClient, not the browser client", async () => {
+  it("createMeToken uses the shared anon supabase client", async () => {
     const service = new MeTokenSupabaseService();
     await service.createMeToken({
       address: "0xAbC",
@@ -54,9 +66,8 @@ describe("MeTokenSupabaseService create/update", () => {
       symbol: "TST",
     });
 
-    expect(mockCreateServiceClient).toHaveBeenCalled();
-    expect(mockServiceClient.from).toHaveBeenCalledWith("metokens");
-    expect(mockInsert).toHaveBeenCalledWith(
+    expect(mocks.mockAnonClient.from).toHaveBeenCalledWith("metokens");
+    expect(mocks.mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         address: "0xabc",
         owner_address: "0xdef",
@@ -64,14 +75,13 @@ describe("MeTokenSupabaseService create/update", () => {
     );
   });
 
-  it("updateMeToken uses createServiceClient", async () => {
+  it("updateMeToken uses the shared anon supabase client", async () => {
     const service = new MeTokenSupabaseService();
     await service.updateMeToken("0xAbC", { name: "Renamed" });
 
-    expect(mockCreateServiceClient).toHaveBeenCalled();
-    expect(mockServiceClient.from).toHaveBeenCalledWith("metokens");
-    expect(mockEq).toHaveBeenCalledWith("address", "0xabc");
-    expect(mockUpdate).toHaveBeenCalledWith(
+    expect(mocks.mockAnonClient.from).toHaveBeenCalledWith("metokens");
+    expect(mocks.mockEq).toHaveBeenCalledWith("address", "0xabc");
+    expect(mocks.mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Renamed" }),
     );
   });
