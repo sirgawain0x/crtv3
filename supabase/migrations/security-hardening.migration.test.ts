@@ -20,6 +20,20 @@ function stripSqlComments(sql: string): string {
     .join("\n");
 }
 
+function assertAtMostOneCreatePolicyPerTable(sql: string): void {
+  const policyRegex =
+    /CREATE\s+POLICY\s+"([^"]+)"\s+ON\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi;
+  const counts = new Map<string, number>();
+  let match: RegExpExecArray | null;
+  while ((match = policyRegex.exec(sql)) !== null) {
+    const key = `${match[2].toLowerCase()}::${match[1]}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  for (const [key, count] of counts) {
+    expect(count, `duplicate CREATE POLICY ${key}`).toBeLessThanOrEqual(1);
+  }
+}
+
 describe("security hardening migration", () => {
   const fileName = findMigrationByGlob(/^\d+_security_hardening\.sql$/);
   const migrationSql = readFileSync(path.join(MIGRATIONS_DIR, fileName), "utf8");
@@ -64,6 +78,7 @@ describe("security hardening migration", () => {
     expect(rollbackSql).not.toMatch(
       /^\s*--\s*CREATE POLICY "Users can insert their own balances"/m,
     );
+    assertAtMostOneCreatePolicyPerTable(rollbackSql);
   });
 
   it("has active #3 metoken policy drops and revokes (not commented)", () => {

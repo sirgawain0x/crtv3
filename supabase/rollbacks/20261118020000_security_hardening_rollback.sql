@@ -110,8 +110,7 @@ CREATE POLICY "Creators can delete their own stream" ON public.streams
   USING (creator_id = lower(((SELECT auth.jwt()) ->> 'sub'::text)));
 
 -- ============================================================================================
--- ROLLBACK for #3 (only if #3 was applied). If both were applied, run this block first,
--- then the block above (the metokens UPDATE policy recreate above would otherwise conflict).
+-- ROLLBACK for #3 (restore metoken JWT write policies and DML grants dropped by migration A #3)
 -- ============================================================================================
 GRANT INSERT, UPDATE, DELETE ON TABLE public.metokens, public.metoken_balances, public.metoken_transactions TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.metokens, public.metoken_balances, public.metoken_transactions TO anon;  -- only if #2 is also being rolled back
@@ -123,6 +122,5 @@ CREATE POLICY "Users can insert their own transactions" ON public.metoken_transa
   WITH CHECK (COALESCE(NULLIF((SELECT current_setting('request.jwt.claim.address', true)), ''), NULLIF((SELECT current_setting('request.jwt.claim.sub', true)), '')) = user_address);
 CREATE POLICY "Users can insert their own metokens" ON public.metokens AS PERMISSIVE FOR INSERT TO authenticated
   WITH CHECK ((lower(COALESCE(NULLIF((SELECT current_setting('request.jwt.claim.address', true)), ''), NULLIF((SELECT current_setting('request.jwt.claim.sub', true)), ''))) = lower(owner_address)) AND (owner_address IS NOT NULL) AND (address IS NOT NULL) AND (name IS NOT NULL) AND (symbol IS NOT NULL));
-CREATE POLICY "Users can update their own metokens" ON public.metokens AS PERMISSIVE FOR UPDATE TO public
-  USING (COALESCE(NULLIF((SELECT current_setting('request.jwt.claim.address', true)), ''), NULLIF((SELECT current_setting('request.jwt.claim.sub', true)), '')) = owner_address);   -- skip if the #6 rollback above already recreated it
+-- "Users can update their own metokens" is recreated by the #6 restore above.
 
