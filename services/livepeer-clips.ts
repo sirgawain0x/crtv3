@@ -1,4 +1,5 @@
 import { getVideoProvider } from "@/lib/video-provider";
+import { getStreamByPlaybackId } from "@/services/streams";
 
 /**
  * Best-effort server-side lookup for a Livepeer asset's thumbnail URL.
@@ -39,7 +40,15 @@ export async function createClip({
   if (!playbackId || !sessionId || !startTime || !endTime)
     return { playbackUrl: "", assetId: "", newPlaybackId: "", error: "Missing required fields" };
   try {
-    return getVideoProvider().streams.createClip({
+    const provider = getVideoProvider();
+    const stream = provider.id === "frameworks"
+      ? await getStreamByPlaybackId(playbackId)
+      : null;
+    if (provider.id === "frameworks" && !stream?.stream_id) {
+      throw new Error("Stream not found for playback ID");
+    }
+    return await provider.streams.createClip({
+      streamId: stream?.stream_id,
       playbackId,
       sessionId,
       startTime,

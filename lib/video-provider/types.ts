@@ -49,6 +49,8 @@ export type AssetSummary = {
 };
 
 export type CreateClipParams = {
+  /** Provider stream ID resolved by the server from playbackId. */
+  streamId?: string;
   playbackId: string;
   sessionId: string;
   startTime: number;
