@@ -1,10 +1,11 @@
 import { createPrivateKey, generateKeyPairSync } from "crypto";
+import jwt from "jsonwebtoken";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { frameworksPlayHlsUrl } from "./constants";
+import { FrameworksPlaybackSigningError } from "../errors";
 import { resetVideoProviderForTests, getVideoProvider } from "../index";
 import {
   buildAuthorizedViewerPlayHlsUrl,
-  pickHlsUrl,
   signAuthorizedFrameworksPlaybackToken,
   signFrameworksPlaybackToken,
 } from "./playback";
@@ -25,6 +26,7 @@ describe("frameworks playback (#405)", () => {
     vi.unstubAllEnvs();
     resetVideoProviderForTests();
     fetchMock.mockReset();
+    vi.restoreAllMocks();
   });
 
   it("playback.get returns unsigned Foghorn /play HLS (viewer geo routing)", async () => {
@@ -81,57 +83,38 @@ describe("frameworks playback (#405)", () => {
     expect(decoded.aud).toBe("pb-jwt");
   });
 
-  it.each([
-    ["WHEP", "https://edge.example/whep"],
-    ["WebRTC", "https://edge.example/webrtc"],
-    ["DASH", "https://edge.example/manifest.mpd"],
-  ])("pickHlsUrl ignores %s primary and falls back to Foghorn HLS", (_label, url) => {
-    const resolved = pickHlsUrl({
-      resolveViewerEndpoint: {
-        primary: { url, protocol: _label.toUpperCase() },
-      },
-    });
-    expect(resolved).toBeUndefined();
-    const foghornFallback = frameworksPlayHlsUrl("pb-whep");
-    expect(foghornFallback).toContain("/play/pb-whep/hls/index.m3u8");
+  it("buildAuthorizedViewerPlayHlsUrl throws when signing env is missing", () => {
+    delete process.env.FRAMEWORKS_SIGNING_PRIVATE_KEY;
+    delete process.env.FRAMEWORKS_SIGNING_KID;
+    expect(() => buildAuthorizedViewerPlayHlsUrl({ playbackId: "pb-missing" })).toThrow(
+      FrameworksPlaybackSigningError,
+    );
+    try {
+      buildAuthorizedViewerPlayHlsUrl({ playbackId: "pb-missing" });
+    } catch (err) {
+      expect(err).toBeInstanceOf(FrameworksPlaybackSigningError);
+      expect((err as FrameworksPlaybackSigningError).reason).toBe("signing_unavailable");
+    }
   });
 
-  it("pickHlsUrl ignores non-m3u8 primary.url without HLS protocol", () => {
-    const resolved = pickHlsUrl({
-      resolveViewerEndpoint: {
-        primary: {
-          url: "https://cdn.example/live/stream",
-          protocol: "HTTP",
-        },
-      },
+  it("buildAuthorizedViewerPlayHlsUrl throws when jwt.sign fails", () => {
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+    vi.stubEnv("FRAMEWORKS_SIGNING_PRIVATE_KEY", pem);
+    vi.stubEnv("FRAMEWORKS_SIGNING_KID", "kid-test");
+    vi.spyOn(jwt, "sign").mockImplementation(() => {
+      throw new Error("sign failed");
     });
-    expect(resolved).toBeUndefined();
-    expect(frameworksPlayHlsUrl("pb-2")).toMatch(/\/play\/pb-2\/hls\/index\.m3u8$/);
+
+    expect(() => buildAuthorizedViewerPlayHlsUrl({ playbackId: "pb-bad-sign" })).toThrow(
+      FrameworksPlaybackSigningError,
+    );
   });
 
-  it("pickHlsUrl accepts outputs.HLS and m3u8 primary", () => {
-    expect(
-      pickHlsUrl({
-        resolveViewerEndpoint: {
-          primary: {
-            outputs: {
-              HLS: { url: "https://edge.example/hls/index.m3u8" },
-            },
-          },
-        },
-      }),
-    ).toBe("https://edge.example/hls/index.m3u8");
-
-    expect(
-      pickHlsUrl({
-        resolveViewerEndpoint: {
-          primary: {
-            url: "https://edge.example/alt/playlist.m3u8",
-            protocol: "HLS",
-          },
-        },
-      }),
-    ).toBe("https://edge.example/alt/playlist.m3u8");
+  it("buildAuthorizedViewerPlayHlsUrl throws for empty playbackId", () => {
+    expect(() => buildAuthorizedViewerPlayHlsUrl({ playbackId: "  " })).toThrow(
+      FrameworksPlaybackSigningError,
+    );
   });
 
   it("signFrameworksPlaybackToken mints ES256 JWT with configured kid", () => {

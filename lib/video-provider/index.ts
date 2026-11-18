@@ -22,6 +22,7 @@ export type {
   StreamSummary,
 } from "./types";
 export {
+  FrameworksPlaybackSigningError,
   VideoProviderNotConfiguredError,
   VideoProviderNotImplementedError,
 } from "./errors";

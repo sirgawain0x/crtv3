@@ -13,6 +13,25 @@ export class VideoProviderNotImplementedError extends Error {
   }
 }
 
+export type FrameworksPlaybackSigningFailureReason =
+  | "invalid_playback_id"
+  | "signing_unavailable";
+
+export class FrameworksPlaybackSigningError extends Error {
+  readonly code = "FRAMEWORKS_PLAYBACK_SIGNING_FAILED" as const;
+  readonly reason: FrameworksPlaybackSigningFailureReason;
+
+  constructor(reason: FrameworksPlaybackSigningFailureReason) {
+    super(
+      reason === "invalid_playback_id"
+        ? "Authorized playback URL requires a non-empty playback ID"
+        : "Authorized playback URL requires configured viewer JWT signing",
+    );
+    this.name = "FrameworksPlaybackSigningError";
+    this.reason = reason;
+  }
+}
+
 export class VideoProviderNotConfiguredError extends Error {
   readonly code = "VIDEO_PROVIDER_NOT_CONFIGURED" as const;
 

@@ -1,75 +1,11 @@
 import "server-only";
 import jwt from "jsonwebtoken";
 import type { PlaybackInfoResult } from "../types";
+import { FrameworksPlaybackSigningError } from "../errors";
 import { frameworksPlayHlsUrl } from "./constants";
 
-export type ResolveViewerEndpointQuery = {
-  resolveViewerEndpoint: {
-    primary?: {
-      url?: string;
-      protocol?: string;
-      baseUrl?: string;
-      outputs?: Record<string, { protocol?: string; url?: string }>;
-    } | null;
-    fallbacks?: Array<{ url?: string; protocol?: string }>;
-    metadata?: {
-      status?: string;
-      isLive?: boolean;
-      title?: string;
-      contentId?: string;
-      contentType?: string;
-    };
-  } | null;
-};
-
-function isHlsProtocol(protocol: string | undefined): boolean {
-  return protocol?.toUpperCase() === "HLS";
-}
-
-function isM3u8Url(url: string): boolean {
-  try {
-    return new URL(url).pathname.toLowerCase().endsWith(".m3u8");
-  } catch {
-    return /\.m3u8(?:\?|#|$)/i.test(url);
-  }
-}
-
-function isHlsPlaybackUrl(url: string | undefined, protocol?: string): boolean {
-  if (!url) return false;
-  if (isHlsProtocol(protocol)) return true;
-  return isM3u8Url(url);
-}
-
-/**
- * Maps a resolveViewerEndpoint catalog entry to an HLS URL only.
- * Intended for browser-side resolve (#405 app layer); server playback uses Foghorn /play.
- */
-export function pickHlsUrl(data: ResolveViewerEndpointQuery): string | undefined {
-  const primary = data.resolveViewerEndpoint?.primary;
-  const hlsOutput = primary?.outputs?.HLS;
-  if (hlsOutput?.url) {
-    return hlsOutput.url;
-  }
-  if (primary?.url && isHlsPlaybackUrl(primary.url, primary.protocol)) {
-    return primary.url;
-  }
-  const outputs = primary?.outputs;
-  if (outputs) {
-    for (const value of Object.values(outputs)) {
-      if (value?.url && isHlsPlaybackUrl(value.url, value.protocol)) {
-        return value.url;
-      }
-    }
-  }
-  const fallback = data.resolveViewerEndpoint?.fallbacks?.find((f) =>
-    isHlsPlaybackUrl(f.url, f.protocol),
-  );
-  return fallback?.url;
-}
-
-function viewerPlayHlsUrl(playbackId: string, jwtToken: string | null): string {
+function viewerPlayHlsUrl(playbackId: string, jwtToken: string): string {
   const url = frameworksPlayHlsUrl(playbackId);
-  if (!jwtToken) return url;
   const parsed = new URL(url);
   parsed.searchParams.set("jwt", jwtToken);
   return parsed.toString();
@@ -168,18 +104,31 @@ export function signAuthorizedFrameworksPlaybackToken(
   });
 }
 
-/** Foghorn /play HLS URL with an authorized viewer JWT when signing is configured. */
+/**
+ * Foghorn /play HLS URL with a scoped viewer JWT.
+ * Throws {@link FrameworksPlaybackSigningError} when signing is unavailable — never returns unsigned.
+ */
 export function buildAuthorizedViewerPlayHlsUrl(
   input: AuthorizedFrameworksPlaybackTokenInput,
 ): string {
   const playbackId = input.playbackId.trim();
+  if (!playbackId) {
+    throw new FrameworksPlaybackSigningError("invalid_playback_id");
+  }
   const token = signAuthorizedFrameworksPlaybackToken(input);
+  if (!token) {
+    throw new FrameworksPlaybackSigningError("signing_unavailable");
+  }
   return viewerPlayHlsUrl(playbackId, token);
+}
+
+function unsignedViewerPlayHlsUrl(playbackId: string): string {
+  return frameworksPlayHlsUrl(playbackId);
 }
 
 export const frameworksPlayback = {
   get: async (playbackId: string): Promise<PlaybackInfoResult> => {
-    const url = viewerPlayHlsUrl(playbackId, null);
+    const url = unsignedViewerPlayHlsUrl(playbackId);
     return toPlaybackInfo(playbackId, url);
   },
 };
