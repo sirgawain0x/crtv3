@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FrameworksGraphqlUnionError } from "../errors";
 import { getVideoProvider, resetVideoProviderForTests } from "../index";
 
 describe("frameworks assets (#406)", () => {
@@ -94,6 +95,7 @@ describe("frameworks assets (#406)", () => {
             __typename: "VodUploadSession",
             id: "up-1",
             artifactId: "vod-2",
+            artifactHash: "hash-canonical",
             playbackId: "pb-2",
             partSize: 4096,
             parts: [{ partNumber: 1, presignedUrl: "https://s3.example/part1" }],
@@ -112,7 +114,7 @@ describe("frameworks assets (#406)", () => {
         asset?: { id?: string };
       };
     };
-    expect(result.data?.asset?.id).toBe("vod-2");
+    expect(result.data?.asset?.id).toBe("hash-canonical");
     expect(result.data?.tusEndpoint).toBeUndefined();
     expect(result.data?.presignedParts?.[0]?.url).toBe("https://s3.example/part1");
     expect((result.data as { uploadId?: string })?.uploadId).toBe("up-1");
@@ -149,6 +151,90 @@ describe("frameworks assets (#406)", () => {
     };
     expect(response.assets).toBeUndefined();
     expect(response.data?.[0]?.id).toBe("vod-1");
+  });
+
+  describe("GraphQL union handling (#440)", () => {
+    const unionCases = {
+      create: {
+        field: "createVodUpload",
+        invoke: () =>
+          getVideoProvider().assets.create({ name: "demo.mp4", sizeBytes: 1024 }),
+        errors: ["AuthError", "ValidationError", "UnexpectedResult"] as const,
+      },
+      completeUpload: {
+        field: "completeVodUpload",
+        invoke: () =>
+          (
+            getVideoProvider().assets as {
+              completeUpload: (body: unknown) => Promise<unknown>;
+            }
+          ).completeUpload({
+            uploadId: "up-1",
+            parts: [{ partNumber: 1, etag: '"e"' }],
+          }),
+        errors: ["AuthError", "NotFoundError", "ValidationError", "UnexpectedResult"] as const,
+      },
+      importVodAsset: {
+        field: "importVodAsset",
+        invoke: () =>
+          getVideoProvider().assets.createViaUrl({
+            url: "https://cdn.example/v.mp4",
+            name: "Remote",
+          }),
+        errors: ["AuthError", "ValidationError", "UnexpectedResult"] as const,
+      },
+      deleteVodAsset: {
+        field: "deleteVodAsset",
+        invoke: () => getVideoProvider().assets.delete("vod-del"),
+        errors: ["AuthError", "NotFoundError", "ValidationError", "UnexpectedResult"] as const,
+      },
+    };
+
+    for (const [label, config] of Object.entries(unionCases)) {
+      for (const typename of config.errors) {
+        it(`${label} throws FrameworksGraphqlUnionError on ${typename}`, async () => {
+          fetchMock.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: {
+                [config.field]: {
+                  __typename: typename,
+                  message: `${typename} from ${label}`,
+                },
+              },
+            }),
+          });
+
+          await expect(config.invoke()).rejects.toMatchObject({
+            name: "FrameworksGraphqlUnionError",
+            graphqlTypename: typename,
+            message: `${typename} from ${label}`,
+          });
+        });
+      }
+    }
+  });
+
+  it("abortUpload calls abortVodUpload and swallows union errors", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          abortVodUpload: {
+            __typename: "NotFoundError",
+            message: "session gone",
+          },
+        },
+      }),
+    });
+
+    const assets = getVideoProvider().assets as { abortUpload?: (id: string) => Promise<void> };
+    await expect(assets.abortUpload?.("up-abort")).resolves.toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 
   it("createViaUrl uses importVodAsset", async () => {

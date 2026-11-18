@@ -32,6 +32,18 @@ export class FrameworksPlaybackSigningError extends Error {
   }
 }
 
+/** GraphQL union returned a member other than the expected success type. */
+export class FrameworksGraphqlUnionError extends Error {
+  readonly code = "FRAMEWORKS_GRAPHQL_UNION_ERROR" as const;
+  readonly graphqlTypename: string;
+
+  constructor(graphqlTypename: string, message: string) {
+    super(message);
+    this.name = "FrameworksGraphqlUnionError";
+    this.graphqlTypename = graphqlTypename;
+  }
+}
+
 export class VideoProviderNotConfiguredError extends Error {
   readonly code = "VIDEO_PROVIDER_NOT_CONFIGURED" as const;
 

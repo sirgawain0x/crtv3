@@ -8,9 +8,12 @@ import FileUpload from "./FileUpload";
 const CREATOR = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const mp4Blob = new Blob([new Uint8Array([0, 1, 2, 3])], { type: "video/mp4" });
 
+const tusCallbacks = vi.hoisted(() => ({ onSuccess: undefined as (() => void) | undefined }));
+
 const mocks = vi.hoisted(() => ({
   getLivepeerUploadUrl: vi.fn(),
   completeFrameworksVodUpload: vi.fn(),
+  abortFrameworksVodUpload: vi.fn(),
   uploadFileViaPresignedParts: vi.fn(),
   getLivepeerAsset: vi.fn(),
 }));
@@ -18,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/app/api/livepeer/assetUploadActions", () => ({
   getLivepeerUploadUrl: mocks.getLivepeerUploadUrl,
   completeFrameworksVodUpload: mocks.completeFrameworksVodUpload,
+  abortFrameworksVodUpload: mocks.abortFrameworksVodUpload,
   getLivepeerAsset: mocks.getLivepeerAsset,
 }));
 
@@ -40,7 +44,12 @@ vi.mock("@/components/ui/progress", () => ({
 }));
 vi.mock("tus-js-client", () => ({
   Upload: class {
-    start() {}
+    constructor(_file: unknown, options: { onSuccess?: () => void }) {
+      tusCallbacks.onSuccess = options.onSuccess;
+    }
+    start() {
+      tusCallbacks.onSuccess?.();
+    }
   },
 }));
 
@@ -130,6 +139,26 @@ describe("FileUpload FrameWorks multipart completion", () => {
       expect(onFileUploaded).toHaveBeenCalledWith("artifact-1");
     });
     expect(container.textContent).toContain("Upload Complete!");
+    expect(mocks.getLivepeerAsset).not.toHaveBeenCalled();
+  });
+
+  it("polls Livepeer IPFS metadata on tus success", async () => {
+    mocks.getLivepeerUploadUrl.mockResolvedValue({
+      asset: { id: "lp-asset-1" },
+      tusEndpoint: "https://tus.example/upload",
+    });
+    mocks.getLivepeerAsset.mockResolvedValue({
+      status: { phase: "ready" },
+      storage: { ipfs: { nftMetadata: { url: "ipfs://meta" } } },
+    });
+
+    await renderUpload();
+    await selectFile();
+    await clickUpload();
+
+    await vi.waitFor(() => {
+      expect(mocks.getLivepeerAsset).toHaveBeenCalledWith("lp-asset-1");
+    });
   });
 
   it("fails when uploadId is missing and never calls complete or onFileUploaded", async () => {

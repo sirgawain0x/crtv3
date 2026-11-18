@@ -22,6 +22,7 @@ export type {
   StreamSummary,
 } from "./types";
 export {
+  FrameworksGraphqlUnionError,
   FrameworksPlaybackSigningError,
   VideoProviderNotConfiguredError,
   VideoProviderNotImplementedError,

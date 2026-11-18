@@ -2,6 +2,7 @@
 
 import { NextApiRequest, NextApiResponse } from "next";
 import {
+  FrameworksGraphqlUnionError,
   FrameWorksUploadsAssetsUnavailableError,
   requireVideoProviderForUploadsAndAssets,
 } from "@/lib/video-provider";
@@ -49,6 +50,18 @@ export default async function handler(
     } catch (error) {
       if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
         res.status(503).json({ error: error.message });
+        return;
+      }
+      if (error instanceof FrameworksGraphqlUnionError) {
+        const status =
+          error.graphqlTypename === "AuthError"
+            ? 401
+            : error.graphqlTypename === "NotFoundError"
+              ? 404
+              : error.graphqlTypename === "ValidationError"
+                ? 400
+                : 502;
+        res.status(status).json({ error: error.message });
         return;
       }
       serverLogger.error("Error creating Livepeer upload URL:", error);

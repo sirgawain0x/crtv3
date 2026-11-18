@@ -96,6 +96,18 @@ export const getLivepeerUploadUrl = async (
   return result.data as LivepeerUploadSession | undefined;
 };
 
+export const abortFrameworksVodUpload = async (uploadId: string): Promise<void> => {
+  const assets = requireVideoProviderForUploadsAndAssets(
+    "assetUploadActions.abortFrameworksVodUpload",
+  ).assets as {
+    abortUpload?: (id: string) => Promise<void>;
+  };
+  if (typeof assets.abortUpload !== "function") {
+    return;
+  }
+  await assets.abortUpload(uploadId);
+};
+
 export const completeFrameworksVodUpload = async (
   uploadId: string,
   parts: Array<{ partNumber: number; etag: string }>,

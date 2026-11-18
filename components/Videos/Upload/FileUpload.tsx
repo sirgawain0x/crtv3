@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Clapperboard, CopyIcon, ExternalLink } from "lucide-react";
 import {
+  abortFrameworksVodUpload,
   completeFrameworksVodUpload,
   getLivepeerUploadUrl,
   getLivepeerAsset,
@@ -246,7 +247,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         return;
       }
 
-      const finishSuccessfulUpload = () => {
+      const finishSuccessfulUpload = (opts?: { skipIpfsMetadataPoll?: boolean }) => {
         logger.debug("Upload completed");
         setUploadComplete(true);
         setUploadState("complete");
@@ -259,14 +260,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
         if (uploadedAssetId) {
           onFileUploaded(uploadedAssetId);
 
-          void (async () => {
-            try {
-              const metadataUri = await pollForMetadataUri(uploadedAssetId);
-              setUploadedUri(metadataUri);
-            } catch (pollErr) {
-              logger.warn("Failed to resolve metadata URI:", pollErr);
-            }
-          })();
+          if (!opts?.skipIpfsMetadataPoll) {
+            void (async () => {
+              try {
+                const metadataUri = await pollForMetadataUri(uploadedAssetId);
+                setUploadedUri(metadataUri);
+              } catch (pollErr) {
+                logger.warn("Failed to resolve metadata URI:", pollErr);
+              }
+            })();
+          }
 
           if (onAssetReady && uploadRequestResult?.asset) {
             onAssetReady(uploadRequestResult.asset);
@@ -293,12 +296,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
           presignedParts,
           {
             partSize: uploadRequestResult.partSize,
+            uploadId,
             onProgress: setProgress,
+            abortVodUpload: abortFrameworksVodUpload,
           },
         );
 
         await completeFrameworksVodUpload(uploadId, uploadedParts);
-        finishSuccessfulUpload();
+        finishSuccessfulUpload({ skipIpfsMetadataPoll: true });
         return;
       }
 

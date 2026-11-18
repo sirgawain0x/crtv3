@@ -1,6 +1,28 @@
 import type { AssetSummary } from "../types";
+import { FrameworksGraphqlUnionError } from "../errors";
 import { frameworksGraphqlRequest } from "../frameworks-graphql";
 import { frameworksPlayHlsUrl } from "./constants";
+
+type GraphqlUnionMember = {
+  __typename: string;
+  message?: string;
+  field?: string;
+};
+
+function assertGraphqlUnionSuccess<T extends GraphqlUnionMember>(
+  result: T,
+  successTypename: string,
+  operation: string,
+): asserts result is T & { __typename: typeof successTypename } {
+  if (result.__typename === successTypename) {
+    return;
+  }
+  const message =
+    typeof result.message === "string" && result.message.trim().length > 0
+      ? result.message
+      : `FrameWorks ${operation} failed (${result.__typename})`;
+  throw new FrameworksGraphqlUnionError(result.__typename, message);
+}
 
 type VodAssetNode = {
   id: string;
@@ -85,6 +107,14 @@ type DeleteVodAssetMutation = {
   };
 };
 
+type AbortVodUploadMutation = {
+  abortVodUpload: {
+    __typename: string;
+    success?: boolean;
+    message?: string;
+  };
+};
+
 const GET_VOD_ASSET = `
   query GetVodAsset($id: ID!) {
     vodAsset(id: $id) {
@@ -150,6 +180,9 @@ const CREATE_VOD_UPLOAD = `
         message
         field
       }
+      ... on AuthError {
+        message
+      }
     }
   }
 `;
@@ -166,6 +199,12 @@ const COMPLETE_VOD_UPLOAD = `
       ... on ValidationError {
         message
         field
+      }
+      ... on NotFoundError {
+        message
+      }
+      ... on AuthError {
+        message
       }
     }
   }
@@ -185,6 +224,9 @@ const IMPORT_VOD_ASSET = `
         message
         field
       }
+      ... on AuthError {
+        message
+      }
     }
   }
 `;
@@ -197,6 +239,26 @@ const DELETE_VOD_ASSET = `
         success
       }
       ... on NotFoundError {
+        message
+      }
+      ... on AuthError {
+        message
+      }
+    }
+  }
+`;
+
+const ABORT_VOD_UPLOAD = `
+  mutation AbortVodUpload($uploadId: ID!) {
+    abortVodUpload(uploadId: $uploadId) {
+      __typename
+      ... on DeleteSuccess {
+        success
+      }
+      ... on NotFoundError {
+        message
+      }
+      ... on AuthError {
         message
       }
     }
@@ -333,24 +395,22 @@ export const frameworksAssets = {
         contentType: payload.contentType ?? "video/mp4",
       },
     });
-    if (data.createVodUpload.__typename === "ValidationError") {
-      throw new Error(data.createVodUpload.message ?? "Invalid VOD upload");
-    }
-    const upload = data.createVodUpload;
+    const uploadResult = data.createVodUpload;
+    assertGraphqlUnionSuccess(uploadResult, "VodUploadSession", "createVodUpload");
+    const upload = uploadResult;
     const presignedParts = (upload.parts ?? []).map((part) => ({
       partNumber: part.partNumber,
       url: part.presignedUrl,
     }));
+    const assetLookupId = upload.artifactHash ?? upload.artifactId ?? upload.id;
     return {
       data: {
-        asset: upload.artifactId
-          ? {
-              id: upload.artifactId,
-              playbackId: upload.playbackId,
-              status: { phase: "waiting" },
-              name: payload.name,
-            }
-          : { id: upload.id },
+        asset: {
+          id: assetLookupId,
+          playbackId: upload.playbackId,
+          status: { phase: "waiting" },
+          name: payload.name,
+        },
         uploadId: upload.id,
         partSize: upload.partSize,
         expiresAt: upload.expiresAt,
@@ -380,9 +440,7 @@ export const frameworksAssets = {
       },
     );
     const result = data.completeVodUpload;
-    if (result.__typename === "ValidationError") {
-      throw new Error(result.message ?? "Failed to complete VOD upload");
-    }
+    assertGraphqlUnionSuccess(result, "VodAsset", "completeVodUpload");
     return {
       data: {
         asset: {
@@ -392,6 +450,29 @@ export const frameworksAssets = {
         },
       },
     };
+  },
+
+  abortUpload: async (uploadId: string): Promise<void> => {
+    const trimmed = uploadId.trim();
+    if (!trimmed) return;
+    try {
+      const data = await frameworksGraphqlRequest<AbortVodUploadMutation>(ABORT_VOD_UPLOAD, {
+        uploadId: trimmed,
+      });
+      const result = data.abortVodUpload;
+      if (result.__typename !== "DeleteSuccess") {
+        console.error("[frameworks] abortVodUpload failed", {
+          uploadId: trimmed,
+          typename: result.__typename,
+          message: result.message,
+        });
+      }
+    } catch (err) {
+      console.error("[frameworks] abortVodUpload error", {
+        uploadId: trimmed,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   },
 
   update: async (): Promise<unknown> => {
@@ -414,9 +495,7 @@ export const frameworksAssets = {
       },
     });
     const result = data.importVodAsset;
-    if (result.__typename === "ValidationError") {
-      throw new Error(result.message ?? "Import failed");
-    }
+    assertGraphqlUnionSuccess(result, "VodAsset", "importVodAsset");
     return {
       data: {
         asset: {
@@ -433,8 +512,6 @@ export const frameworksAssets = {
     const data = await frameworksGraphqlRequest<DeleteVodAssetMutation>(DELETE_VOD_ASSET, {
       id: assetId,
     });
-    if (data.deleteVodAsset.__typename === "NotFoundError") {
-      throw new Error(data.deleteVodAsset.message ?? "Asset not found");
-    }
+    assertGraphqlUnionSuccess(data.deleteVodAsset, "DeleteSuccess", "deleteVodAsset");
   },
 };
