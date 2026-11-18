@@ -1,7 +1,8 @@
 import type { VideoProvider } from "./interface";
-import type { AssetSummary, PlaybackInfoResult } from "./types";
+import type { AssetSummary } from "./types";
 import { VideoProviderNotImplementedError } from "./errors";
 import { isFrameworksConfigured, frameworksGraphqlUrl } from "./config";
+import { frameworksPlayback } from "./frameworks/playback";
 import { frameworksDeletePushTarget, frameworksStreams } from "./frameworks/streams";
 
 function notImplemented(operation: string): never {
@@ -31,9 +32,7 @@ export const frameworksVideoProvider: VideoProvider = {
     delete: async () => notImplemented("assets.delete"),
   },
 
-  playback: {
-    get: async (): Promise<PlaybackInfoResult> => notImplemented("playback.get"),
-  },
+  playback: frameworksPlayback,
 
   multistream: {
     delete: frameworksDeletePushTarget,

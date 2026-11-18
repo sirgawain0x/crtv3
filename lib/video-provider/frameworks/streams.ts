@@ -262,7 +262,11 @@ function toUnixSeconds(time: number): number {
 
 type FrameWorksPlaybackPolicyInput = {
   type: "PUBLIC" | "JWT" | "WEBHOOK";
-  jwt?: { allowedKids?: string[] };
+  jwt?: {
+    allowedKids?: string[];
+    requiredAudience?: string[];
+    requiredClaimsJson?: Array<{ name: string; jsonValue: string }>;
+  };
   webhook?: {
     url: string;
     secret?: string;
@@ -273,6 +277,7 @@ type FrameWorksPlaybackPolicyInput = {
 
 function mapLivepeerPlaybackPolicy(
   policy: Record<string, unknown>,
+  playbackId?: string,
 ): FrameWorksPlaybackPolicyInput {
   const rawType = String(policy.type ?? "public").toLowerCase();
   if (rawType === "jwt") {
@@ -282,9 +287,15 @@ function mapLivepeerPlaybackPolicy(
       : kid
         ? [kid]
         : [];
+    const scopedPlaybackId =
+      typeof playbackId === "string" ? playbackId.trim() : "";
+    const jwtPolicy: NonNullable<FrameWorksPlaybackPolicyInput["jwt"]> = {
+      ...(allowedKids.length ? { allowedKids } : {}),
+      ...(scopedPlaybackId ? { requiredAudience: [scopedPlaybackId] } : {}),
+    };
     return {
       type: "JWT",
-      jwt: allowedKids.length ? { allowedKids } : {},
+      jwt: jwtPolicy,
     };
   }
   if (rawType === "webhook") {
@@ -314,8 +325,9 @@ function mapLivepeerPlaybackPolicy(
 async function applyPlaybackPolicy(
   streamId: string,
   playbackPolicy: Record<string, unknown>,
+  playbackId: string,
 ): Promise<void> {
-  const policy = mapLivepeerPlaybackPolicy(playbackPolicy);
+  const policy = mapLivepeerPlaybackPolicy(playbackPolicy, playbackId);
   const data = await frameworksGraphqlRequest<SetPlaybackPolicyMutation>(
     SET_PLAYBACK_POLICY,
     {
@@ -395,7 +407,7 @@ export const frameworksStreams = {
     }
     if (params.playbackPolicy && Object.keys(params.playbackPolicy).length > 0) {
       try {
-        await applyPlaybackPolicy(result.id, params.playbackPolicy);
+        await applyPlaybackPolicy(result.id, params.playbackPolicy, result.playbackId);
       } catch (policyErr) {
         // Best-effort cleanup so a policy failure does not leave an orphaned upstream stream.
         try {
