@@ -1,4 +1,8 @@
 import { supabase, CreatorProfile, CreateCreatorProfileData, UpdateCreatorProfileData } from './client';
+import {
+  CREATOR_PROFILE_PUBLIC_SELECT,
+  type CreatorProfilePublicRow,
+} from './creator-profiles-select';
 import { serverLogger } from '@/lib/utils/logger';
 
 
@@ -40,7 +44,7 @@ export class CreatorProfileSupabaseService {
     try {
       const { data, error } = await supabase
         .from('creator_profiles')
-        .select('*')
+        .select(CREATOR_PROFILE_PUBLIC_SELECT)
         .eq('id', id)
         .single();
 
@@ -49,7 +53,7 @@ export class CreatorProfileSupabaseService {
         throw new Error(`Failed to fetch creator profile: ${error.message}`);
       }
 
-      return data;
+      return data as unknown as CreatorProfilePublicRow;
     } catch (error) {
       // Handle case where creator_profiles table doesn't exist
       if (error instanceof Error && error.message.includes('relation "public.creator_profiles" does not exist')) {
@@ -76,14 +80,14 @@ export class CreatorProfileSupabaseService {
           ...profileWithoutSocial,
           owner_address: profileData.owner_address.toLowerCase(),
         })
-        .select()
+        .select(CREATOR_PROFILE_PUBLIC_SELECT)
         .single();
 
       if (error) {
         throw new Error(`Failed to create creator profile: ${error.message}`);
       }
 
-      return data;
+      return data as unknown as CreatorProfilePublicRow;
     } catch (error) {
       // Handle case where creator_profiles table doesn't exist
       if (error instanceof Error && error.message.includes('relation "public.creator_profiles" does not exist')) {
@@ -182,7 +186,7 @@ export class CreatorProfileSupabaseService {
 
     let query = supabase
       .from('creator_profiles')
-      .select('*')
+      .select(CREATOR_PROFILE_PUBLIC_SELECT)
       .range(offset, offset + limit - 1)
       .order('created_at', { ascending: false });
 
@@ -197,14 +201,14 @@ export class CreatorProfileSupabaseService {
       throw new Error(`Failed to fetch creator profiles: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []) as unknown as CreatorProfilePublicRow[];
   }
 
   // Search creator profiles
   async searchCreatorProfiles(query: string, limit: number = 20): Promise<CreatorProfile[]> {
     const { data, error } = await supabase
       .from('creator_profiles')
-      .select('*')
+      .select(CREATOR_PROFILE_PUBLIC_SELECT)
       .or(`username.ilike.%${query}%,bio.ilike.%${query}%`)
       .limit(limit)
       .order('created_at', { ascending: false });
@@ -213,7 +217,7 @@ export class CreatorProfileSupabaseService {
       throw new Error(`Failed to search creator profiles: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []) as unknown as CreatorProfilePublicRow[];
   }
 
   // Subscribe to real-time creator profile updates
