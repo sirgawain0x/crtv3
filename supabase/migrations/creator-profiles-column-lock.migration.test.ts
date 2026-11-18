@@ -138,10 +138,11 @@ describe("creator_profiles column lock migration", () => {
   const grantColumns = parseGrantSelectColumns(migrationSql);
   const grantSet = new Set(grantColumns);
 
-  it("documents not-applied gate and prod select('*') in the header", () => {
+  it("documents live apply record and livepeer_notifications_enabled omission in the header", () => {
     expect(migrationSql).toMatch(
-      /-- NOT applied; prod main still has anon select\('\*'\) on creator_profiles; apply only after #447 is in main\/prod/i,
+      /Applied live to creative-tv on 2026-11-17 at 10:03 PM ET \(version 20261118030259\)/,
     );
+    expect(migrationSql).toMatch(/after #449 \(#447 hotfix\) reached prod/);
     expect(migrationSql).toMatch(/livepeer_notifications_enabled is intentionally omitted/i);
   });
 
