@@ -155,9 +155,14 @@ export async function listStudioAssetsPage(
       : null;
 
   if (assets.length === pageSize && !nextCursor) {
-    throw new Error(
-      `Livepeer list assets: full page (${pageSize}) but missing Link rel=next cursor — refusing to undercount. ${LIVEPEER_STUDIO_LIST_ASSETS_DOC}`,
-    );
+    const fetchedBefore = Math.max(0, options.fetchedCountBeforePage ?? 0);
+    const fetchedAfter = fetchedBefore + assets.length;
+    const listComplete = totalCount !== null && fetchedAfter >= totalCount;
+    if (!listComplete) {
+      throw new Error(
+        `Livepeer list assets: full page (${pageSize}) but missing Link rel=next cursor — refusing to undercount (fetched ${fetchedAfter}, X-Total-Count=${totalHeader ?? "missing"}). ${LIVEPEER_STUDIO_LIST_ASSETS_DOC}`,
+      );
+    }
   }
 
   return { assets, nextCursor, totalCount };
@@ -192,7 +197,10 @@ export async function listAllStudioAssets(
   let totalCount: number | null = null;
 
   for (let page = 0; page < MAX_STUDIO_LIST_PAGES; page++) {
-    const result = await listStudioAssetsPage(options, cursor);
+    const result = await listStudioAssetsPage(
+      { ...options, fetchedCountBeforePage: all.length },
+      cursor,
+    );
     pageCount += 1;
     if (result.totalCount !== null) {
       totalCount = result.totalCount;

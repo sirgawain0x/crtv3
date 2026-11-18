@@ -67,6 +67,8 @@ export type StudioAssetListOptions = {
   authToken: string;
   pageSize?: number;
   fetchImpl?: typeof fetch;
+  /** Assets already collected before this page (for full-page / missing Link checks). */
+  fetchedCountBeforePage?: number;
 };
 
 export type ArchiveManifestEntryFailed = {

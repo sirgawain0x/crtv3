@@ -97,14 +97,50 @@ describe("listStudioAssetsPage pagination", () => {
     expect(all.pageCount).toBe(1);
   });
 
-  it("throws when a full page has no next cursor", async () => {
+  it("treats full page without Link as complete only when X-Total-Count allows", async () => {
     const fullPage = Array.from({ length: 2 }, (_, i) => assetJson(`a${i}`));
-    const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify(fullPage), { status: 200 }),
+    const baseOpts = {
+      baseUrl: "https://livepeer.studio",
+      authToken: "t",
+      pageSize: 2,
+    };
+
+    const complete = await listStudioAssetsPage(
+      {
+        ...baseOpts,
+        fetchImpl: vi.fn(async () =>
+          new Response(JSON.stringify(fullPage), {
+            status: 200,
+            headers: { "X-Total-Count": "2" },
+          }),
+        ),
+      },
+      null,
     );
+    expect(complete.assets).toHaveLength(2);
+    expect(complete.nextCursor).toBeNull();
+
     await expect(
       listStudioAssetsPage(
-        { baseUrl: "https://livepeer.studio", authToken: "t", pageSize: 2, fetchImpl },
+        {
+          ...baseOpts,
+          fetchImpl: vi.fn(async () => new Response(JSON.stringify(fullPage), { status: 200 })),
+        },
+        null,
+      ),
+    ).rejects.toThrow(/missing Link rel=next/);
+
+    await expect(
+      listStudioAssetsPage(
+        {
+          ...baseOpts,
+          fetchImpl: vi.fn(async () =>
+            new Response(JSON.stringify(fullPage), {
+              status: 200,
+              headers: { "X-Total-Count": "99" },
+            }),
+          ),
+        },
         null,
       ),
     ).rejects.toThrow(/missing Link rel=next/);

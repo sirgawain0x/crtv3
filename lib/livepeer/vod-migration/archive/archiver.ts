@@ -6,6 +6,7 @@ import type {
 } from "../types";
 import { clearManifestEntryFailed, markManifestEntryFailed } from "./manifest-failure";
 import { createEmptyManifest, touchManifest } from "./manifest";
+import { relativePathForAsset } from "./paths";
 
 export type ArchiveDownloadFn = (
   assetId: string,
@@ -18,11 +19,6 @@ export type ArchiveAssetResult =
   | { assetId: string; status: "skipped" | "archived"; bytes: number }
   | { assetId: string; status: "checksum_mismatch"; expected: string; actual: string }
   | { assetId: string; status: "error"; message: string };
-
-function relativePathForAsset(assetId: string, suggestedFilename?: string): string {
-  const safeName = (suggestedFilename ?? `${assetId}.mp4`).replace(/[^\w.\-]+/g, "_");
-  return `assets/${assetId}/${safeName}`;
-}
 
 async function verifyExistingFile(
   storage: ArchiveStorageBackend,
@@ -136,7 +132,11 @@ export async function archiveStudioAssets(params: {
 
     try {
       const { stream, suggestedFilename } = await params.download(asset.assetId);
-      const relativePath = relativePathForAsset(asset.assetId, suggestedFilename);
+      const relativePath = relativePathForAsset(
+        asset.assetId,
+        suggestedFilename,
+        params.storage.root,
+      );
       const iterable = toAsyncIterable(
         stream as ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>,
       );

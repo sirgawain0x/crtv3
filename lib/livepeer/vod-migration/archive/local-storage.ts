@@ -93,11 +93,25 @@ export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
   }
 
   async readManifest(): Promise<ArchiveManifest | null> {
+    let raw: string;
     try {
-      const raw = await readFile(this.manifestPath, "utf8");
+      raw = await readFile(this.manifestPath, "utf8");
+    } catch (err) {
+      const code =
+        err !== null && typeof err === "object" && "code" in err
+          ? String((err as NodeJS.ErrnoException).code)
+          : "";
+      if (code === "ENOENT") {
+        return null;
+      }
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(`Failed to read archive manifest at ${this.manifestPath}: ${detail}`);
+    }
+    try {
       return JSON.parse(raw) as ArchiveManifest;
-    } catch {
-      return null;
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(`Failed to parse archive manifest at ${this.manifestPath}: ${detail}`);
     }
   }
 
