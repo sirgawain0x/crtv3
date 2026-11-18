@@ -278,6 +278,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       const presignedParts = uploadRequestResult?.presignedParts;
       if (presignedParts?.length) {
+        const uploadId = uploadRequestResult.uploadId?.trim();
+        if (!uploadId) {
+          const message =
+            "Upload session is missing an ID; the file was not registered for completion.";
+          logger.error(message, { presignedPartCount: presignedParts.length });
+          setError(message);
+          setUploadState("idle");
+          return;
+        }
+
         const uploadedParts = await uploadFileViaPresignedParts(
           fileToUpload,
           presignedParts,
@@ -287,10 +297,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           },
         );
 
-        if (uploadRequestResult.uploadId) {
-          await completeFrameworksVodUpload(uploadRequestResult.uploadId, uploadedParts);
-        }
-
+        await completeFrameworksVodUpload(uploadId, uploadedParts);
         finishSuccessfulUpload();
         return;
       }

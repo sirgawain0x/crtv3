@@ -31,10 +31,19 @@ export default async function handler(
         filename,
         contentType: filetype,
         sizeBytes,
-      })) as { data?: { tusEndpoint?: string; presignedParts?: Array<{ url?: string }> } };
+      })) as {
+        data?: {
+          tusEndpoint?: string;
+          uploadId?: string;
+          partSize?: number;
+          presignedParts?: Array<{ url?: string }>;
+        };
+      };
 
       res.status(200).json({
         uploadUrl: asset.data?.tusEndpoint,
+        uploadId: asset.data?.uploadId,
+        partSize: asset.data?.partSize,
         presignedParts: asset.data?.presignedParts,
       });
     } catch (error) {
