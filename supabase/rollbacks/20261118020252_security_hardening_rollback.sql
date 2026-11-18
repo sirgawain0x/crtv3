@@ -84,6 +84,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 -- #5 restore backup table grants (pre-change: full DML + TRUNCATE/TRIGGER/REFERENCES for both roles)
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.creator_profiles_backup_20261027 TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.creator_profiles_backup_20261027 TO authenticated;
+GRANT MAINTAIN ON TABLE public.creator_profiles_backup_20261027 TO anon, authenticated;
 
 -- #6 remove the added WITH CHECK (pre-change: UPDATE policies had USING only)
 -- ALTER POLICY can't unset WITH CHECK, so recreate both policies as they were

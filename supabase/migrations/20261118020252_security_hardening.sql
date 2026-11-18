@@ -1,6 +1,5 @@
 -- creative-tv (zdeiezfoemibjgrkyzvs) hardening migration: audit fixes #2, #5, #6, #7
--- DRAFT 2026-11-17, not applied. Generated from live catalog state read at about 8:10 PM ET.
--- Proposed migration name: creative_tv_hardening_grants_policies
+-- Generated from live catalog state read at about 8:10 PM ET.
 --
 -- Anon write exceptions: NONE.
 --   Supabase API logs, Nov 10 8:05 PM to Nov 17 8:05 PM ET: 0 POST/PATCH/DELETE/rpc by anon or
@@ -109,7 +108,6 @@ ALTER POLICY "Users can update their own profile" ON public.creator_profiles
   WITH CHECK (COALESCE(NULLIF((SELECT current_setting('request.jwt.claim.address', true)), ''), NULLIF((SELECT current_setting('request.jwt.claim.sub', true)), '')) = owner_address);
 ALTER POLICY "Users can update their own metokens" ON public.metokens
   WITH CHECK (COALESCE(NULLIF((SELECT current_setting('request.jwt.claim.address', true)), ''), NULLIF((SELECT current_setting('request.jwt.claim.sub', true)), '')) = owner_address);
--- (If #3 is applied, it drops the metokens policy above, so that line becomes moot. Apply #3 after this file or drop the line.)
 
 -- #7 streams: no authenticated writes (all app writes use service_role)
 REVOKE INSERT, UPDATE, DELETE ON TABLE public.streams FROM authenticated;
@@ -122,7 +120,7 @@ DROP POLICY IF EXISTS "Creators can delete their own stream" ON public.streams;
 -- ============================================================================================
 -- #3 (included in this migration). metoken_drop_jwt_claim_write_policies
 -- Every metoken sync writer uses service_role. The only non-service writers can't succeed today
--- (see report). Apply as its own migration after the one above.
+-- (see report).
 -- ============================================================================================
 DROP POLICY IF EXISTS "Users can insert their own balances" ON public.metoken_balances;
 DROP POLICY IF EXISTS "Users can update their own balances" ON public.metoken_balances;

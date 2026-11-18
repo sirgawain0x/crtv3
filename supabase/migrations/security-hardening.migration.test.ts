@@ -79,6 +79,9 @@ describe("security hardening migration", () => {
       /^\s*--\s*CREATE POLICY "Users can insert their own balances"/m,
     );
     assertAtMostOneCreatePolicyPerTable(rollbackSql);
+    expect(rollbackSql).toMatch(
+      /GRANT MAINTAIN ON TABLE public\.creator_profiles_backup_20261027 TO anon, authenticated;/,
+    );
   });
 
   it("has active #3 metoken policy drops and revokes (not commented)", () => {

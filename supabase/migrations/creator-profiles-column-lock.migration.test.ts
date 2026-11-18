@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { CREATOR_PROFILE_PUBLIC_COLUMNS } from "@/lib/sdk/supabase/creator-profiles-select";
 
 const MIGRATIONS_DIR = path.join(__dirname);
 const REPO_ROOT = path.join(MIGRATIONS_DIR, "../..");
@@ -137,10 +138,18 @@ describe("creator_profiles column lock migration", () => {
   const grantColumns = parseGrantSelectColumns(migrationSql);
   const grantSet = new Set(grantColumns);
 
-  it("documents apply-after-#447 gate in the header", () => {
+  it("documents not-applied gate and prod select('*') in the header", () => {
     expect(migrationSql).toMatch(
-      /-- Apply after #447 is merged; verified no runtime anon\/authenticated select\('\*'\) on creator_profiles in prod \(code \+ 24h logs\)/,
+      /-- NOT applied; prod main still has anon select\('\*'\) on creator_profiles; apply only after #447 is in main\/prod/i,
     );
+    expect(migrationSql).toMatch(/livepeer_notifications_enabled is intentionally omitted/i);
+  });
+
+  it("excludes livepeer_notifications_enabled from CREATOR_PROFILE_PUBLIC_COLUMNS and migration B GRANT", () => {
+    expect(CREATOR_PROFILE_PUBLIC_COLUMNS).not.toContain(
+      "livepeer_notifications_enabled",
+    );
+    expect(grantSet.has("livepeer_notifications_enabled")).toBe(false);
   });
 
   it("excludes twin_pinata secret columns from GRANT SELECT", () => {
