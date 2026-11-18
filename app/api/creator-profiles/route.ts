@@ -4,6 +4,7 @@ import { supabaseService } from '@/lib/sdk/supabase/service';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
+import { CREATOR_PROFILE_PUBLIC_SELECT } from '@/lib/sdk/supabase/creator-profiles-select';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       if (supabaseService) {
         const result = await supabaseService
           .from('creator_profiles')
-          .select('*')
+          .select(CREATOR_PROFILE_PUBLIC_SELECT)
           .eq('owner_address', owner.toLowerCase())
           .single();
         data = result.data;
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
         const supabase = await createClient();
         const result = await supabase
           .from('creator_profiles')
-          .select('*')
+          .select(CREATOR_PROFILE_PUBLIC_SELECT)
           .eq('owner_address', owner.toLowerCase())
           .single();
         data = result.data;
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
       if (supabaseService) {
         const result = await supabaseService
           .from('creator_profiles')
-          .select('*')
+          .select(CREATOR_PROFILE_PUBLIC_SELECT)
           .or(`username.ilike.%${search}%,bio.ilike.%${search}%`)
           .range(offset, offset + limit - 1)
           .order('created_at', { ascending: false });
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
         const supabase = await createClient();
         const result = await supabase
           .from('creator_profiles')
-          .select('*')
+          .select(CREATOR_PROFILE_PUBLIC_SELECT)
           .or(`username.ilike.%${search}%,bio.ilike.%${search}%`)
           .range(offset, offset + limit - 1)
           .order('created_at', { ascending: false });
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
       if (supabaseService) {
         const result = await supabaseService
           .from('creator_profiles')
-          .select('*')
+          .select(CREATOR_PROFILE_PUBLIC_SELECT)
           .range(offset, offset + limit - 1)
           .order('created_at', { ascending: false });
         data = result.data;
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
         const supabase = await createClient();
         const result = await supabase
           .from('creator_profiles')
-          .select('*')
+          .select(CREATOR_PROFILE_PUBLIC_SELECT)
           .range(offset, offset + limit - 1)
           .order('created_at', { ascending: false });
         data = result.data;
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest) {
           bio,
           avatar_url,
         })
-        .select();
+        .select(CREATOR_PROFILE_PUBLIC_SELECT);
       data = result.data;
       error = result.error;
     } else {
@@ -186,7 +187,7 @@ export async function POST(request: NextRequest) {
           bio,
           avatar_url,
         })
-        .select();
+        .select(CREATOR_PROFILE_PUBLIC_SELECT);
       data = result.data;
       error = result.error;
     }
@@ -262,7 +263,7 @@ export async function PUT(request: NextRequest) {
         }, {
           onConflict: 'owner_address'
         })
-        .select();
+        .select(CREATOR_PROFILE_PUBLIC_SELECT);
       data = result.data;
       error = result.error;
     } else {
@@ -278,7 +279,7 @@ export async function PUT(request: NextRequest) {
         }, {
           onConflict: 'owner_address'
         })
-        .select();
+        .select(CREATOR_PROFILE_PUBLIC_SELECT);
       data = result.data;
       error = result.error;
     }

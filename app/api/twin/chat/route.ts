@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseService } from "@/lib/sdk/supabase/service";
-import { createClient } from "@/lib/sdk/supabase/server";
+import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { CREATOR_PROFILE_TWIN_ROUTING_SELECT } from "@/lib/sdk/supabase/creator-profiles-select";
 import { serverLogger } from "@/lib/utils/logger";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { forwardPinataAgentChat } from "@/lib/pinata/chat";
@@ -22,12 +22,10 @@ interface TwinRouting {
 }
 
 async function loadRouting(creatorAddress: string): Promise<TwinRouting | null> {
-  const supabase = supabaseService ?? (await createClient());
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("creator_profiles")
-    .select(
-      "twin_enabled, twin_pinata_base_url, twin_pinata_gateway_token, twin_chat_endpoint"
-    )
+    .select(CREATOR_PROFILE_TWIN_ROUTING_SELECT)
     .eq("owner_address", creatorAddress.toLowerCase())
     .maybeSingle();
   if (error) throw error;
