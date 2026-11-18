@@ -12,6 +12,8 @@ type UploadTicketPayload = {
 };
 
 function uploadTicketSecret(providerId: VideoProviderId): string {
+  // TODO(upload-ticket): Reusing the provider webhook secret is temporary; a dedicated
+  // upload-ticket signing secret needs G2 approval before we add a new env var.
   const envKey =
     providerId === "frameworks" ? "FRAMEWORKS_WEBHOOK_SECRET" : "LIVEPEER_WEBHOOK_SECRET";
   const secret = process.env[envKey]?.trim();

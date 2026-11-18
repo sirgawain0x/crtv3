@@ -6,6 +6,16 @@ import {
 import { resolveVideoProviderId } from "./config";
 import { mintUploadSessionTicket, verifyUploadSessionTicket } from "./upload-session-ticket";
 
+export function isWalletAuthProvided(auth: WalletAuthArgs | undefined): boolean {
+  if (!auth) return false;
+  return Boolean(
+    auth.address?.trim() &&
+      auth.signature?.trim() &&
+      Number.isFinite(auth.timestamp) &&
+      auth.timestamp > 0,
+  );
+}
+
 /** Authenticated creator for upload create (ignores any client-supplied creator address). */
 export async function requireUploadCreatorWallet(
   auth: WalletAuthArgs | undefined,
@@ -45,4 +55,43 @@ export async function requireUploadSessionOwner(
     );
   }
   return address;
+}
+
+/**
+ * Abort authorization: valid HMAC ticket for uploadId is required; wallet proof is optional.
+ * When proof is present and valid it must match the ticket creator; stale/missing proof still
+ * allows abort if the ticket is valid.
+ */
+export async function requireUploadSessionAbort(
+  auth: WalletAuthArgs | undefined,
+  uploadId: string,
+  uploadTicket: string | undefined,
+): Promise<string> {
+  if (!uploadTicket?.trim()) {
+    throw new WalletAuthError(403, "Missing upload session ticket");
+  }
+  const ticketOwner = verifyUploadSessionTicket(
+    uploadTicket,
+    uploadId,
+    resolveVideoProviderId(),
+  );
+
+  if (isWalletAuthProvided(auth)) {
+    try {
+      const { address } = await verifyWalletAuthArgs(auth);
+      if (address !== ticketOwner) {
+        throw new WalletAuthError(
+          403,
+          "Authenticated wallet does not own this upload session",
+        );
+      }
+      return address;
+    } catch (err) {
+      if (err instanceof WalletAuthError && err.status === 403) {
+        throw err;
+      }
+    }
+  }
+
+  return ticketOwner;
 }

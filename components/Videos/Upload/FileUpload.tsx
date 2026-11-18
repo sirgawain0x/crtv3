@@ -325,8 +325,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
           return;
         }
 
-        const boundAbortVodUpload = (id: string) =>
-          abortFrameworksVodUpload(auth, id, uploadTicket);
+        const abortWithTicketOnly = (id: string) =>
+          abortFrameworksVodUpload(undefined, id, uploadTicket);
 
         const uploadedParts = await uploadFileViaPresignedParts(
           fileToUpload,
@@ -335,15 +335,37 @@ const FileUpload: React.FC<FileUploadProps> = ({
             partSize: uploadRequestResult.partSize,
             uploadId,
             onProgress: setProgress,
-            abortVodUpload: boundAbortVodUpload,
+            abortVodUpload: abortWithTicketOnly,
           },
         );
 
+        let completeAuth;
         try {
-          await completeFrameworksVodUpload(auth, uploadId, uploadedParts, uploadTicket);
+          completeAuth = walletAuthHeadersToArgs(await getAuthHeaders());
+        } catch (reAuthErr) {
+          try {
+            await abortWithTicketOnly(uploadId);
+          } catch (abortErr) {
+            logger.error("abortVodUpload after re-auth failure", {
+              uploadId,
+              error: abortErr instanceof Error ? abortErr.message : String(abortErr),
+            });
+          }
+          setError(uploadAuthErrorMessage(reAuthErr));
+          setUploadState("idle");
+          return;
+        }
+
+        try {
+          await completeFrameworksVodUpload(
+            completeAuth,
+            uploadId,
+            uploadedParts,
+            uploadTicket,
+          );
         } catch (completeErr) {
           try {
-            await boundAbortVodUpload(uploadId);
+            await abortWithTicketOnly(uploadId);
           } catch (abortErr) {
             logger.error("abortVodUpload after completeFrameworksVodUpload failed", {
               uploadId,

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   abortFrameworksVodUpload: vi.fn(),
   uploadFileViaPresignedParts: vi.fn(),
   getLivepeerAsset: vi.fn(),
+  getAuthHeaders: vi.fn(),
 }));
 
 vi.mock("@/app/api/livepeer/assetUploadActions", () => ({
@@ -36,13 +37,17 @@ vi.mock("@/lib/hooks/accountkit/useUniversalAccount", () => ({
 vi.mock("@/lib/auth/useWalletAuth", () => ({
   useWalletAuth: () => ({
     isReady: true,
-    getAuthHeaders: vi.fn().mockResolvedValue({
-      "X-Wallet-Address": CREATOR,
-      "X-Wallet-Timestamp": "1700000000",
-      "X-Wallet-Signature": "0x" + "22".repeat(65),
-    }),
+    getAuthHeaders: mocks.getAuthHeaders,
   }),
 }));
+
+function authHeadersAt(timestamp: number) {
+  return {
+    "X-Wallet-Address": CREATOR,
+    "X-Wallet-Timestamp": String(timestamp),
+    "X-Wallet-Signature": "0x" + "22".repeat(65),
+  };
+}
 
 vi.mock("@/lib/utils/logger", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn() },
@@ -112,6 +117,7 @@ describe("FileUpload FrameWorks multipart completion", () => {
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, React });
     vi.clearAllMocks();
+    mocks.getAuthHeaders.mockResolvedValue(authHeadersAt(1_700_000_000));
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -145,8 +151,9 @@ describe("FileUpload FrameWorks multipart completion", () => {
     await clickUpload();
 
     await vi.waitFor(() => {
+      expect(mocks.getAuthHeaders).toHaveBeenCalledTimes(2);
       expect(mocks.completeFrameworksVodUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ address: CREATOR }),
+        expect.objectContaining({ address: CREATOR, timestamp: 1_700_000_000 }),
         "session-1",
         [{ partNumber: 1, etag: "etag-1" }],
         uploadTicket,
@@ -216,7 +223,7 @@ describe("FileUpload FrameWorks multipart completion", () => {
     await vi.waitFor(() => {
       expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledTimes(1);
       expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ address: CREATOR }),
+        undefined,
         "session-3",
         uploadTicket,
       );
@@ -243,12 +250,85 @@ describe("FileUpload FrameWorks multipart completion", () => {
 
     await vi.waitFor(() => {
       expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ address: CREATOR }),
+        undefined,
         "session-4",
         uploadTicket,
       );
     });
     expect(container.textContent).toContain("complete rejected");
+    expect(onFileUploaded).not.toHaveBeenCalled();
+  });
+
+  it("re-signs wallet proof before complete after a long multipart upload", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2023-11-14T22:13:20Z"));
+    const createTs = Math.floor(Date.now() / 1000);
+    const completeTs = createTs + 6 * 60 + 1;
+    mocks.getAuthHeaders
+      .mockResolvedValueOnce(authHeadersAt(createTs))
+      .mockImplementation(async () => {
+        vi.advanceTimersByTime(6 * 60 * 1000 + 1000);
+        return authHeadersAt(completeTs);
+      });
+
+    mocks.getLivepeerUploadUrl.mockResolvedValue({
+      asset: { id: "artifact-slow" },
+      uploadId: "session-slow",
+      uploadTicket,
+      partSize: 5_242_880,
+      presignedParts: [{ partNumber: 1, url: "https://parts.example/1" }],
+    });
+    mocks.completeFrameworksVodUpload.mockResolvedValue({ data: { asset: { id: "vod-slow" } } });
+
+    let uploadStarted = false;
+    mocks.uploadFileViaPresignedParts.mockImplementation(async () => {
+      uploadStarted = true;
+      return [{ partNumber: 1, etag: "etag-slow" }];
+    });
+
+    await renderUpload();
+    await selectFile();
+    await clickUpload();
+
+    await vi.waitFor(() => expect(uploadStarted).toBe(true));
+
+    await vi.waitFor(() => {
+      expect(mocks.completeFrameworksVodUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ timestamp: completeTs }),
+        "session-slow",
+        [{ partNumber: 1, etag: "etag-slow" }],
+        uploadTicket,
+      );
+    });
+    vi.useRealTimers();
+  });
+
+  it("aborts with ticket only when re-auth before complete fails", async () => {
+    mocks.getAuthHeaders
+      .mockResolvedValueOnce(authHeadersAt(1_700_000_000))
+      .mockRejectedValueOnce(new Error("User declined signature"));
+
+    mocks.getLivepeerUploadUrl.mockResolvedValue({
+      asset: { id: "artifact-reauth" },
+      uploadId: "session-reauth",
+      uploadTicket,
+      partSize: 5_242_880,
+      presignedParts: [{ partNumber: 1, url: "https://parts.example/1" }],
+    });
+
+    await renderUpload();
+    await selectFile();
+    await clickUpload();
+
+    await vi.waitFor(() => {
+      expect(mocks.abortFrameworksVodUpload).toHaveBeenCalledWith(
+        undefined,
+        "session-reauth",
+        uploadTicket,
+      );
+    });
+    expect(mocks.completeFrameworksVodUpload).not.toHaveBeenCalled();
+    expect(container.textContent).toMatch(/declined signature/i);
     expect(onFileUploaded).not.toHaveBeenCalled();
   });
 });

@@ -141,17 +141,18 @@ describe("assetUploadActions wallet auth", () => {
   });
 
   describe("abortFrameworksVodUpload", () => {
-    it("returns 401 without session", async () => {
-      mockVerifyWalletAuthArgs.mockRejectedValue(
-        new WalletAuthError(401, "Missing wallet auth"),
+    it("succeeds with valid ticket and no wallet auth", async () => {
+      const { mintUploadSessionTicket } = await import(
+        "@/lib/video-provider/upload-session-ticket"
       );
+      const ticket = mintUploadSessionTicket(UPLOAD_ID, CREATOR, "frameworks");
       const { abortFrameworksVodUpload } = await import("./assetUploadActions");
-      await expect(
-        abortFrameworksVodUpload(authArgs, UPLOAD_ID, "ticket"),
-      ).rejects.toMatchObject({ status: 401 });
+      await abortFrameworksVodUpload(undefined, UPLOAD_ID, ticket);
+      expect(mockAbortUpload).toHaveBeenCalledWith(UPLOAD_ID);
+      expect(mockVerifyWalletAuthArgs).not.toHaveBeenCalled();
     });
 
-    it("returns 403 for wrong wallet", async () => {
+    it("returns 403 when valid auth wallet mismatches ticket creator", async () => {
       mockVerifyWalletAuthArgs.mockResolvedValue({ address: OTHER });
       const { mintUploadSessionTicket } = await import(
         "@/lib/video-provider/upload-session-ticket"
@@ -163,8 +164,18 @@ describe("assetUploadActions wallet auth", () => {
       ).rejects.toMatchObject({ status: 403 });
     });
 
-    it("succeeds for ticket owner", async () => {
-      mockVerifyWalletAuthArgs.mockResolvedValue({ address: CREATOR });
+    it("fails when ticket is missing or invalid", async () => {
+      const { abortFrameworksVodUpload } = await import("./assetUploadActions");
+      await expect(abortFrameworksVodUpload(undefined, UPLOAD_ID, "")).rejects.toMatchObject({
+        status: 403,
+      });
+      await expect(
+        abortFrameworksVodUpload(undefined, UPLOAD_ID, "bad-ticket"),
+      ).rejects.toMatchObject({ status: expect.any(Number) });
+    });
+
+    it("succeeds with stale auth when ticket is valid", async () => {
+      mockVerifyWalletAuthArgs.mockRejectedValue(new WalletAuthError(401, "too old"));
       const { mintUploadSessionTicket } = await import(
         "@/lib/video-provider/upload-session-ticket"
       );

@@ -18,6 +18,7 @@ import {
 import {
   maybeMintUploadSessionTicket,
   requireUploadCreatorWallet,
+  requireUploadSessionAbort,
   requireUploadSessionOwner,
 } from "@/lib/video-provider/upload-session-auth";
 
@@ -141,12 +142,12 @@ export const getLivepeerUploadUrl = async (
 };
 
 export const abortFrameworksVodUpload = async (
-  auth: WalletAuthArgs,
+  auth: WalletAuthArgs | undefined,
   uploadId: string,
   uploadTicket: string,
 ): Promise<void> => {
   try {
-    await requireUploadSessionOwner(auth, uploadId, uploadTicket);
+    await requireUploadSessionAbort(auth, uploadId, uploadTicket);
   } catch (err) {
     toUploadActionError(err);
   }
