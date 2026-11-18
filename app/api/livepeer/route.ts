@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   assertUploadsAndAssetsAvailable,
   FrameWorksUploadsAssetsUnavailableError,
+  resolveVideoProviderId,
 } from "@/lib/video-provider";
 import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -36,6 +37,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (resolveVideoProviderId() === "frameworks") {
+    return NextResponse.json(
+      {
+        error:
+          "FrameWorks VOD uploads use the provider upload flow (request-upload / server actions), not Livepeer Studio proxy.",
+      },
+      { status: 409 },
+    );
+  }
+
   try {
     assertUploadsAndAssetsAvailable("livepeer.route.POST.request-upload");
   } catch (error) {
