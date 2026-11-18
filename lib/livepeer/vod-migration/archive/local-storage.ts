@@ -5,6 +5,7 @@ import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ArchiveManifest, ArchiveStorageBackend, StreamWriteResult } from "../types";
+import { writeFileAtomically } from "./atomic-write";
 import { sha256FileOnDisk } from "./file-hash";
 import { MANIFEST_FILE } from "./manifest";
 
@@ -101,7 +102,7 @@ export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
   }
 
   async writeManifest(manifest: ArchiveManifest): Promise<void> {
-    await mkdir(this.root, { recursive: true });
-    await writeFile(this.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    const body = `${JSON.stringify(manifest, null, 2)}\n`;
+    await writeFileAtomically(this.manifestPath, body);
   }
 }
