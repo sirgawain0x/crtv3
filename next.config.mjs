@@ -16,6 +16,12 @@ const nextConfig = {
   // Optimize memory usage in development
   transpilePackages: ['@privy-io/react-auth', '@privy-io/alchemy-migration'],
   experimental: {
+    // Custom webpack hooks disable Next's build worker by default. Run compilation
+    // in its own process so its heap is released before TypeScript starts.
+    webpackBuildWorker: true,
+    webpackMemoryOptimizations: true,
+    // Bound page-generation workers on memory-limited build machines.
+    cpus: 2,
     // Reduce memory usage by optimizing compilation
     optimizePackageImports: ['@privy-io/react-auth', '@privy-io/alchemy-migration', '@apollo/client', 'lucide-react', 'framer-motion'],
   },

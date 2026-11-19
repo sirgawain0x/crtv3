@@ -3,7 +3,7 @@
   "build": {
     "env": {
       "NODE_ENV": "production",
-      "NODE_OPTIONS": "--max-old-space-size=4096 --no-deprecation"
+      "NODE_OPTIONS": "--max-old-space-size=6144 --no-deprecation"
     }
   },
   "installCommand": "yarn install --production=false --network-timeout 600000",
