@@ -1,4 +1,5 @@
 import { createHmac, randomBytes } from "node:crypto";
+import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 import { resetFrameworksWebhookDedupeForTests } from "@/lib/video-provider/frameworks/webhook-dedupe";
@@ -67,7 +68,7 @@ describe("FrameWorks signed webhook route (#409)", () => {
     const signature = createHmac("sha256", options.key ?? signingKey)
       .update(`evt-local-verification.${timestamp}.${body}`)
       .digest("base64");
-    return new Request(webhookUrl, {
+    return new NextRequest(webhookUrl, {
       method: "POST",
       body: options.sentBody ?? body,
       headers: {
@@ -131,7 +132,7 @@ describe("FrameWorks signed webhook route (#409)", () => {
     expect(getVideoProvider).not.toHaveBeenCalled();
   });
 
-  it("persists a signed recording by artifactHash and permits retry after lookup failure", async () => {
+  it("resolves a signed v1 artifactId to the provider hash and permits retry after lookup failure", async () => {
     const artifactHash = "recording-hash-local";
     const asset = {
       id: artifactHash,
@@ -142,7 +143,8 @@ describe("FrameWorks signed webhook route (#409)", () => {
     const getAsset = vi.fn().mockResolvedValueOnce(null).mockResolvedValue(asset);
     vi.mocked(getVideoProvider).mockReturnValue({ assets: { get: getAsset } } as never);
     const body = eventBody("recording.ready", {
-      artifact: { artifactHash, artifactId: "internal-storage-id-local" },
+      // Public v1 payloads use artifactId, not the GraphQL artifactHash field.
+      artifact: { artifactId: artifactHash },
     });
 
     expect((await POST(signedRequest(body))).status).toBe(500);

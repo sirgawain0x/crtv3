@@ -24,6 +24,7 @@ npx next typegen
 npx tsc --noEmit
 npx vitest run app/api/livepeer/webhook/route.frameworks.integration.test.ts
 npx vitest run
+node --test tools/frameworks-webhook-relay/test/*.test.mjs
 ```
 
 The integration test imports the actual route, provider selector, HMAC verifier, webhook handler, and instance-local dedupe. It replaces only the external provider, persistence, and logging boundaries. Every test generates an ephemeral signing key locally; no deployed secret is read or emitted and no HTTP request is sent.
@@ -38,11 +39,11 @@ Checks:
 | Event signed with another endpoint's key | 401; no external work |
 | Multiple signatures with one match | 200 |
 | Signed `stream.live` and `stream.idle` | Correct persistence boundary called once; repeat in the same instance returns 204 |
-| Signed `recording.ready` | Look up `artifactHash`, preserve it as asset ID, persist once; a failed lookup returns 500 and can retry successfully |
+| Signed `recording.ready` | Accept the public v1 `artifact.artifactId` payload, resolve and preserve the provider hash as asset ID, persist once; a failed lookup returns 500 and can retry successfully |
 
 These tests establish local behavior. They do not validate the deployed secret, the FrameWorks account/token, network delivery, Supabase grants, or cross-instance dedupe.
 
-Local validation on the prepared change: Next.js route type generation passed; `tsc --noEmit` passed; all 186 Vitest files / 924 tests passed, including the 9 new signed-event integration cases. This change adds tests and this operator plan only; it does not change deployed application behavior. No cloud build is required to exercise these local tests.
+This change includes the nine route integration cases, a standalone undeployed relay, its Node tests/deployment configuration, and CI/operator documentation. The relay is isolated under `tools/frameworks-webhook-relay`; it is not automatically hosted by the crtv4 application Preview. Local commands exercise the tests without cloud access. TypeScript and all app/relay suites must pass on the reviewed head; hosted relay behavior is a later, separately approved verification gate.
 
 ## Endpoint signing-secret prerequisite
 

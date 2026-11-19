@@ -6,9 +6,12 @@ export const MAX_BODY_BYTES = 256 * 1024;
 const SIGNED_HEADERS = ["webhook-id", "webhook-timestamp", "webhook-signature"];
 
 function reply(status, error) {
+  const headers = { "Cache-Control": "no-store" };
+  if (status !== 204) headers["Content-Type"] = "application/json";
+  if (status === 405) headers.Allow = "POST";
   return new Response(status === 204 ? null : JSON.stringify(error ? { error } : { ok: true }), {
     status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers,
   });
 }
 
@@ -68,8 +71,9 @@ export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled
 
     const encodedKey = typeof webhookSecret === "string" ? webhookSecret.trim().replace(/^whsec_/, "") : "";
     const key = Buffer.from(encodedKey, "base64");
+    const bypass = typeof bypassSecret === "string" ? bypassSecret.trim() : "";
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encodedKey) || key.length !== 32 ||
-        typeof bypassSecret !== "string" || !bypassSecret || /[^\x21-\x7e]/.test(bypassSecret)) {
+        !bypass || /[^\x21-\x7e]/.test(bypass)) {
       return reply(503, "Relay not configured");
     }
     const headers = request.headers;
@@ -80,8 +84,9 @@ export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled
         Math.abs(Math.floor(now() / 1000) - Number(timestamp)) > 300 || !signature || signature.length > 1024) {
       return reply(401, "Invalid signature");
     }
+    const encoding = headers.get("content-encoding")?.trim().toLowerCase();
     if (!/^application\/json(?:\s*;|$)/i.test(headers.get("content-type") ?? "") ||
-        ![null, "identity"].includes(headers.get("content-encoding"))) {
+        (encoding !== undefined && encoding !== "identity")) {
       return reply(415, "JSON required");
     }
     const result = await readBody(request);
@@ -103,7 +108,7 @@ export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled
 
     const outgoingHeaders = new Headers({
       "Content-Type": "application/json",
-      "x-vercel-protection-bypass": bypassSecret,
+      "x-vercel-protection-bypass": bypass,
     });
     for (const name of SIGNED_HEADERS) outgoingHeaders.set(name, headers.get(name));
 
@@ -118,7 +123,11 @@ export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled
       });
       // Neither upstream response bodies nor headers/cookies are exposed or logged.
       if (response.body) await response.body.cancel().catch(() => {});
-      return response.ok ? reply(response.status === 204 ? 204 : 200) : reply(502, "Delivery failed");
+      if (response.status === 204) return reply(204);
+      if (response.status === 200 && /^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) {
+        return reply(200);
+      }
+      return reply(502, "Delivery failed");
     } catch {
       return reply(502, "Delivery failed");
     }

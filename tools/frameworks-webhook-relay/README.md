@@ -22,8 +22,9 @@ The staging application verifies the signature again. Its existing handler still
 - HMAC-SHA256 with the endpoint's 32-byte key, timing-safe comparison, and five-minute timestamp tolerance. An absent or malformed secret fails closed.
 - Body cap: 256 KiB, enforced on declared and streamed sizes. Body read timeout: 5 seconds. Upstream timeout: 8 seconds.
 - Target is fixed in source; no environment, request URL, headers, or JSON field can redirect delivery to production or another host.
-- Redirects are not followed. Upstream non-2xx responses and network failures become 502 so FrameWorks can retry.
+- Redirects are not followed. Only upstream 204 or upstream 200 with a JSON content type is acknowledged. HTML/login pages, other statuses (including other 2xx statuses), and network failures become 502 so FrameWorks can retry.
 - No console logging. Upstream body, cookies, headers, error messages, credentials, and URLs are not returned to the caller.
+- Static output is restricted to `public/`, which contains only a generic 404 page. README and tests are also excluded by `.vercelignore`; package metadata, source, configuration, and operational notes are outside the static output.
 - Dedupe remains the staging app's per-instance behavior. This relay does not make it durable or exactly once.
 
 ## Local validation
@@ -34,13 +35,15 @@ Requires Node.js 22; no install or external credentials are needed:
 node --test tools/frameworks-webhook-relay/test/*.test.mjs
 ```
 
-The tests cover raw-byte preservation, fixed destination, header filtering, tampering, malformed and multiple signatures, stale/future events, missing configuration, probe-only default and explicit business-event enablement, malformed event bodies, oversized/chunked/stalled bodies, wrong methods/paths/query strings/content types, redirects, upstream failures, credential redaction, and 204 acknowledgements. They use generated fixture keys and mocked fetch; no remote requests occur. The repository CI runs this suite after Vitest.
+The tests cover raw-byte preservation, fixed destination, header filtering, tampering, malformed and multiple signatures, stale/future events, missing/whitespace configuration, probe-only default and explicit business-event enablement, native Fetch-export environment wiring, malformed event bodies, oversized/chunked/stalled bodies, wrong methods/paths/query strings/content types, JSON charsets/identity encoding, redirects, upstream status/content-type checks, credential redaction, 204 acknowledgements, and the static-output file allowlist. They use generated fixture keys and mocked fetch; no remote requests occur. The repository CI runs this suite after Vitest.
 
 ## Concrete deployment proposal — approval required
 
-Proposed project: `crtv3-frameworks-staging-hooks`, team `creative-projects` (`team_9uA5FPSc9BJkiYc1itzFW5f7`). Root directory: `tools/frameworks-webhook-relay`. Framework: Other / native Vercel Functions, using the package's Node.js 22 engine. Explicitly set Install Command and Build Command to empty strings to skip installs and avoid inheriting the parent application's package-manager/build behavior. The API uses the documented default export with a Fetch handler; there is no body-parsing framework or dependency install.
+Proposed project: `crtv3-frameworks-staging-hooks`, team `creative-projects` (`team_9uA5FPSc9BJkiYc1itzFW5f7`). Root directory: `tools/frameworks-webhook-relay`. The committed `vercel.json` selects Framework Other (`null`), skips Install and Build Commands with explicit empty strings, and restricts static output to `public/`. Do not rely on blank dashboard fields with their Override switches off. Node.js 22 is selected by the package engine. The API uses the documented default export with a Fetch handler; there is no body-parsing framework or dependency install.
 
-Review and merge this code into staging under the existing QA/CTO gates before setting that new project's Production Branch to `staging`. Its public production-domain URL will serve the relay only. This is a new project's public deployment, not a promotion of the crtv4 application or its provider switch. Do not deploy an unreviewed branch or accidentally use crtv4 as the target project.
+Review and merge this code into staging under the existing QA/CTO gates before setting that new project's Production Branch to `staging`. Its public production-domain URL will serve the webhook function and a generic error page; it must not serve source or operational files. This is a new project's public deployment, not a promotion of the crtv4 application or its provider switch. Do not deploy an unreviewed branch or accidentally use crtv4 as the target project.
+
+Before provisioning, evaluate [Vercel Trusted Sources](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/trusted-sources) as an alternative: allow only the relay project's `production` environment to access crtv4's `preview` environment, with a short-lived OIDC token in `x-vercel-trusted-oidc-idp-token`. This could replace the project-wide long-lived bypass credential, but requires an approved trust rule and a reviewed change to runtime token acquisition (for example `@vercel/oidc`), dependencies, and tests. The current implementation supports the bypass-header design only. No trust rule, new dependency, or access-design change has been applied by this PR; select the approach with G2 before creating credentials.
 
 G2 approval must explicitly cover:
 
@@ -54,7 +57,7 @@ G2 approval must explicitly cover:
    | `FRAMEWORKS_WEBHOOK_SECRET` | The same existing FrameWorks endpoint secret that G2 confirmed is stored in crtv4's staging Preview |
    | `STAGING_VERCEL_BYPASS_SECRET` | The newly approved crtv4 automation-bypass credential |
 
-   G2 enters the existing endpoint secret privately; the agent must not decrypt/export it from Vercel. The custom destination-token name avoids colliding with Vercel's system bypass variable for the relay project's own protection settings.
+   G2 enters the existing endpoint secret privately; the agent must not decrypt/export it from Vercel. The custom destination-token name avoids colliding with Vercel's system bypass variable for the relay project's own protection settings. Both secrets are trimmed at their boundaries; empty values or interior bypass-key whitespace still fail closed. If entering values through a privately authenticated CLI session, use `printf %s` rather than `echo` and never expose the literal value in shell history or arguments.
    Leave `FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS` unset (or `false`). Only the exact string `true` enables business events, and setting it requires a separate approval plus a verified backup for the shared-database test writes. Keep the FrameWorks endpoint paused for business deliveries until that gate; otherwise its retry window can expire while the relay returns 503.
 5. Updating the **FrameWorks** endpoint currently targeting `tv.creativeplatform.xyz` to the new public relay's `/api/webhook` URL. Preserve its endpoint ID and signing secret. Do not change or delete the separate Livepeer Studio webhook.
 6. Running the provider's signed `webhook.test` delivery only, initially. Confirm the relay's canonical production-domain URL accepts external requests rather than redirecting to Vercel login. Production application cutover, stream creation, imports, database-writing events, and changes to crtv4's SSO setting are outside this approval.
@@ -66,6 +69,7 @@ The endpoint ID is useful for API operations, but G2 can update the endpoint thr
 ## Verification and rollback
 
 1. After the approved deployment is READY, external GET `/api/webhook` returns the relay's 405 response rather than a login redirect.
+   Confirm `/README.md`, `/package.json`, `/vercel.json`, `/test/webhook.test.mjs`, and `/api/webhook.mjs` do not return source or operational content (expect 404). The configuration/static-output checks are local evidence; these hosted checks still need the approved standalone deployment.
 2. Unsigned POST returns 401, and malformed/expired/tampered signatures return 401 without forwarding.
 3. FrameWorks Developer → Webhooks → Test sends the signed `webhook.test`; require a 2xx result. It is ignored by the staging event handler without a Supabase write.
 4. Capture only SHA/deployment, HTTP statuses, endpoint/event/delivery IDs and timestamps. A local mock test is not deployed provider-delivery evidence.
