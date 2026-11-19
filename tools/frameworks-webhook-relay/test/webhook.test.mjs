@@ -79,6 +79,36 @@ test("rejects byte tampering without forwarding", async () => {
   assert.equal(f.calls.length, 0);
 });
 
+test("pauses signed business events by default before they reach the shared database", async () => {
+  const f = fixture();
+  const payload = Buffer.from('{"id":"evt-local","type":"stream.live","data":{"streamId":"local"}}');
+  assert.equal((await f.relay(f.request({ payload }))).status, 503);
+  assert.equal(f.calls.length, 0);
+});
+
+test("forwards signed business events only after explicit enablement", async () => {
+  const f = fixture({ businessEventsEnabled: true });
+  const payload = Buffer.from('{"id":"evt-local","type":"stream.live","data":{"streamId":"local"}}');
+  assert.equal((await f.relay(f.request({ payload }))).status, 200);
+  assert.equal(f.calls.length, 1);
+  assert.deepEqual(f.calls[0][1].body, payload);
+});
+
+test("a string truthy value does not bypass the business-event gate", async () => {
+  const f = fixture({ businessEventsEnabled: "true" });
+  const payload = Buffer.from('{"id":"evt-local","type":"recording.ready","data":{}}');
+  assert.equal((await f.relay(f.request({ payload }))).status, 503);
+  assert.equal(f.calls.length, 0);
+});
+
+for (const text of ["{", "null", "{}", '{"type":42}']) {
+  test("rejects signed malformed event bodies without forwarding", async () => {
+    const f = fixture();
+    assert.equal((await f.relay(f.request({ payload: Buffer.from(text) }))).status, 400);
+    assert.equal(f.calls.length, 0);
+  });
+}
+
 for (const signature of ["", "v1,invalid", `v1,${"é".repeat(44)}`, "v2,invalid"]) {
   test("rejects malformed/nonmatching signature without throwing or forwarding", async () => {
     const f = fixture();

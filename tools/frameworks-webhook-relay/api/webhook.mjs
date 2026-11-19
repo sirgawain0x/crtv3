@@ -60,7 +60,7 @@ function validSignature(body, headers, key) {
   });
 }
 
-export function createRelay({ webhookSecret, bypassSecret, fetchImpl = fetch, now = Date.now }) {
+export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled = false, fetchImpl = fetch, now = Date.now }) {
   return async (request) => {
     const url = new URL(request.url);
     if (url.pathname !== "/api/webhook" || url.search) return reply(404, "Not found");
@@ -87,6 +87,19 @@ export function createRelay({ webhookSecret, bypassSecret, fetchImpl = fetch, no
     const result = await readBody(request);
     if (result.status) return reply(result.status, "Invalid request body");
     if (!validSignature(result.body, headers, key)) return reply(401, "Invalid signature");
+
+    let event;
+    try {
+      event = JSON.parse(result.body.toString("utf8"));
+    } catch {
+      return reply(400, "Invalid event");
+    }
+    if (!event || typeof event.type !== "string" || !event.type) return reply(400, "Invalid event");
+    // Preview shares the production database. A delivery probe must not enable
+    // business-event writes before their separate backup and approval gate.
+    if (event.type !== "webhook.test" && businessEventsEnabled !== true) {
+      return reply(503, "Business events are paused");
+    }
 
     const outgoingHeaders = new Headers({
       "Content-Type": "application/json",
@@ -118,6 +131,7 @@ export default {
     return createRelay({
       webhookSecret: process.env.FRAMEWORKS_WEBHOOK_SECRET,
       bypassSecret: process.env.STAGING_VERCEL_BYPASS_SECRET,
+      businessEventsEnabled: process.env.FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS === "true",
     })(request);
   },
 };
