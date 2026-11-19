@@ -1,0 +1,7 @@
+{
+  "name": "crtv3-frameworks-staging-webhook-relay",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "scripts": { "test": "node --test test/*.test.mjs" }
+}

@@ -28,3 +28,6 @@ jobs:
 
       - name: Vitest
         run: npx vitest run
+
+      - name: Staging webhook relay
+        run: node --test tools/frameworks-webhook-relay/test/*.test.mjs
