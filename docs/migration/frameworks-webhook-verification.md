@@ -48,7 +48,7 @@ Local validation on the prepared change: Next.js route type generation passed; `
 
 FrameWorks generates an endpoint-specific signing secret at endpoint creation and returns it once. Its create input has URL, description, event types, and API version; it does not accept a caller-selected signing secret. Therefore the existence of `FRAMEWORKS_WEBHOOK_SECRET` in Vercel does not establish that it matches the eventual endpoint.
 
-First ask G2 whether the endpoint already exists and request its ID only. Never request its secret or a credential-bearing URL in chat.
+G2 confirmed the endpoint already exists, currently targets `https://tv.creativeplatform.xyz/api/livepeer/webhook`, and its signing secret is set in staging. Secret confirmation is complete. Its ID is only needed for API operations; G2 can update the endpoint directly through the dashboard without sharing the ID. Never request its secret or a credential-bearing URL in chat.
 
 - If it exists, confirm the secret stored privately in staging is the secret from that endpoint.
 - If it does not exist, obtain approval to register it, then G2 privately copies the generated secret into staging's Preview variable and approves the required redeploy. Do not select the secret field in a query whose result will be shown in tool output or chat.
@@ -62,9 +62,9 @@ The FrameWorks API and sender at upstream commit `11c40d55ac8ede27df0ceb10d62048
 
 Vercel documents a query-parameter automation bypass for senders without custom headers. However, that puts a credential into the registered URL and can expose it to URL/access/delivery logs. Do not silently adopt it under the migration's prohibition on logging secrets or signed URLs. It needs an explicit access/secret-handling decision from G2; never assemble or display a real bypass URL in chat, source, CLI arguments, or this document.
 
-Alternatives to prepare after G2 selects the approach:
+Prepared access proposal and alternative:
 
-1. A dedicated public webhook-only relay with a fixed staging destination. It must verify the original HMAC and timestamp, bound request size, preserve the exact body and signed headers, and forward with a privately stored bypass header. It must not log credentials or raw URLs. This requires a reviewed implementation, infrastructure/secrets approval, and any build/spend approval before provisioning.
+1. A dedicated public webhook-only relay with a fixed staging destination is now prepared under `tools/frameworks-webhook-relay`. It verifies the original HMAC and timestamp, bounds request size and time, preserves the exact body and signed headers, and forwards with a privately stored bypass header. It does not log credentials or raw URLs. Its README specifies the exact proposed project, private environment names, project-scoped bypass credential, account update, and approval gates. It is not deployed. This requires review and infrastructure/secrets/build/spend approval before provisioning.
 2. A narrowly scoped staging access exception, only if the available Vercel controls support the agreed scope. Verify whether it exposes a whole hostname rather than only a route before proposing it. Auth/access changes require G2's approval. Do not disable protection across the project.
 
 No relay, bypass credential, domain, access exception, or new project has been created. Existing agent authentication is suitable for agent checks, not a credential to hand to FrameWorks.
