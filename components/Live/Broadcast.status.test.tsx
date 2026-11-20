@@ -24,6 +24,7 @@ describe("Broadcast local session status", () => {
     mocks.auth.mockResolvedValue({ "x-wallet-address": owner, "x-wallet-timestamp": "1", "x-wallet-signature": "test" });
     mocks.sources.mockResolvedValue([{ type: "hls", src: "https://example.test/index.m3u8" }]);
     mocks.update.mockResolvedValue({}); mocks.fetch.mockResolvedValue({ ok: true });
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
     vi.stubGlobal("fetch", mocks.fetch); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   });
@@ -79,6 +80,24 @@ describe("Broadcast local session status", () => {
     await render(recording, owner, true);
     await act(async () => vi.advanceTimersByTimeAsync(130_000));
     expect(mocks.fetch).toHaveBeenCalledTimes(recording ? 3 : 0);
+  });
+
+  it("loads the owner's masked RTMP destination only on request", async () => {
+    await render(false);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Stream settings"]')!.click());
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    mocks.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ provider: "frameworks", rtmpUrl: "rtmp://edge.frameworks.network/live/test-local-key" }) });
+    const load = Array.from(document.querySelectorAll("button")).find(button => button.textContent === "Load streaming settings")!;
+    await act(async () => load.click());
+    expect(mocks.fetch).toHaveBeenCalledWith("/api/streams/ingest", expect.objectContaining({
+      method: "POST", body: JSON.stringify({ creatorAddress: owner, protocol: "RTMP" }),
+      headers: expect.objectContaining({ "x-wallet-address": owner }),
+    }));
+    const input = document.querySelector<HTMLInputElement>('#broadcast-rtmp-key')!;
+    expect(input.type).toBe("password");
+    expect(input.value).toBe("test-local-key");
+    expect(document.querySelector<HTMLInputElement>('#broadcast-rtmp-server')?.value).toBe("rtmp://edge.frameworks.network/live/");
   });
 
 });

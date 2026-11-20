@@ -72,6 +72,7 @@ function streamRequest(body: Record<string, unknown>) {
 }
 
 describe("POST /api/livepeer/livepeer-proxy", () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireWalletAuthFor.mockResolvedValue({ address: CREATOR });
@@ -214,4 +215,11 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
     expect(json.streamKey).toBe("new-key");
     expect(json.replaced).toBe(true);
   });
+  it("allows FrameWorks creation without a legacy Livepeer private key", async () => {
+    vi.stubEnv("VIDEO_PROVIDER", "frameworks"); delete process.env.LIVEPEER_FULL_API_KEY;
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({ streamId: "fw-stream", playbackId: "fw-playback", streamKey: "fw-test-key", reused: false, replaced: false, synced: false });
+    expect((await POST(streamRequest(validBody))).status).toBe(200);
+    expect(mockEnsureLivepeerStreamForCreator).toHaveBeenCalled();
+  });
+
 });

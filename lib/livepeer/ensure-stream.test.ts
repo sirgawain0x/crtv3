@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetLivepeerStreamOrNull = vi.fn();
 const mockCreateLivepeerStream = vi.fn();
@@ -38,6 +38,7 @@ const baseOpts = {
 };
 
 describe("ensureLivepeerStreamForCreator", () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
     mockHasLivepeerPrivateApiKey.mockReturnValue(true);
@@ -238,4 +239,13 @@ describe("ensureLivepeerStreamForCreator", () => {
     expect(mockCreateStreamRecord).toHaveBeenCalled();
     expect(mockGetLivepeerStreamOrNull).not.toHaveBeenCalled();
   });
+  it("creates through FrameWorks without a legacy Livepeer private key", async () => {
+    vi.stubEnv("VIDEO_PROVIDER", "frameworks"); mockHasLivepeerPrivateApiKey.mockReturnValue(false);
+    mockCreateLivepeerStream.mockResolvedValue({ streamId: "fw-stream", playbackId: "fw-playback", streamKey: "fw-test-key" });
+    mockCreateStreamRecord.mockResolvedValue({});
+    const result = await ensureLivepeerStreamForCreator({ ...baseOpts, existing: null });
+    expect(result.streamId).toBe("fw-stream");
+    expect(mockCreateLivepeerStream).toHaveBeenCalled();
+  });
+
 });
