@@ -3,7 +3,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useBroadcast } from "./useBroadcast";
-const mocks = vi.hoisted(() => ({ resolve: vi.fn(), fetch: vi.fn(), refresh: vi.fn(), error: vi.fn() }));
+const mocks = vi.hoisted(() => ({ resolve: vi.fn(), fetch: vi.fn(), refresh: vi.fn(), error: vi.fn(), media: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: mocks.error, success: vi.fn(), warning: vi.fn(), message: vi.fn() } }));
 vi.mock("@/lib/utils/logger", () => ({ logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn() } }));
 const destination = "https://edge.frameworks.network/whip/test-key";
@@ -25,7 +25,8 @@ describe("provider-aware browser publishing", () => {
     mocks.fetch.mockImplementation(async () => new Response(sdp, { status: 201, headers: { Location: "/whip/resource/test-session" } }));
     const track = { readyState: "live", stop: vi.fn(), enabled: true };
     const stream = { getTracks: () => [track], getAudioTracks: () => [track], getVideoTracks: () => [track] };
-    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia: vi.fn(async () => stream), enumerateDevices: vi.fn(async () => []), addEventListener: vi.fn(), removeEventListener: vi.fn() } });
+    mocks.media.mockResolvedValue(stream);
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia: mocks.media, enumerateDevices: vi.fn(async () => []), addEventListener: vi.fn(), removeEventListener: vi.fn() } });
     vi.stubGlobal("RTCPeerConnection", Peer);
     vi.stubGlobal("RTCSessionDescription", class { constructor(value: RTCSessionDescriptionInit) { Object.assign(this, value); } });
     vi.stubGlobal("fetch", mocks.fetch); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -100,6 +101,28 @@ describe("provider-aware browser publishing", () => {
     await act(async () => { finish(new Response(sdp, { status: 201, headers: { Location: "/whip/resource/late-session" } })); await pending; });
     expect(mocks.fetch).toHaveBeenLastCalledWith("https://edge.frameworks.network/whip/resource/late-session", { method: "DELETE" });
     expect(mocks.error).not.toHaveBeenCalled();
+  });
+
+  it("does not reconnect after a delayed legacy credential refresh finishes after unmount", async () => {
+    mocks.resolve.mockResolvedValue({ provider: "livepeer", whipUrl: "https://playback.livepeer.studio/webrtc/old-key" });
+    mocks.fetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    let finish!: (key: string) => void;
+    mocks.refresh.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    await render(); let pending!: Promise<void>;
+    await act(async () => { pending = api.startBroadcast(); });
+    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+    await act(async () => root.unmount()); mounted = false;
+    await act(async () => { finish("new-key"); await pending; });
+    expect(mocks.resolve).toHaveBeenCalledTimes(1); expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.error).not.toHaveBeenCalled();
+  });
+  it("releases a camera request that resolves after unmount", async () => {
+    let finish!: (stream: unknown) => void;
+    mocks.media.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    await render(); await act(async () => root.unmount()); mounted = false;
+    const stop = vi.fn();
+    await act(async () => finish({ getTracks: () => [{ stop }] }));
+    expect(stop).toHaveBeenCalledTimes(1); expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
 });

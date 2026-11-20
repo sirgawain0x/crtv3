@@ -75,6 +75,8 @@ export function useBroadcast({
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
     const whipResourceRef = useRef<string | null>(null);
     const connectionGenerationRef = useRef(0);
+    const mountedRef = useRef(true);
+    const mediaRequestRef = useRef(0);
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -84,6 +86,11 @@ export function useBroadcast({
     useEffect(() => {
         activeStreamKeyRef.current = streamKey ?? null;
     }, [streamKey]);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
 
     // Enumerate devices
     useEffect(() => {
@@ -114,6 +121,7 @@ export function useBroadcast({
 
     // Initialize Media Stream
     const initStream = useCallback(async () => {
+        const mediaRequest = ++mediaRequestRef.current;
         try {
             if (mediaStreamRef.current) {
                 mediaStreamRef.current.getTracks().forEach(track => track.stop());
@@ -129,6 +137,10 @@ export function useBroadcast({
             };
 
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (!mountedRef.current || mediaRequest !== mediaRequestRef.current) {
+                stream.getTracks().forEach(track => track.stop());
+                return;
+            }
             mediaStreamRef.current = stream;
             setLocalStream(stream);
 
@@ -142,6 +154,7 @@ export function useBroadcast({
             stream.getVideoTracks().forEach(track => track.enabled = isVideoEnabled);
 
         } catch (err) {
+            if (!mountedRef.current || mediaRequest !== mediaRequestRef.current) return;
             logger.error('Error accessing media devices:', err);
             setError('Failed to access camera/microphone');
             toast.error('Failed to access camera/microphone');
@@ -152,6 +165,7 @@ export function useBroadcast({
     useEffect(() => {
         initStream();
         return () => {
+            mediaRequestRef.current += 1;
             if (mediaStreamRef.current) {
                 mediaStreamRef.current.getTracks().forEach(track => track.stop());
             }
@@ -201,8 +215,9 @@ export function useBroadcast({
         teardownPeerConnection();
         const generation = connectionGenerationRef.current;
         const assertCurrent = () => {
-            if (generation !== connectionGenerationRef.current) throw new DOMException('Broadcast stopped', 'AbortError');
+            if (!mountedRef.current || generation !== connectionGenerationRef.current) throw new DOMException('Broadcast stopped', 'AbortError');
         };
+        assertCurrent();
         // Resolve at Go Live, not on mount: FrameWorks placement is dynamic.
         const destination = resolveIngest ? await resolveIngest() : null;
         assertCurrent();
@@ -496,6 +511,7 @@ export function useBroadcast({
     };
 
     const stopBroadcast = () => {
+        mediaRequestRef.current += 1;
         // Stop screen sharing if active
         if (screenStreamRef.current) {
             screenStreamRef.current.getTracks().forEach((track) => track.stop());
