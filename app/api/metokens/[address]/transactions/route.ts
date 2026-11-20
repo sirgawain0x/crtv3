@@ -112,7 +112,6 @@ export async function POST(
       amount,
       collateral_amount,
       transaction_hash,
-      block_number,
       video_id,
       playback_id,
     } = body;
@@ -214,6 +213,13 @@ export async function POST(
         );
       }
       throw verifyErr;
+    }
+
+    // When chain indexing owns trades, do not race its canonical event rows with
+    // a second random-id browser-ledger insert. Receipt authentication still runs.
+    if (process.env.METOKEN_TRADE_INDEXER_ENABLED === 'true' &&
+      ['mint', 'burn', 'buy', 'sell', 'subscribe', 'unsubscribe', 'contribute'].includes(transaction_type)) {
+      return NextResponse.json({ data: null, indexingPending: true }, { status: 202 });
     }
 
     const transactionData = {
