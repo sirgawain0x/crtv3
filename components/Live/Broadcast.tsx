@@ -48,6 +48,7 @@ interface BroadcastProps {
   playbackId?: string | null;
   creatorAddress: string;
   saveRecording?: boolean;
+  recordingSettingsReady?: boolean;
   /** Called when stream-key heal returns fresh Livepeer credentials. */
   onCredentialsChange?: (creds: {
     streamKey: string;
@@ -205,6 +206,7 @@ function BroadcastWithControls({
   playbackId,
   creatorAddress,
   saveRecording = true,
+  recordingSettingsReady = true,
   onCredentialsChange,
 }: BroadcastProps) {
   const { getAuthHeaders } = useWalletAuth();
@@ -286,17 +288,27 @@ function BroadcastWithControls({
   });
 
   const finalizeTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const broadcastSessionRef = useRef({ identity: "", reachedLive: false });
 
   // Sync is_live with DB only after Livepeer playback is ready (or warm-up budget expires).
   // Finalize recordings when broadcast ends.
   useEffect(() => {
     if (!creatorAddress) return;
 
+    const identity = `${creatorAddress}:${activeStreamId}`;
+    if (broadcastSessionRef.current.identity !== identity) {
+      broadcastSessionRef.current = { identity, reachedLive: false };
+    }
+    if (status === "live") broadcastSessionRef.current.reachedLive = true;
+    // A fresh studio, failed camera setup, or failed connection is not a stop.
+    if (status !== "live" && !broadcastSessionRef.current.reachedLive) return;
+    if (status !== "live" && status !== "idle" && status !== "error") return;
     const abort = new AbortController();
 
     const syncStatus = async () => {
       try {
         const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+        if (abort.signal.aborted) return;
         if (status === 'live') {
           if (activePlaybackId) {
             await waitForPlaybackSources(activePlaybackId, { signal: abort.signal });
@@ -312,8 +324,13 @@ function BroadcastWithControls({
             playbackId: activePlaybackId,
           });
         } else if (status === 'idle' || status === 'error') {
-          await updateStream(creatorAddress, { is_live: false, last_live_at: new Date().toISOString() }, auth);
+          await updateStream(creatorAddress, { is_live: false }, auth);
+          if (abort.signal.aborted) return;
           logger.info("Stream marked as offline in DB");
+          // Keep the session pending if Stop races a recording update. Its
+          // confirmed preference must decide whether to finalize the recording.
+          if (!recordingSettingsReady) return;
+          broadcastSessionRef.current.reachedLive = false;
           if (status === 'idle' && activeStreamId && saveRecording) {
             // Recording assets may take a minute to process; retry a few times.
             const delays = [15_000, 45_000, 120_000];
@@ -335,7 +352,7 @@ function BroadcastWithControls({
       finalizeTimeoutsRef.current.forEach(clearTimeout);
       finalizeTimeoutsRef.current = [];
     };
-  }, [status, creatorAddress, activeStreamId, activePlaybackId, getAuthHeaders, saveRecording]);
+  }, [status, creatorAddress, activeStreamId, activePlaybackId, getAuthHeaders, saveRecording, recordingSettingsReady]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -472,7 +489,7 @@ function BroadcastWithControls({
               ) : (
                 <button
                   onClick={startBroadcast}
-                  disabled={status === 'loading'}
+                  disabled={status === 'loading' || !recordingSettingsReady}
                   className="flex items-center gap-2 bg-white hover:bg-gray-100 text-black px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50"
                 >
                   <Radio size={16} className={status === 'loading' ? 'animate-spin' : ''} />
