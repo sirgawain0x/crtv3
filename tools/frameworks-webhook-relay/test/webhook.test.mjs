@@ -98,12 +98,60 @@ test("pauses signed business events by default before they reach the shared data
   assert.equal(f.calls.length, 0);
 });
 
-test("forwards signed business events only after explicit enablement", async () => {
-  const f = fixture({ businessEventsEnabled: true });
-  const payload = Buffer.from('{"id":"evt-local","type":"stream.live","data":{"streamId":"local"}}');
+for (const type of ["stream.live", "stream.idle"]) {
+  test(`forwards signed ${type} only for the enabled designated test stream`, async () => {
+    const f = fixture({ businessEventsEnabled: true, testStreamId: "local" });
+    const payload = Buffer.from(JSON.stringify({ id: "evt-local", type, data: { streamId: "local" } }));
+    assert.equal((await f.relay(f.request({ payload }))).status, 200);
+    assert.equal(f.calls.length, 1);
+    assert.deepEqual(f.calls[0][1].body, payload);
+  });
+}
+
+for (const [label, testStreamId, data] of [
+  ["missing test ID", undefined, { streamId: "local" }],
+  ["blank test ID", " \t", { streamId: "local" }],
+  ["invalid test ID", "local other", { streamId: "local other" }],
+  ["oversized test ID", "x".repeat(201), { streamId: "x".repeat(201) }],
+  ["another stream", "local", { streamId: "creator-stream" }],
+  ["missing stream ID", "local", {}],
+  ["numeric stream ID", "123", { streamId: 123 }],
+  ["array stream ID", "local", { streamId: ["local"] }],
+  ["null data", "local", null],
+  ["missing data", "local", undefined],
+]) {
+  test(`blocks enabled stream events with ${label} without forwarding`, async () => {
+    const f = fixture({ businessEventsEnabled: true, testStreamId });
+    for (const type of ["stream.live", "stream.idle"]) {
+      const payload = Buffer.from(JSON.stringify({ id: "evt-local", type, data }));
+      assert.equal((await f.relay(f.request({ payload }))).status, 503);
+    }
+    assert.equal(f.calls.length, 0);
+  });
+}
+
+for (const type of ["recording.ready", "upload.ready", "clip.ready", "stream.deleted", "unknown"]) {
+  test(`blocks ${type} even with an enabled matching test stream`, async () => {
+    const f = fixture({ businessEventsEnabled: true, testStreamId: "local" });
+    const payload = Buffer.from(JSON.stringify({ id: "evt-local", type, data: { streamId: "local" } }));
+    assert.equal((await f.relay(f.request({ payload }))).status, 503);
+    assert.equal(f.calls.length, 0);
+  });
+}
+
+test("matches trimmed stream IDs consistently with the staging handler without changing signed bytes", async () => {
+  const f = fixture({ businessEventsEnabled: true, testStreamId: " local " });
+  const payload = Buffer.from('{"id":"evt-local","type":"stream.live","data":{"streamId":" local "}}');
   assert.equal((await f.relay(f.request({ payload }))).status, 200);
-  assert.equal(f.calls.length, 1);
   assert.deepEqual(f.calls[0][1].body, payload);
+});
+
+test("the test stream ID alone does not enable business events or affect delivery probes", async () => {
+  const f = fixture({ testStreamId: "local" });
+  const payload = Buffer.from('{"id":"evt-local","type":"stream.live","data":{"streamId":"local"}}');
+  assert.equal((await f.relay(f.request({ payload }))).status, 503);
+  assert.equal(f.calls.length, 0);
+  assert.equal((await f.relay(f.request())).status, 200);
 });
 
 test("a string truthy value does not bypass the business-event gate", async () => {
@@ -285,6 +333,7 @@ for (const value of [undefined, "false", "TRUE", "1", "true ", "true"]) {
       FRAMEWORKS_WEBHOOK_SECRET: f.webhookSecret,
       STAGING_VERCEL_BYPASS_SECRET: f.bypass,
       FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS: value,
+      FRAMEWORKS_RELAY_TEST_STREAM_ID: "local",
     });
     t.mock.method(Date, "now", () => now);
     t.mock.method(globalThis, "fetch", f.fetchImpl);
@@ -301,12 +350,30 @@ test("native Fetch export wires both private keys and permits a delivery probe b
     FRAMEWORKS_WEBHOOK_SECRET: f.webhookSecret,
     STAGING_VERCEL_BYPASS_SECRET: f.bypass,
     FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS: undefined,
+    FRAMEWORKS_RELAY_TEST_STREAM_ID: undefined,
   });
   t.mock.method(Date, "now", () => now);
   t.mock.method(globalThis, "fetch", f.fetchImpl);
   assert.equal((await nativeHandler.fetch(f.request())).status, 200);
   assert.equal(f.calls[0][1].headers.get("x-vercel-protection-bypass"), f.bypass);
 });
+
+for (const testStreamId of [undefined, "other-stream", " "]) {
+  test(`native Fetch export blocks an enabled event without a matching test ID (${JSON.stringify(testStreamId) ?? "unset"})`, async (t) => {
+    const f = fixture();
+    setTestEnvironment(t, {
+      FRAMEWORKS_WEBHOOK_SECRET: f.webhookSecret,
+      STAGING_VERCEL_BYPASS_SECRET: f.bypass,
+      FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS: "true",
+      FRAMEWORKS_RELAY_TEST_STREAM_ID: testStreamId,
+    });
+    t.mock.method(Date, "now", () => now);
+    t.mock.method(globalThis, "fetch", f.fetchImpl);
+    const payload = Buffer.from('{"id":"evt-local","type":"stream.live","data":{"streamId":"local"}}');
+    assert.equal((await nativeHandler.fetch(f.request({ payload }))).status, 503);
+    assert.equal(f.calls.length, 0);
+  });
+}
 
 test("standalone static output contains only the generic error page, not source or operational files", async () => {
   const root = fileURLToPath(new URL("..", import.meta.url));
