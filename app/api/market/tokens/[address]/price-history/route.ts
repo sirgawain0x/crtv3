@@ -3,10 +3,8 @@ import { createClient } from '@/lib/sdk/supabase/server';
 import { formatEther } from 'viem';
 import { serverLogger } from '@/lib/utils/logger';
 import { resolveLiveMeTokenMarket } from '@/lib/metokens/resolveLiveMeTokenMarket';
-import {
-  dbMeTokenTransactionAmountToWei,
-  dbMetokenTotalSupplyToWei,
-} from '@/lib/utils/metoken-units';
+import { dbMetokenTotalSupplyToWei } from '@/lib/utils/metoken-units';
+import { toFiniteNumber } from '@/lib/metokens/units';
 
 export interface PriceHistoryPoint {
   timestamp: number;
@@ -39,7 +37,7 @@ export async function GET(
     // Get MeToken info
     const { data: meToken, error: meTokenError } = await supabase
       .from('metokens')
-      .select('id, address, total_supply, tvl, hub_id')
+      .select('id, address, total_supply, tvl, hub_id, created_at')
       .eq('address', address.toLowerCase())
       .single();
 
@@ -93,19 +91,25 @@ export async function GET(
       txQuery = txQuery.gte('created_at', startDate.toISOString());
     }
 
-    const { data: transactions, error: txError } = await txQuery.order(
+    const { data: allTransactions, error: txError } = await txQuery.order(
       'created_at',
       { ascending: true }
     );
+
+    const transactions = (allTransactions ?? []).filter(tx => {
+      const time = new Date(tx.created_at).getTime();
+      return ['mint', 'burn'].includes(tx.transaction_type) && Number.isFinite(time) && time <= now.getTime() && (!startDate || time >= startDate.getTime());
+    });
 
     const liveMarket = await resolveLiveMeTokenMarket(
       meToken.address,
       meToken.hub_id ?? undefined
     );
 
-    let currentTotalSupply =
+    const currentTotalSupply =
       liveMarket?.totalSupplyWei ?? dbMetokenTotalSupplyToWei(meToken.total_supply);
-    let currentTvl = liveMarket?.tvl ?? (meToken.tvl || 0);
+    const currentTvl = liveMarket?.tvl ?? toFiniteNumber(meToken.tvl);
+    const currentSupplyTokens = Number(formatEther(currentTotalSupply));
 
     const currentPrice =
       liveMarket?.price ??
@@ -117,7 +121,7 @@ export async function GET(
       address: meToken.address,
       dbSupply: meToken.total_supply,
       dbTvl: meToken.tvl,
-      finalSupply: currentTotalSupply.toString(),
+      finalSupplyTokens: currentSupplyTokens,
       finalTvl: currentTvl,
       calculatedPrice: currentPrice,
     });
@@ -144,20 +148,18 @@ export async function GET(
     }>();
 
     const currentTimestamp = Math.floor(now.getTime() / 1000);
-    const currentKey = interval === 'hour'
-      ? new Date(currentTimestamp * 1000).toISOString().slice(0, 13) + ':00:00'
-      : new Date(currentTimestamp * 1000).toISOString().slice(0, 10);
 
     // Process transactions to build price history
     // Logic: We have the *Current* state (reliable) and the list of transactions in the period.
     // To find the *Start* state (at startDate), we must "reverse replay" the transactions from Current backwards.
     // Then we can forward replay to generate the points.
 
-    let runningSupply = BigInt(0);
+    let runningSupply = 0;
     let runningTvl = 0;
 
-    // 1. Reverse Replay to find initial state
-    let replaySupply = currentTotalSupply;
+    // 1. Reverse Replay to find initial state.
+    // All values are whole units: supply in MeTokens, TVL in hub-asset USD.
+    let replaySupply = currentSupplyTokens;
     let replayTvl = currentTvl;
 
     // Sort descending for reverse replay
@@ -166,48 +168,37 @@ export async function GET(
     );
 
     for (const tx of reverseTxs) {
-      const amount = dbMeTokenTransactionAmountToWei(tx.amount);
-      const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
+      const amount = toFiniteNumber(tx.amount);
+      const collateral = toFiniteNumber(tx.collateral_amount);
+      const hasCollateral = tx.collateral_amount != null && tx.collateral_amount !== '' && Number.isFinite(Number(tx.collateral_amount));
 
       // Price at this moment (approximate using current replay state)
-      const replayPrice = replaySupply > 0n ? replayTvl / parseFloat(formatEther(replaySupply)) : 0;
+      const replayPrice = replaySupply > 0 ? replayTvl / replaySupply : 0;
 
       if (tx.transaction_type === 'mint') {
         // Undo Mint: Remove supply, remove collateral
         replaySupply -= amount;
         replayTvl -= collateral;
       } else if (tx.transaction_type === 'burn') {
-        // Undo Burn: Add supply back, add collateral back
+        // Undo Burn: add the supply back and the collateral that was returned
         replaySupply += amount;
-        // Estimate collateral returned if not stored: amount * price
-        // If collateral_amount exists (it should for burns in a perfect world, but might not), use it? 
-        // DB schema says collateral_amount is there.
-        // If assume collateral_amount is accurate:
-        // replayTvl += collateral; 
-        // But in `history` route we see collateral_amount is often used for mints.
-        // Let's stick to estimation if collateral is 0 or low? 
-        // For consistency with forward pass, let's use the price estimation derived from similar logic.
-        // Forward pass says: `returnedEstimate = ... * preTxPrice`.
-
-        // Undo burn: Tvl = Tvl_after + returned.
-        // returned = amount * price_before_burn.  
-        // price_before_burn = (Tvl_after + returned) / (Supply_after + amount).
-        // This is circular if we don't know returned.
-
-        // Let's use the simple approximation: 
-        const estimatedValue = parseFloat(formatEther(amount)) * replayPrice;
-        replayTvl += estimatedValue;
+        replayTvl += hasCollateral ? collateral : amount * replayPrice;
       }
     }
 
     // Set initial running values (clamped to 0 to avoid precision errors causing negatives)
-    runningSupply = replaySupply > 0n ? replaySupply : 0n;
+    runningSupply = replaySupply > 0 ? replaySupply : 0;
     runningTvl = replayTvl > 0 ? replayTvl : 0;
 
+    // Snapshot the state at the start of the period BEFORE the forward replay
+    // mutates the running values — this is the baseline for the period % gain.
+    const startSupply = runningSupply;
+    const startTvl = runningTvl;
+
     serverLogger.debug('Reverse Replay Result:', {
-      currentSupply: currentTotalSupply.toString(),
+      currentSupply: currentSupplyTokens,
       currentTvl,
-      startSupply: runningSupply.toString(),
+      startSupply: runningSupply,
       startTvl: runningTvl,
       txCount: transactions?.length
     });
@@ -228,37 +219,27 @@ export async function GET(
         : txDate.toISOString().slice(0, 10);
 
       // Calculate price BEFORE this transaction to estimate returned value for burns
-      const preTxPrice = runningSupply > 0n
-        ? runningTvl / parseFloat(formatEther(runningSupply))
-        : 0;
+      const preTxPrice = runningSupply > 0 ? runningTvl / runningSupply : 0;
 
-      // Update running totals based on transaction type
+      // Update running totals based on transaction type (whole units throughout)
+      const amount = toFiniteNumber(tx.amount);
+      const collateral = toFiniteNumber(tx.collateral_amount);
+      const hasCollateral = tx.collateral_amount != null && tx.collateral_amount !== '' && Number.isFinite(Number(tx.collateral_amount));
+
       if (tx.transaction_type === 'mint') {
-        // Fallback: Use 'amount' as proxy for minted tokens if better data unavailable
-        const minted = dbMeTokenTransactionAmountToWei(tx.amount);
-        const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
-        runningSupply += minted;
+        runningSupply += amount;
         runningTvl += collateral;
       } else if (tx.transaction_type === 'burn') {
-        const burned = dbMeTokenTransactionAmountToWei(tx.amount);
-
-        // ESTIMATION: We lack assets_returned in DB.
-        // Estimate returned assets based on the price *before* the burn.
-        // This assumes the burn happened at approximately the current calculated price.
-        // returned = burned_tokens * price_per_token
-        const returnedEstimate = parseFloat(formatEther(burned)) * preTxPrice;
-
-        runningSupply -= burned;
-        runningTvl -= returnedEstimate;
-
-        // Safety check: TVL shouldn't go below 0 (though technically possible with slippage/fees, for display we clamp)
+        // Use the value actually returned when we have it, otherwise value the
+        // burn at the price just before it happened.
+        const returned = hasCollateral ? collateral : amount * preTxPrice;
+        runningSupply -= amount;
+        runningTvl -= returned;
         if (runningTvl < 0) runningTvl = 0;
       }
 
       // Calculate price AFTER this transaction
-      const price = runningSupply > 0n
-        ? runningTvl / parseFloat(formatEther(runningSupply))
-        : 0;
+      const price = runningSupply > 0 ? runningTvl / runningSupply : 0;
 
       // Get or create bucket
       if (!historyMap.has(bucketKey)) {
@@ -273,32 +254,7 @@ export async function GET(
       const bucket = historyMap.get(bucketKey)!;
       bucket.prices.push(price);
       bucket.tvls.push(runningTvl);
-
-      const volume = tx.transaction_type === 'mint'
-        ? parseFloat(tx.collateral_amount?.toString() || tx.amount?.toString() || '0')
-        : parseFloat(tx.amount?.toString() || '0') * preTxPrice; // Estimate volume in DAI
-      bucket.volumes.push(volume);
-    }
-
-    // Period-open snapshot for 7d/30d only — ALL uses the first real transaction bucket.
-    if (!isAllPeriod && startDate) {
-      const startTimestamp = Math.floor(startDate.getTime() / 1000);
-      const startBucketKey = interval === 'hour'
-        ? startDate.toISOString().slice(0, 13) + ':00:00'
-        : startDate.toISOString().slice(0, 10);
-
-      if (!historyMap.has(startBucketKey)) {
-        const startPrice = runningSupply > 0n
-          ? runningTvl / parseFloat(formatEther(runningSupply))
-          : 0;
-
-        historyMap.set(startBucketKey, {
-          timestamp: startTimestamp,
-          prices: [startPrice],
-          volumes: [0],
-          tvls: [runningTvl],
-        });
-      }
+      bucket.volumes.push(hasCollateral ? collateral : tx.transaction_type === 'burn' ? amount * preTxPrice : 0);
     }
 
     // Convert map to array and aggregate by bucket
@@ -309,7 +265,7 @@ export async function GET(
       (a, b) => a[1].timestamp - b[1].timestamp
     );
 
-    for (const [key, bucket] of sortedBuckets) {
+    for (const [, bucket] of sortedBuckets) {
       // Calculate averages for the bucket
       const avgPrice = bucket.prices.length > 0
         ? bucket.prices.reduce((sum, p) => sum + p, 0) / bucket.prices.length
@@ -327,15 +283,14 @@ export async function GET(
       });
     }
 
-    // Add current point if not already included
+    // The window baseline is a snapshot, not an average with trades in its bucket.
+    if (!isAllPeriod && startDate) {
+      history.unshift({ timestamp: Math.floor(startDate.getTime() / 1000),
+        price: startSupply > 0 ? startTvl / startSupply : 0, volume: 0, tvl: startTvl });
+    }
     const lastPoint = history[history.length - 1];
-    if (!lastPoint || lastPoint.timestamp < currentTimestamp - 3600) {
-      history.push({
-        timestamp: currentTimestamp,
-        price: currentPrice,
-        volume: 0,
-        tvl: currentTvl,
-      });
+    if (!lastPoint || lastPoint.timestamp < currentTimestamp) {
+      history.push({ timestamp: currentTimestamp, price: currentPrice, volume: 0, tvl: currentTvl });
     }
 
     return NextResponse.json({

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { formatEther } from 'viem';
-import { getMeTokenProtocolInfo, getMeTokenInfoFromBlockchain, getBulkMeTokenInfo } from '@/lib/utils/metokenUtils';
+import { getBulkMeTokenInfo } from '@/lib/utils/metokenUtils';
 import { isActiveMarketToken } from '@/lib/metokens/syncMeTokenMarketData';
 import { filterMarketTokensBySearch } from '@/lib/market/tokenSearch';
+import { meTokenSupplyToHuman, toFiniteNumber } from '@/lib/metokens/units';
 import { serverLogger } from '@/lib/utils/logger';
 
 export interface MarketToken {
@@ -317,156 +318,70 @@ export async function GET(request: NextRequest) {
       .gte('created_at', twentyFourHoursAgo.toISOString())
       .order('created_at', { ascending: false }); // Descending for reverse replay
 
-    // Stats map by metoken_id
-    const statsMap = new Map<string, { volume: number; priceCheck: { supplyDelta: bigint; tvlDelta: number } }>();
+    // 24h volume per token, in hub-asset USD.
+    // `metoken_transactions.amount` / `.collateral_amount` are already whole
+    // units (tokens / USD) — never run them through formatEther or BigInt.
+    const volumeByToken = new Map<string, number>();
 
     if (recentTxs) {
       for (const tx of recentTxs) {
-        if (!statsMap.has(tx.metoken_id)) {
-          statsMap.set(tx.metoken_id, { volume: 0, priceCheck: { supplyDelta: 0n, tvlDelta: 0 } });
-        }
-        const stats = statsMap.get(tx.metoken_id)!;
+        if (!['mint', 'burn'].includes(tx.transaction_type)) continue;
+        const collateral = toFiniteNumber(tx.collateral_amount);
+        const amount = toFiniteNumber(tx.amount);
 
-        // Volume calculation (in ETH/DAI terms)
-        // For MINT: collateral_amount is the volume
-        // For BURN: we estimate volume based on amount * current_price (since we process in batch, we might simplify)
-        // Better: Use collateral_amount for MINT. For BURN, use an estimate if collateral is missing.
-        // Assuming collateral_amount is present for MINTs
-
-        // Note: The Price History route estimates volume for burns using price * amounts.
-        // Here we'll do a simplified volume sum.
-        let txVolume = 0;
-        const amount = BigInt(Math.floor(tx.amount || 0));
-        const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
-
-        if (tx.transaction_type === 'mint') {
-          // Mint: Volume is the collateral amount (incoming value)
-          txVolume = collateral;
-          
-          // Reverse replay: User +Collateral -> +Supply. To go back to state "before", we subtract.
-          stats.priceCheck.supplyDelta += amount;
-          stats.priceCheck.tvlDelta += collateral;
-        } else if (tx.transaction_type === 'burn') {
-          // Burn: User -Supply -> +Collateral (outgoing value). 
-          // Reverse replay: To go back, we add supply and put collateral back.
-          stats.priceCheck.supplyDelta -= amount;
-          
-          // We don't have exact collateral returned in DB for burns usually (unless collateral_amount is populated).
-          // If collateral_amount is present, use it. Otherwise, we'll have to estimate during the replay loop or here using current token price.
-          // For global volume, we want to count this activity.
-          
-          if (collateral > 0) {
-            txVolume = collateral;
-             stats.priceCheck.tvlDelta -= collateral; // Reverse: we passed out collateral, so to go back we add it? No.
-             // Wait. 
-             // Current TVL = Prev TVL + MintCollateral - BurnCollateral.
-             // Prev TVL = Current TVL - MintCollateral + BurnCollateral.
-             
-             // So for Mint (which added collateral): Delta should be +Collateral. (We subtract this Delta from Current to get Prev)
-             // For Burn (which removed collateral): Delta should be -Collateral. (We subtract this Delta [-Val] -> Add Val to Current)
-             
-             stats.priceCheck.tvlDelta -= collateral;
-          } else {
-             // We will estimate the value using the token's current price for the volume metric
-             // But for TVL Replay, we need to be careful. We'll handle TVL replay calculation more precisely in the per-token loop.
-             // For now, let's try to estimate volume here if possible, or defer volume calculation to the token loop too?
-             // Actually, 'token.price' is available in the outer loop but not easily accessible here inside the tx loop unless we look it up.
-             // Let's defer exact volume summation to the token loop where we have price data, OR look up price here.
-             
-             // Optimization: Look up token in allTokens map? We haven't built a map, but we can find it.
-             const tokenForPrice = allTokens.find(t => t.id === tx.metoken_id);
-             if (tokenForPrice && tokenForPrice.price > 0) {
-               txVolume = parseFloat(formatEther(amount)) * tokenForPrice.price;
-             }
-          }
-        } else {
-             // Other types (e.g. transfer)? Usually doesn't affect TVL/Supply directly in the same way, but 'swap' might be here if recorded.
-             // If it's a recorded 'swap' or 'trade', count volume.
-             if (collateral > 0) {
-                 txVolume = collateral;
-             } else {
-                 const tokenForPrice = allTokens.find(t => t.id === tx.metoken_id);
-                 if (tokenForPrice && tokenForPrice.price > 0) {
-                   txVolume = parseFloat(formatEther(amount)) * tokenForPrice.price;
-                 }
-             }
+        let txVolume = collateral;
+        if (tx.collateral_amount == null && tx.transaction_type === 'burn' && amount > 0) {
+          // Burns sometimes arrive without collateral_amount; value them at the
+          // token's current price so they still count as activity.
+          const tokenForPrice = allTokens.find((t) => t.id === tx.metoken_id);
+          txVolume = tokenForPrice ? amount * tokenForPrice.price : 0;
         }
 
-        stats.volume += txVolume;
+        volumeByToken.set(tx.metoken_id, (volumeByToken.get(tx.metoken_id) ?? 0) + txVolume);
       }
     }
 
     // Apply calculated stats
     allTokens = allTokens.map((token) => {
-      const tokenStats = statsMap.get(token.id);
+      const volume24h = volumeByToken.get(token.id) ?? 0;
 
       let price_change_24h = 0;
-      let volume_24h = 0;
+      const volume_24h = volume24h;
 
-      if (tokenStats) {
-        
-        // Use the volume we summed up (including estimates)
-        volume_24h = tokenStats.volume;
-
-        // Calculate Price Change
-        // Current Price is known: token.price
-        // Price 24h ago = (CurrentTVL - DeltaTVL) / (CurrentSupply - DeltaSupply)
-
-        const currentSupply = BigInt(token.total_supply || 0);
-        const currentTvl = token.tvl;
-
-        // Re-scan recentTxs for this token to do accurate Replay
-        const tokenTxs = recentTxs?.filter(tx => tx.metoken_id === token.id) || [];
-
+      if (volumeByToken.has(token.id)) {
+        // Walk the last 24h of trades backwards to reconstruct the state at the
+        // start of the window. Everything here is whole units:
+        //   supply -> tokens, tvl -> hub-asset USD.
+        const currentSupply = meTokenSupplyToHuman(token.total_supply);
         let replaySupply = currentSupply;
-        let replayTvl = currentTvl;
+        let replayTvl = token.tvl;
+
+        // recentTxs is ordered newest-first, which is the order we need to undo.
+        const tokenTxs = recentTxs?.filter((tx) => tx.metoken_id === token.id) ?? [];
 
         for (const tx of tokenTxs) {
-          const amount = BigInt(Math.floor(tx.amount || 0));
-          const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
+          const amount = toFiniteNumber(tx.amount);
+          const collateral = toFiniteNumber(tx.collateral_amount);
 
-          // Current State in Replay (initially Current Actual State)
-          // We want to walk BACKWARDS to find state 24h ago.
-          
           if (tx.transaction_type === 'mint') {
-            // Mint happened: Supply increased, TVL increased.
-            // Action: ONE step back means Removing that Supply and TVL.
+            // Mint moved us forward: undo by removing the supply and the collateral.
             replaySupply -= amount;
             replayTvl -= collateral;
           } else if (tx.transaction_type === 'burn') {
-            // Burn happened: Supply decreased, TVL decreased.
-            // Action: ONE step back means Adding that Supply and TVL back.
+            // Burn moved us forward: undo by restoring supply and collateral.
+            const replayPrice = replaySupply > 0 ? replayTvl / replaySupply : 0;
             replaySupply += amount;
-            
-            if (collateral > 0) {
-                replayTvl += collateral;
-            } else {
-                // Estimate collateral returned using the price AT THAT MOMENT (approx)
-                // Since verification is hard without exact logs, we use the Replay Price
-                // Replay Price = Price *after* the action. We want Price *at* the action?
-                // Approximation: Use current replay state price (which is "after" the action in forward time, "before" undoing in reverse)
-                // Actually, if we are at state T, and burn happened to get to T. State T-1 had more TVL.
-                // Value burned = Amount * Price(T-1)? Or Price(T)?
-                // Let's use the current calculated price in the loop.
-                const currentReplayPrice = replaySupply > 0n ? replayTvl / parseFloat(formatEther(replaySupply)) : 0;
-                const estCollateral = parseFloat(formatEther(amount)) * currentReplayPrice;
-                replayTvl += estCollateral;
-            }
+            replayTvl += tx.collateral_amount != null ? collateral : amount * replayPrice;
           }
         }
-        
-        // Calculate price 24h ago
-        // Avoid division by zero
-        if (replayTvl < 0) replayTvl = 0; // Safety
-        if (replaySupply < 0n) replaySupply = 0n; // Safety
 
-        const price24hAgo = replaySupply > 0n ? replayTvl / parseFloat(formatEther(replaySupply)) : 0;
+        replaySupply = Math.max(0, replaySupply);
+        replayTvl = Math.max(0, replayTvl);
+
+        const price24hAgo = replaySupply > 0 ? replayTvl / replaySupply : 0;
 
         if (price24hAgo > 0) {
           price_change_24h = ((token.price - price24hAgo) / price24hAgo) * 100;
-        } else if (token.price > 0) {
-            // If price was 0 and now is > 0, that's 100% (or infinite) gain. Cap or show 100?
-            price_change_24h = 0; 
         }
       }
 
