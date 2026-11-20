@@ -29,6 +29,10 @@
 # production
 /build
 
+# Livepeer Studio VOD migration CLI outputs (may contain playback IDs)
+livepeer-studio-inventory.*
+**/livepeer-archive-manifest.json
+
 # misc
 .DS_Store
 *.pem
