@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Broadcast,
   createStreamViaProxy,
@@ -128,6 +128,8 @@ export default function LivePage() {
   const [streamName, setStreamName] = useState<string | null>(null);
   const [saveRecording, setSaveRecording] = useState(true);
   const [isUpdatingSaveRecording, setIsUpdatingSaveRecording] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const recordingRequestRef = useRef<AbortController | null>(null);
   const [requiresMetoken, setRequiresMetoken] = useState(false);
   const [metokenPrice, setMetokenPrice] = useState<number | null>(null);
   const [storyIpId, setStoryIpId] = useState<string | null>(null);
@@ -171,6 +173,9 @@ export default function LivePage() {
     setAllowClipping(true);
     setStreamName(null);
     setSaveRecording(true);
+    setRecordingError(null);
+    setIsUpdatingSaveRecording(false);
+    recordingRequestRef.current?.abort();
     setRequiresMetoken(false);
     setMetokenPrice(null);
     setStoryIpId(null);
@@ -262,6 +267,7 @@ export default function LivePage() {
 
     return () => {
       active = false;
+      recordingRequestRef.current?.abort();
     };
   }, [creatorAddress, signerAddress, getAuthHeaders, identityReady]);
 
@@ -336,28 +342,32 @@ export default function LivePage() {
   }
 
   async function handleToggleSaveRecording(next: boolean) {
-    if (!creatorAddress) return;
+    if (!creatorAddress || !streamMetadataReady || isUpdatingSaveRecording) return;
+    setRecordingError(null);
     if (!streamId) {
       setSaveRecording(next);
       return;
     }
-    const previous = saveRecording;
-    setSaveRecording(next);
+    const controller = new AbortController();
+    recordingRequestRef.current = controller;
     setIsUpdatingSaveRecording(true);
     try {
-      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
-      await updateStream(creatorAddress, { save_recording: next }, auth);
-      // Sync the recording flag on the Livepeer stream object as well.
-      await fetch(`/api/livepeer/stream/${encodeURIComponent(streamId)}/recording`, {
+      const authHeaders = await getAuthHeaders();
+      if (controller.signal.aborted) return;
+      const response = await fetch(`/api/livepeer/stream/${encodeURIComponent(streamId)}/recording`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ record: next }),
+        signal: controller.signal,
       });
+      if (!response.ok) throw new Error("Recording update failed");
+      if (!controller.signal.aborted) setSaveRecording(next);
     } catch (err) {
+      if (controller.signal.aborted) return;
       logger.error("Failed to update save-recording preference:", err);
-      setSaveRecording(previous);
+      setRecordingError("Recording settings could not be confirmed. Refresh before starting another broadcast.");
     } finally {
-      setIsUpdatingSaveRecording(false);
+      if (!controller.signal.aborted) setIsUpdatingSaveRecording(false);
     }
   }
 
@@ -609,11 +619,13 @@ export default function LivePage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                 <div className="lg:col-span-2 relative">
                   <Broadcast
+                    key={creatorAddress}
                     streamKey={streamKey}
                     streamId={streamId}
                     playbackId={playbackId}
                     creatorAddress={creatorAddress!}
                     saveRecording={saveRecording}
+                    recordingSettingsReady={!isUpdatingSaveRecording && !recordingError}
                     onCredentialsChange={({ streamKey: key, streamId: id, playbackId: pb }) => {
                       setStreamKey(key);
                       setStreamId(id);
@@ -755,10 +767,11 @@ export default function LivePage() {
                   <Switch
                     checked={saveRecording}
                     onCheckedChange={handleToggleSaveRecording}
-                    disabled={isUpdatingSaveRecording}
+                    disabled={isUpdatingSaveRecording || !streamMetadataReady}
                     aria-label="Save live stream replay"
                   />
                 </div>
+                {recordingError && <p role="alert" className="mt-2 text-sm text-red-500">{recordingError}</p>}
               </div>
             )}
             {streamId && creatorAddress && (

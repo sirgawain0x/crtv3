@@ -29,9 +29,9 @@ vi.mock("@/lib/utils/logger", () => ({ logger: { debug: vi.fn(), error: vi.fn(),
 vi.mock("@/components/Live/Broadcast", () => ({
   fetchStreamKeyForCreator: mocks.credentials,
   createStreamViaProxy: mocks.create,
-  Broadcast: ({ saveRecording }: { saveRecording: boolean }) => {
+  Broadcast: ({ saveRecording, recordingSettingsReady }: { saveRecording: boolean; recordingSettingsReady: boolean }) => {
     mocks.broadcastPreferences.push(saveRecording);
-    return <div data-testid="broadcast" data-recording={String(saveRecording)} />;
+    return <div data-testid="broadcast" data-recording={String(saveRecording)} data-ready={String(recordingSettingsReady)} />;
   },
 }));
 vi.mock("./LivePageClient", () => ({ LivePageClient: ({ children }: { children: React.ReactNode }) => children }));
@@ -130,4 +130,42 @@ describe("Live Studio recording preferences", () => {
     expect(createButton().disabled).toBe(false);
     expect(container.textContent).not.toContain("Could not load stream settings");
   });
+  it.each([true, false])("confirms recording changes only after a successful owner-authenticated response (%s)", async (ok) => {
+    mocks.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({
+      stream_id: "stream-local", playback_id: "playback-local", save_recording: false,
+    }) });
+    await act(async () => root.render(<LivePage />));
+    let finishRequest!: (value: unknown) => void;
+    mocks.fetch.mockImplementationOnce(() => new Promise(resolve => { finishRequest = resolve; }));
+    const toggle = container.querySelector<HTMLButtonElement>('[aria-label="Save live stream replay"]')!;
+    await act(async () => toggle.click());
+    expect(toggle.disabled).toBe(true);
+    expect(container.querySelector('[data-testid="broadcast"]')?.getAttribute("data-ready")).toBe("false");
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.fetch).toHaveBeenLastCalledWith("/api/livepeer/stream/stream-local/recording", expect.objectContaining({
+      method: "POST", headers: expect.objectContaining({ "x-wallet-address": mocks.owner }), body: JSON.stringify({ record: true }),
+    }));
+    await act(async () => finishRequest({ ok, status: ok ? 200 : 502 }));
+    expect(toggle.disabled).toBe(false);
+    expect(container.querySelector('[data-testid="broadcast"]')?.getAttribute("data-ready")).toBe(String(ok));
+    expect(toggle.getAttribute("aria-checked")).toBe(String(ok));
+    if (!ok) expect(container.querySelector('[role="alert"]')?.textContent).toContain("Recording settings could not be confirmed");
+  });
+
+  it("ignores an old creator's recording response after switching wallets", async () => {
+    mocks.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ stream_id: "stream-local", playback_id: "playback-local", save_recording: false }) });
+    await act(async () => root.render(<LivePage />));
+    let finishOldRequest!: (value: unknown) => void;
+    mocks.fetch.mockImplementationOnce(() => new Promise(resolve => { finishOldRequest = resolve; }));
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Save live stream replay"]')!.click());
+    const signal = mocks.fetch.mock.calls.at(-1)![1].signal as AbortSignal;
+    mocks.owner = "0x2222222222222222222222222222222222222222";
+    await act(async () => root.render(<LivePage />));
+    expect(signal.aborted).toBe(true);
+    await act(async () => finishOldRequest({ ok: false, status: 502 }));
+    expect(container.textContent).not.toContain("Recording settings could not be confirmed");
+    expect(createButton().disabled).toBe(false);
+  });
+
 });
