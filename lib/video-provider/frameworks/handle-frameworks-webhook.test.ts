@@ -63,6 +63,27 @@ describe("handleFrameworksWebhookEvent", () => {
     expect(getSessions).not.toHaveBeenCalled();
   });
 
+  it.each([true, false])("normalizes a recording's raw parent stream UUID (explicit=%s)", async (explicit) => {
+    const uuid = "12345678-abcd-4abc-8def-123456789abc";
+    const asset = {
+      id: "artifact-hash",
+      playbackId: "playback-local",
+      status: { phase: "ready" },
+      source: { type: "recording", streamId: uuid },
+    };
+    vi.mocked(getVideoProvider).mockReturnValue({
+      assets: { get: vi.fn().mockResolvedValue(asset) },
+    } as never);
+    await handleFrameworksWebhookEvent({
+      id: "evt-recording-uuid",
+      type: "recording.ready",
+      data: { artifact: { artifactId: "artifact-hash" }, ...(explicit ? { streamId: uuid } : {}) },
+    });
+    expect(persistRecordingAsset).toHaveBeenCalledWith(asset, {
+      streamId: Buffer.from(`Stream:${uuid}`).toString("base64"),
+    });
+  });
+
   it("deduplicates on event id after successful handling", async () => {
     const event = { id: "evt-dup", type: "webhook.test", data: {} };
     expect(await handleFrameworksWebhookEvent(event)).toBe("ignored");

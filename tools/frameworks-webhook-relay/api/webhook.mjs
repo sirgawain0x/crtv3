@@ -5,6 +5,15 @@ export const STAGING_WEBHOOK = "https://crtv4-git-staging-creative-projects.verc
 export const MAX_BODY_BYTES = 256 * 1024;
 const SIGNED_HEADERS = ["webhook-id", "webhook-timestamp", "webhook-signature"];
 
+// Keep the standalone relay independent of app imports/dependencies. This maps
+// only raw UUIDs to the GraphQL Stream IDs stored by createStream; signed bytes
+// are never rewritten. The app normalizes again at its persistence boundary.
+function toStreamNodeId(streamId) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(streamId)
+    ? Buffer.from(`Stream:${streamId.toLowerCase()}`, "utf8").toString("base64")
+    : streamId;
+}
+
 function reply(status, error) {
   const headers = { "Cache-Control": "no-store" };
   if (status !== 204) headers["Content-Type"] = "application/json";
@@ -107,7 +116,8 @@ export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled
       const streamId = typeof event.data?.streamId === "string" ? event.data.streamId.trim() : "";
       if (businessEventsEnabled !== true || !allowedStream || allowedStream.length > 200 ||
           /[^\x21-\x7e]/.test(allowedStream) ||
-          !["stream.live", "stream.idle"].includes(event.type) || streamId !== allowedStream) {
+          !["stream.live", "stream.idle"].includes(event.type) ||
+          toStreamNodeId(streamId) !== toStreamNodeId(allowedStream)) {
         return reply(503, "Business events are paused");
       }
     }

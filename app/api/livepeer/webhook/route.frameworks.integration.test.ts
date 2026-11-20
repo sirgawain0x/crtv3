@@ -132,6 +132,17 @@ describe("FrameWorks signed webhook route (#409)", () => {
     expect(getVideoProvider).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["stream.live", markStreamLiveByStreamId],
+    ["stream.idle", markStreamOfflineByStreamId],
+  ] as const)("maps signed raw UUID %s events to the stored GraphQL stream ID", async (type, persist) => {
+    const uuid = "12345678-abcd-4abc-8def-123456789abc";
+    const body = eventBody(type, { streamId: uuid });
+    expect((await POST(signedRequest(body))).status).toBe(200);
+    expect(persist).toHaveBeenCalledWith(Buffer.from(`Stream:${uuid}`).toString("base64"));
+    expect(getVideoProvider).not.toHaveBeenCalled();
+  });
+
   it("resolves a signed v1 artifactId to the provider hash and permits retry after lookup failure", async () => {
     const artifactHash = "recording-hash-local";
     const asset = {

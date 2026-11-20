@@ -11,6 +11,7 @@ import {
   markStreamOfflineByStreamId,
 } from "@/services/streams";
 import { serverLogger } from "@/lib/utils/logger";
+import { toFrameworksStreamNodeId } from "./stream-id";
 
 export type FrameworksWebhookEvent = {
   id: string;
@@ -88,7 +89,9 @@ async function handleArtifactReadyEvent(
         `recording.ready artifact not ready yet: ${artifactId}`,
       );
     }
-    await persistRecordingAsset(resolved.asset, { streamId });
+    await persistRecordingAsset(resolved.asset, {
+      streamId: streamId ? toFrameworksStreamNodeId(streamId) : undefined,
+    });
   }
 }
 
@@ -110,14 +113,14 @@ export async function handleFrameworksWebhookEvent(
     if (type === "stream.live") {
       const streamId = readString(data, "streamId");
       if (streamId) {
-        await markStreamLiveByStreamId(streamId);
+        await markStreamLiveByStreamId(toFrameworksStreamNodeId(streamId));
         serverLogger.info("Marked stream live from stream.live webhook", { streamId });
       }
       result = "processed";
     } else if (type === "stream.idle") {
       const streamId = readString(data, "streamId");
       if (streamId) {
-        await markStreamOfflineByStreamId(streamId);
+        await markStreamOfflineByStreamId(toFrameworksStreamNodeId(streamId));
         serverLogger.info("Marked stream offline from stream.idle webhook", { streamId });
       }
       result = "processed";
