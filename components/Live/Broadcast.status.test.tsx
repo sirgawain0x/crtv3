@@ -30,8 +30,8 @@ describe("Broadcast local session status", () => {
   afterEach(async () => {
     await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals();
   });
-  async function render(recording = true, creator = owner) {
-    await act(async () => root.render(<Broadcast streamKey="test-local-key" streamId="stream-1" playbackId="playback-1" creatorAddress={creator} saveRecording={recording} />));
+  async function render(recording = true, creator = owner, settingsReady = true) {
+    await act(async () => root.render(<Broadcast streamKey="test-local-key" streamId="stream-1" playbackId="playback-1" creatorAddress={creator} saveRecording={recording} recordingSettingsReady={settingsReady} />));
   }
   it("does not mark an externally live stream offline just by opening the studio, including Strict Mode", async () => {
     await act(async () => root.render(<React.StrictMode><Broadcast streamKey="test-local-key" streamId="stream-1" creatorAddress={owner} /></React.StrictMode>));
@@ -68,6 +68,17 @@ describe("Broadcast local session status", () => {
     await act(async () => root.render(<Broadcast streamKey="test-local-key" creatorAddress={owner} recordingSettingsReady={false} />));
     const start = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes("Go Live"));
     expect(start?.disabled).toBe(true);
+  });
+
+  it.each([false, true])("waits for a pending recording change at Stop, then honors confirmed recording=%s", async recording => {
+    await render(!recording); mocks.status = "live"; await render(!recording);
+    await render(!recording, owner, false);
+    mocks.status = "idle"; await render(!recording, owner, false);
+    await act(async () => vi.advanceTimersByTimeAsync(20_000));
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    await render(recording, owner, true);
+    await act(async () => vi.advanceTimersByTimeAsync(130_000));
+    expect(mocks.fetch).toHaveBeenCalledTimes(recording ? 3 : 0);
   });
 
 });

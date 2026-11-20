@@ -326,8 +326,11 @@ function BroadcastWithControls({
         } else if (status === 'idle' || status === 'error') {
           await updateStream(creatorAddress, { is_live: false }, auth);
           if (abort.signal.aborted) return;
-          broadcastSessionRef.current.reachedLive = false;
           logger.info("Stream marked as offline in DB");
+          // Keep the session pending if Stop races a recording update. Its
+          // confirmed preference must decide whether to finalize the recording.
+          if (!recordingSettingsReady) return;
+          broadcastSessionRef.current.reachedLive = false;
           if (status === 'idle' && activeStreamId && saveRecording) {
             // Recording assets may take a minute to process; retry a few times.
             const delays = [15_000, 45_000, 120_000];
@@ -349,7 +352,7 @@ function BroadcastWithControls({
       finalizeTimeoutsRef.current.forEach(clearTimeout);
       finalizeTimeoutsRef.current = [];
     };
-  }, [status, creatorAddress, activeStreamId, activePlaybackId, getAuthHeaders, saveRecording]);
+  }, [status, creatorAddress, activeStreamId, activePlaybackId, getAuthHeaders, saveRecording, recordingSettingsReady]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
