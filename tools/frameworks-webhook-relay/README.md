@@ -1,6 +1,18 @@
 # FrameWorks staging webhook relay
 
-TL;DR: a standalone, dependency-free Vercel Node.js function that accepts signed FrameWorks POSTs and forwards their original bytes to one fixed staging webhook. This implementation is prepared locally for review. No project, deployment, bypass credential, or environment variable has been created by this change.
+TL;DR: the staging relay is deployed in probe mode. This proposed revision limits future business-event forwarding to live/idle transitions for one approved test stream. The revision is not deployed or enabled.
+
+## Current revision: bounded stream testing
+
+The existing relay project is `crtv3-frameworks-staging-hooks` on team `creative-projects`. G2 reported successful signed probe delivery on November 19. The initial setup proposal below is historical context; do not create another project or bypass credential.
+
+This revision requires both `FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS=true` and `FRAMEWORKS_RELAY_TEST_STREAM_ID` set to the one approved test stream. Only `stream.live` and `stream.idle` with that exact ID (after trimming, as in the staging handler) are forwarded. The configured ID must contain 1–200 printable, non-whitespace ASCII characters after trimming. Missing or invalid configuration fails closed. Recording/upload/clip events, unknown types, and other streams return 503 without forwarding, even when the flag is true. Signed `webhook.test` remains available without either setting.
+
+The flag alone no longer admits business events. This is intentionally narrower than the original proposal below. Testing recording/upload/clip events requires a separate reviewed admission change. The relay does not change the application's own webhook behavior or prevent direct delivery through another authorized access path.
+
+Review and approve the exact code and relay redeploy before using the new variable. Keep the flag `false` during deployment and probe checks. Before enabling stream tests, verify a recoverable backup, designate an operator-owned test stream/row with recording disabled, approve its temporary production-listing visibility and cleanup, and inspect queued deliveries. After the test, return the flag to `false` and redeploy. Blocked events are retried rather than acknowledged; reassess the queue before widening access later.
+
+Retain backup/restore reports, exact fixture IDs and before-state, and conditional cleanup instructions privately outside the public repository. Those records must accompany the separate write-test approval.
 
 ## Why this is separate
 
@@ -73,7 +85,7 @@ The endpoint ID is useful for API operations, but G2 can update the endpoint thr
 2. Unsigned POST returns 401, and malformed/expired/tampered signatures return 401 without forwarding.
 3. FrameWorks Developer → Webhooks → Test sends the signed `webhook.test`; require a 2xx result. It is ignored by the staging event handler without a Supabase write.
 4. Capture only SHA/deployment, HTTP statuses, endpoint/event/delivery IDs and timestamps. A local mock test is not deployed provider-delivery evidence.
-5. Confirm a signed business event returns 503 without reaching staging while the relay is in its default probe mode. Only after a verified shared-database backup and separate approval, enable `FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS=true` and run stream/recording/upload/clip business-event tests on designated test records.
+5. Confirm a signed business event returns 503 without reaching staging while the relay is in its default probe mode. Only after a verified shared-database backup and separate approval, set the designated test stream ID and enable the flag, then redeploy the reviewed bounded revision and test only its live/idle transitions. Verify other streams and recording/upload/clip events remain blocked. This revision does not permit the broader test described in the historical proposal.
 
 Rollback must be preapproved: disable only the new relay deployment or pause only this FrameWorks endpoint; keep the existing Livepeer webhook. Revoking the newly created crtv4 bypass credential or removing the relay's private variables is a separate access/secret change and must be covered by that rollback approval. Do not restore FrameWorks delivery to the production Livepeer route and call that a working rollback.
 

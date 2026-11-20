@@ -63,7 +63,7 @@ function validSignature(body, headers, key) {
   });
 }
 
-export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled = false, fetchImpl = fetch, now = Date.now }) {
+export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled = false, testStreamId, fetchImpl = fetch, now = Date.now }) {
   return async (request) => {
     const url = new URL(request.url);
     if (url.pathname !== "/api/webhook" || url.search) return reply(404, "Not found");
@@ -100,10 +100,16 @@ export function createRelay({ webhookSecret, bypassSecret, businessEventsEnabled
       return reply(400, "Invalid event");
     }
     if (!event || typeof event.type !== "string" || !event.type) return reply(400, "Invalid event");
-    // Preview shares the production database. A delivery probe must not enable
-    // business-event writes before their separate backup and approval gate.
-    if (event.type !== "webhook.test" && businessEventsEnabled !== true) {
-      return reply(503, "Business events are paused");
+    // Preview shares the production database. Enabling the flag admits only
+    // transitions for one approved test stream, never recordings or other assets.
+    if (event.type !== "webhook.test") {
+      const allowedStream = typeof testStreamId === "string" ? testStreamId.trim() : "";
+      const streamId = typeof event.data?.streamId === "string" ? event.data.streamId.trim() : "";
+      if (businessEventsEnabled !== true || !allowedStream || allowedStream.length > 200 ||
+          /[^\x21-\x7e]/.test(allowedStream) ||
+          !["stream.live", "stream.idle"].includes(event.type) || streamId !== allowedStream) {
+        return reply(503, "Business events are paused");
+      }
     }
 
     const outgoingHeaders = new Headers({
@@ -141,6 +147,7 @@ export default {
       webhookSecret: process.env.FRAMEWORKS_WEBHOOK_SECRET,
       bypassSecret: process.env.STAGING_VERCEL_BYPASS_SECRET,
       businessEventsEnabled: process.env.FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS === "true",
+      testStreamId: process.env.FRAMEWORKS_RELAY_TEST_STREAM_ID,
     })(request);
   },
 };
