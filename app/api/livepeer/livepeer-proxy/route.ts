@@ -1,3 +1,4 @@
+import { resolveVideoProviderId } from "@/lib/video-provider/config";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAddress } from "viem";
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
     throw authErr;
   }
 
-  if (!hasLivepeerPrivateApiKey()) {
+  if (resolveVideoProviderId() === "livepeer" && !hasLivepeerPrivateApiKey()) {
     serverLogger.error("[livepeer-proxy] LIVEPEER_FULL_API_KEY is not configured");
     return NextResponse.json(
       {
