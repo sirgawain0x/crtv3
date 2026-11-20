@@ -1,3 +1,4 @@
+import { StreamProviderMigrationRequiredError } from "@/lib/video-provider/stream-provider-guard";
 import { resolveVideoProviderId } from "@/lib/video-provider/config";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -126,6 +127,9 @@ export async function POST(req: NextRequest) {
       replaced: ensured.replaced,
     });
   } catch (error) {
+    if (error instanceof StreamProviderMigrationRequiredError) {
+      return NextResponse.json({ error: error.message, code: "STREAM_PROVIDER_MIGRATION_REQUIRED" }, { status: 409 });
+    }
     if (error instanceof FrameWorksStreamsCreateUnavailableError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }

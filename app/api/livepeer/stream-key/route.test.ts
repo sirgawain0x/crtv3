@@ -1,3 +1,4 @@
+import { StreamProviderMigrationRequiredError } from "@/lib/video-provider/stream-provider-guard";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -195,4 +196,12 @@ describe("GET /api/livepeer/stream-key", () => {
       synced: true,
     });
   });
+  it("returns an explicit migration conflict instead of replacing provider credentials", async () => {
+    mockResolveStreamForCreator.mockResolvedValue({ id: "row-legacy", stream_id: "legacy-stream", creator_id: CREATOR });
+    mockEnsureLivepeerStreamForCreator.mockRejectedValue(new StreamProviderMigrationRequiredError());
+    const response = await GET(keyRequest(CREATOR));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual(expect.objectContaining({ code: "STREAM_PROVIDER_MIGRATION_REQUIRED" }));
+  });
+
 });

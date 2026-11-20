@@ -1,3 +1,4 @@
+import { StreamProviderMigrationRequiredError } from "@/lib/video-provider/stream-provider-guard";
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
@@ -79,6 +80,9 @@ export async function GET(req: NextRequest) {
       synced: ensured.synced,
     });
   } catch (error) {
+    if (error instanceof StreamProviderMigrationRequiredError) {
+      return NextResponse.json({ error: error.message, code: "STREAM_PROVIDER_MIGRATION_REQUIRED" }, { status: 409 });
+    }
     if (error instanceof FrameWorksStreamsCreateUnavailableError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }

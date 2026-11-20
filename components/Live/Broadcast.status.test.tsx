@@ -15,7 +15,7 @@ vi.mock("@/lib/hooks/livepeer/useDetailPlaybackSources", () => ({ getDetailPlayb
 vi.mock("@/components/Player/CreativeBrandOverlay", () => ({ CreativeBrandOverlay: () => null }));
 vi.mock("@/components/Live/FloatingTipHearts", () => ({ FloatingTipHearts: () => null }));
 vi.mock("@/lib/utils/logger", () => ({ logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-import { Broadcast } from "./Broadcast";
+import { Broadcast, createStreamViaProxy } from "./Broadcast";
 const owner = "0x1111111111111111111111111111111111111111";
 describe("Broadcast local session status", () => {
   let root: Root; let container: HTMLDivElement;
@@ -98,6 +98,15 @@ describe("Broadcast local session status", () => {
     expect(input.type).toBe("password");
     expect(input.value).toBe("test-local-key");
     expect(document.querySelector<HTMLInputElement>('#broadcast-rtmp-server')?.value).toBe("rtmp://edge.frameworks.network/live/");
+  });
+
+  it("preserves migration conflict details after checking for an existing stream", async () => {
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ code: "STREAM_PROVIDER_MIGRATION_REQUIRED", error: "migration required" }), { status: 409 }));
+    await expect(createStreamViaProxy({ creatorAddress: owner, name: "QA", profiles: [], record: false, playbackPolicy: { type: "jwt" }, authHeaders: {} })).rejects.toMatchObject({ code: "STREAM_PROVIDER_MIGRATION_REQUIRED", status: 409 });
+  });
+  it("still reuses an existing same-provider stream from a 409 response", async () => {
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ code: "STREAM_EXISTS", streamId: "stream-1", playbackId: "playback-1", streamKey: "test-local-key" }), { status: 409 }));
+    await expect(createStreamViaProxy({ creatorAddress: owner, name: "QA", profiles: [], record: false, playbackPolicy: { type: "jwt" }, authHeaders: {} })).resolves.toEqual({ streamId: "stream-1", playbackId: "playback-1", streamKey: "test-local-key" });
   });
 
 });

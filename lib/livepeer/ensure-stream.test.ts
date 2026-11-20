@@ -1,3 +1,4 @@
+import { StreamProviderMigrationRequiredError } from "@/lib/video-provider/stream-provider-guard";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetLivepeerStreamOrNull = vi.fn();
@@ -246,6 +247,38 @@ describe("ensureLivepeerStreamForCreator", () => {
     const result = await ensureLivepeerStreamForCreator({ ...baseOpts, existing: null });
     expect(result.streamId).toBe("fw-stream");
     expect(mockCreateLivepeerStream).toHaveBeenCalled();
+  });
+
+  it.each([false, true])("does not replace a legacy stream in FrameWorks mode, including forceReplace=%s", async forceReplace => {
+    vi.stubEnv("VIDEO_PROVIDER", "frameworks");
+    await expect(ensureLivepeerStreamForCreator({ ...baseOpts, forceReplace,
+      existing: { id: "row-legacy", creator_id: CREATOR, stream_id: "11111111-1111-4111-8111-111111111111", stream_key: "test-legacy-key", playback_id: "legacy-playback", is_live: false, created_at: "", updated_at: "" },
+    })).rejects.toBeInstanceOf(StreamProviderMigrationRequiredError);
+    expect(mockGetLivepeerStreamOrNull).not.toHaveBeenCalled();
+    expect(mockCreateLivepeerStream).not.toHaveBeenCalled();
+    expect(mockReplaceStreamLivepeerCredentials).not.toHaveBeenCalled();
+    expect(mockCreateStreamRecord).not.toHaveBeenCalled();
+  });
+  it("does not replace a FrameWorks stream when production still selects Livepeer", async () => {
+    vi.stubEnv("VIDEO_PROVIDER", "livepeer");
+    await expect(ensureLivepeerStreamForCreator({ ...baseOpts, forceReplace: true,
+      existing: { id: "row-fw", creator_id: CREATOR, stream_id: Buffer.from("Stream:11111111-1111-4111-8111-111111111111").toString("base64"), stream_key: "test-fw-key", playback_id: "fw-playback", is_live: false, created_at: "", updated_at: "" },
+    })).rejects.toBeInstanceOf(StreamProviderMigrationRequiredError);
+    expect(mockGetLivepeerStreamOrNull).not.toHaveBeenCalled();
+    expect(mockCreateLivepeerStream).not.toHaveBeenCalled();
+    expect(mockReplaceStreamLivepeerCredentials).not.toHaveBeenCalled();
+  });
+
+  it("still reuses a confirmed same-provider FrameWorks channel", async () => {
+    vi.stubEnv("VIDEO_PROVIDER", "frameworks");
+    const streamId = Buffer.from("Stream:11111111-1111-4111-8111-111111111111").toString("base64");
+    mockGetLivepeerStreamOrNull.mockResolvedValue({ id: streamId, streamKey: "test-fw-key", playbackId: "fw-playback" });
+    const result = await ensureLivepeerStreamForCreator({ ...baseOpts,
+      existing: { id: "row-fw", creator_id: CREATOR, stream_id: streamId, stream_key: "test-fw-key", playback_id: "fw-playback", is_live: false, created_at: "", updated_at: "" },
+    });
+    expect(result.reused).toBe(true);
+    expect(mockCreateLivepeerStream).not.toHaveBeenCalled();
+    expect(mockReplaceStreamLivepeerCredentials).not.toHaveBeenCalled();
   });
 
 });
