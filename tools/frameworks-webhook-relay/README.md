@@ -10,6 +10,8 @@ This revision requires both `FRAMEWORKS_RELAY_ALLOW_BUSINESS_EVENTS=true` and `F
 
 The flag alone no longer admits business events. This is intentionally narrower than the original proposal below. Testing recording/upload/clip events requires a separate reviewed admission change. The relay does not change the application's own webhook behavior or prevent direct delivery through another authorized access path.
 
+FrameWorks public v1 events carry raw stream UUIDs, while GraphQL `Stream.id` is base64(`Stream:<uuid>`), the form stored by the application. The relay compares these two representations as the same stream, but forwards the original signed bytes unchanged. Application webhook persistence normalizes raw UUIDs to the stored GraphQL ID. Other opaque IDs retain exact matching after trimming; Clip/VodAsset nodes and malformed encodings are not decoded as streams. No existing database IDs are rewritten.
+
 Review and approve the exact code and relay redeploy before using the new variable. Keep the flag `false` during deployment and probe checks. Before enabling stream tests, verify a recoverable backup, designate an operator-owned test stream/row with recording disabled, approve its temporary production-listing visibility and cleanup, and inspect queued deliveries. After the test, return the flag to `false` and redeploy. Blocked events are retried rather than acknowledged; reassess the queue before widening access later.
 
 Retain backup/restore reports, exact fixture IDs and before-state, and conditional cleanup instructions privately outside the public repository. Those records must accompany the separate write-test approval.

@@ -154,6 +154,47 @@ test("the test stream ID alone does not enable business events or affect deliver
   assert.equal((await f.relay(f.request())).status, 200);
 });
 
+const rawStreamUuid = "12345678-abcd-4abc-8def-123456789abc";
+const graphStreamId = Buffer.from(`Stream:${rawStreamUuid}`).toString("base64");
+for (const [label, configured, incoming] of [
+  ["encoded config, raw UUID event", graphStreamId, rawStreamUuid],
+  ["raw config, encoded event", rawStreamUuid, graphStreamId],
+  ["uppercase raw event", graphStreamId, rawStreamUuid.toUpperCase()],
+  ["encoded event", graphStreamId, graphStreamId],
+]) {
+  for (const type of ["stream.live", "stream.idle"]) {
+    test(`admits the same stream (${label}, ${type}) without changing signed bytes`, async () => {
+      const f = fixture({ businessEventsEnabled: true, testStreamId: configured });
+      const payload = Buffer.from(JSON.stringify({ id: "evt-local", type, data: { streamId: incoming } }));
+      assert.equal((await f.relay(f.request({ payload }))).status, 200);
+      assert.equal(f.calls.length, 1);
+      assert.deepEqual(f.calls[0][1].body, payload);
+    });
+  }
+}
+
+for (const [label, incoming] of [
+  ["another UUID", "12345678-abcd-4abc-8def-123456789abd"],
+  ["a Clip node for the same UUID", Buffer.from(`Clip:${rawStreamUuid}`).toString("base64")],
+  ["an unencoded Stream prefix", `Stream:${rawStreamUuid}`],
+  ["noncanonical encoding", `${graphStreamId}!`],
+]) {
+  test(`does not broaden the stream allowlist to ${label}`, async () => {
+    const f = fixture({ businessEventsEnabled: true, testStreamId: graphStreamId });
+    const payload = Buffer.from(JSON.stringify({ id: "evt-local", type: "stream.live", data: { streamId: incoming } }));
+    assert.equal((await f.relay(f.request({ payload }))).status, 503);
+    assert.equal(f.calls.length, 0);
+  });
+}
+
+test("checks signatures before normalizing stream IDs", async () => {
+  const f = fixture({ businessEventsEnabled: true, testStreamId: graphStreamId });
+  const payload = Buffer.from(JSON.stringify({ id: "evt-local", type: "stream.live", data: { streamId: rawStreamUuid } }));
+  const signedBody = Buffer.from(JSON.stringify({ id: "evt-local", type: "stream.live", data: { streamId: "other" } }));
+  assert.equal((await f.relay(f.request({ payload, signedBody }))).status, 401);
+  assert.equal(f.calls.length, 0);
+});
+
 test("a string truthy value does not bypass the business-event gate", async () => {
   const f = fixture({ businessEventsEnabled: "true" });
   const payload = Buffer.from('{"id":"evt-local","type":"recording.ready","data":{}}');
