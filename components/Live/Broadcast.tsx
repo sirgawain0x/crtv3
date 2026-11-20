@@ -106,7 +106,7 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
     body: JSON.stringify(body),
   });
   if (res.status === 409) {
-    const existing = (await res.json()) as Record<string, unknown>;
+    const existing = (await res.clone().json()) as Record<string, unknown>;
     if (existing.code === "STREAM_EXISTS") {
       return {
         streamId: existing.streamId as string,
