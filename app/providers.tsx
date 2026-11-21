@@ -84,7 +84,7 @@ export const Providers = (
       >
         <QueryClientProvider client={queryClient}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <PrivyProvider appId={privyAppId} config={getPrivyConfig()}>
+            <PrivyProvider appId={privyAppId} clientId={privyClientId} config={getPrivyConfig()}>
               <AuthErrorProvider>
                 <MigrationProvider
                   alchemyConfig={alchemyMigrationConfig}
