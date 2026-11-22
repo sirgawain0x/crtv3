@@ -96,3 +96,11 @@ Browser verification reproduced a missing prediction detail title. The detail lo
 The indexer supplied a short zero-answer default and a creation timestamp despite no on-chain answer. The list now requires answer evidence and does not infer a final result from that timestamp. Details preserve a finalized boolean zero answer as No, avoid announcing an unanswered default as leading, and show a retry state when text cannot be recovered. No transaction-submission method was changed.
 
 The first isolated hosted cost-control preview passed its build and live API probes: unpaid market/feature calls returned 402 to the approved Safe; the existing Coinbase credentials authenticated and the invalid-signature probe returned a normal 402 rejection before settlement. The actual production-candidate AI handler also passed a live integration check: own-agent credentials alone returned 401; an ephemeral wallet signature plus that credential returned an answer through the staging gateway. No wallet payment was signed in that check. The final preview must include the additional prediction fixes before promotion.
+
+### PR #462 review corrections
+
+All platform-admitted responses now override browser, CDN and Vercel CDN cache headers with private/no-store behavior, including human and internal requests without payment receipts. This prevents an admitted browser response from seeding a shared cache that could bypass the access gate. Streaming bodies and existing exposed headers are preserved.
+
+The by-video and Precog routes rely on the central human/internal/settled-payment gate instead of running a second human-only Deep Analysis check after admission. Wallet/ownership checks on other routes remain intact. Regression tests cover paid/internal bots, unpaid rejection before data work, cache-header overrides and streamed receipts. The full suite passed: 178 files / 889 tests; TypeScript passed.
+
+PR #462 targets main intentionally: this isolated production backport excludes staging's unreleased streaming migration. Test the PR's own preview, then release this branch to main after the remaining production gates above. Do not merge all of staging as part of this cost-control release. The preview before these review corrections built successfully and passed live unpaid/invalid-payment probes; the updated commit requires its own hosted build.

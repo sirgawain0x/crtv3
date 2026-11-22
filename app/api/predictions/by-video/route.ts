@@ -2,7 +2,6 @@ import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 
 import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { getVideoPredictionLinks } from "@/lib/predictions/video-prediction-links";
 
@@ -10,8 +9,8 @@ import { getVideoPredictionLinks } from "@/lib/predictions/video-prediction-link
  * GET /api/predictions/by-video?videoAssetId=<Livepeer asset UUID>
  *
  * Returns the prediction markets linked to a video, newest first, for the
- * video-page ActivePredictionsStrip. Anonymous access is allowed (RLS is
- * public-read), so this only exposes question IDs plus any stored display
+ * video-page ActivePredictionsStrip after human, internal, or paid access
+ * verification. This only exposes question IDs plus any stored display
  * metadata (title/category/questionType/outcomes) from
  * prediction_market_creations — no addresses beyond the creator wallet, which
  * is public on-chain data anyway.
@@ -25,17 +24,13 @@ import { getVideoPredictionLinks } from "@/lib/predictions/video-prediction-link
  * }
  *
  * Server components must use getVideoPredictionLinks() directly instead of
- * calling this route over HTTP — BotID deep analysis 403s server-to-server
- * fetches. This route serves browser/client callers.
+ * calling this route over HTTP. HTTP clients must pass the platform access
+ * gate; no additional human-only check runs after a payment settles.
  */
 export async function GET(request: NextRequest) {
   const access = await requirePlatformApiAccess(request, { resource: "predictions.by-video" });
   if (!access.allowed) return access.response;
 
-  const verification = await checkBotIdDeep();
-  if (verification.isBot) {
-    return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Access denied" }, { status: 403 }), access);
-  }
   const rl = await rateLimiters.generous(request);
   if (rl) return withPlatformApiPaymentHeaders(rl, access);
 

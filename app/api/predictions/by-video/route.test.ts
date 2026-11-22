@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
+import { checkBotId } from "botid/server";
 
 const VIDEO_UUID = "a1b2c3d4-e5f6-1234-9abc-def012345678";
 const VIDEO_PK = 42;
@@ -7,6 +9,10 @@ const VIDEO_PK = 42;
 const mockVideoLookup = vi.fn();
 const mockLinksQuery = vi.fn();
 const mockMetadataQuery = vi.fn();
+
+vi.mock("@/lib/middleware/platformApiAccess", () => ({
+  requirePlatformApiAccess: vi.fn(async () => ({ allowed: true, tier: "public" })),
+}));
 
 vi.mock("botid/server", () => ({
   checkBotId: vi.fn(async () => ({ isBot: false })),
@@ -77,6 +83,7 @@ const METADATA = [
 
 describe("predictions/by-video GET", () => {
   beforeEach(() => {
+    vi.mocked(requirePlatformApiAccess).mockResolvedValue({ allowed: true, tier: "public" });
     mockVideoLookup.mockResolvedValue({ data: { id: VIDEO_PK }, error: null });
     mockLinksQuery.mockResolvedValue({
       data: LINKS,
@@ -87,6 +94,22 @@ describe("predictions/by-video GET", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it.each(["internal", "x402"] as const)("serves an admitted %s bot without a second human-only check", async tier => {
+    vi.mocked(requirePlatformApiAccess).mockResolvedValue({ allowed: true, tier, ...(tier === "x402" ? { paymentResponse: "receipt" } : {}) });
+    vi.mocked(checkBotId).mockResolvedValue({ isBot: true } as Awaited<ReturnType<typeof checkBotId>>);
+    const response = await GET(byVideoRequest(`?videoAssetId=${VIDEO_UUID}`));
+    expect(response.status).toBe(200);
+    expect(checkBotId).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    if (tier === "x402") expect(response.headers.get("PAYMENT-RESPONSE")).toBe("receipt");
+  });
+
+  it("denies unpaid callers before querying data", async () => {
+    vi.mocked(requirePlatformApiAccess).mockResolvedValue({ allowed: false, response: new (await import("next/server")).NextResponse(null, { status: 402 }) });
+    expect((await GET(byVideoRequest(`?videoAssetId=${VIDEO_UUID}`))).status).toBe(402);
+    expect(mockVideoLookup).not.toHaveBeenCalled();
   });
 
   it("returns 400 for a missing or malformed videoAssetId", async () => {
