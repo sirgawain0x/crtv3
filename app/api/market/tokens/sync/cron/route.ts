@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/sdk/supabase/service';
 import { getMeTokenProtocolInfo } from '@/lib/utils/metokenUtils';
 import { createPublicClient, http, formatEther } from 'viem';
 import { baseMainnet } from '@/lib/utils/chains/base';
+import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
 import { serverLogger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,8 @@ export async function GET(request: NextRequest) {
   try {
     // Verify the request is from Vercel Cron
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const secret = process.env.CRON_SECRET?.trim();
+    if (!secret || authHeader !== `Bearer ${secret}`) {
       serverLogger.error('Unauthorized cron job attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -105,8 +107,9 @@ export async function GET(request: NextRequest) {
 
             const balancePooled = BigInt(protocolInfo.balancePooled || 0);
             const balanceLocked = BigInt(protocolInfo.balanceLocked || 0);
-            const totalBalance = balancePooled + balanceLocked;
-            const tvl = parseFloat(formatEther(totalBalance));
+            // Hub collateral decimals are not always 18: USDC (hub 2) has 6.
+            // `formatEther` here silently divided USDC TVL by 1e18.
+            const tvl = calculateMeTokenVaultTvlUsd(balancePooled, balanceLocked, protocolInfo.hubId);
             const supply = parseFloat(formatEther(totalSupply));
 
             // Only update if values changed significantly (avoid unnecessary writes)

@@ -66,6 +66,7 @@ function txRequest(body: Record<string, unknown>) {
 
 describe("metokens transactions POST security", () => {
   beforeEach(() => {
+    vi.stubEnv('METOKEN_TRADE_INDEXER_ENABLED', '');
     mockRequireWalletAuthFor.mockResolvedValue({ address: USER });
     mockGetMeTokenByAddress.mockResolvedValue({ id: 1, address: METOKEN });
     mockVerifyMeTokenTransaction.mockResolvedValue({
@@ -81,6 +82,7 @@ describe("metokens transactions POST security", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("returns 401 without wallet auth", async () => {
@@ -126,6 +128,17 @@ describe("metokens transactions POST security", () => {
     expect(res.status).toBe(400);
     expect(json.error).toContain("Transfer");
     expect(mockRecordTransaction).not.toHaveBeenCalled();
+  });
+
+  it('authenticates and verifies before deferring to the enabled chain indexer', async () => {
+    vi.stubEnv('METOKEN_TRADE_INDEXER_ENABLED', 'true');
+    const response = await POST(txRequest({ user_address: USER, transaction_type: 'mint', amount: 1.5,
+      transaction_hash: '0x' + 'a'.repeat(64) }), { params: Promise.resolve({ address: METOKEN }) });
+    expect(response.status).toBe(202);
+    expect(mockRequireWalletAuthFor).toHaveBeenCalled();
+    expect(mockVerifyMeTokenTransaction).toHaveBeenCalled();
+    expect(mockRecordTransaction).not.toHaveBeenCalled();
+    expect(await response.json()).toEqual({ data: null, indexingPending: true });
   });
 
   it("records verified transaction on success", async () => {

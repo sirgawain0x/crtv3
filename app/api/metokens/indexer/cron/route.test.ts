@@ -1,0 +1,14 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+const index = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/metokens/tradeIndexer', () => ({ indexMeTokenTrades: index, DEFAULT_LOOKBACK_BLOCKS: 50_000, MAX_INDEX_BLOCKS: 50_000 }));
+import { GET } from './route';
+const request = (query = '', auth = 'Bearer test-secret') => new NextRequest('https://example.test/api/metokens/indexer/cron' + query, { headers: { authorization: auth } });
+beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('CRON_SECRET', 'test-secret'); vi.stubEnv('METOKEN_TRADE_INDEXER_ENABLED', 'true'); index.mockResolvedValue({ errors: [], eventsFound: 0 }); });
+afterEach(() => vi.unstubAllEnvs());
+it('rejects an unset secret even for Bearer undefined', async () => { vi.stubEnv('CRON_SECRET', ''); expect((await GET(request('', 'Bearer undefined'))).status).toBe(503); expect(index).not.toHaveBeenCalled(); });
+it('rejects unauthorized calls', async () => { expect((await GET(request('', 'Bearer wrong'))).status).toBe(401); expect(index).not.toHaveBeenCalled(); });
+it('is disabled by default', async () => { vi.stubEnv('METOKEN_TRADE_INDEXER_ENABLED', ''); expect((await GET(request())).status).toBe(503); expect(index).not.toHaveBeenCalled(); });
+it('rejects malformed and oversized numeric options', async () => { for (const query of ['?fromBlock=1.5', '?fromBlock=', '?toBlock=-1', '?lookback=50001', '?lookback=Infinity']) expect((await GET(request(query))).status).toBe(400); expect(index).not.toHaveBeenCalled(); });
+it('passes bounded previews to the indexer', async () => { expect((await GET(request('?fromBlock=10&toBlock=20&dryRun=true'))).status).toBe(200); expect(index).toHaveBeenCalledWith({ fromBlock: 10, toBlock: 20, lookbackBlocks: 50_000, dryRun: true }); });
+it('does not disclose RPC credentials in errors', async () => { index.mockRejectedValue(new Error('https://rpc.example/private-key')); const response = await GET(request()); expect(response.status).toBe(502); expect(await response.text()).not.toContain('private-key'); });
