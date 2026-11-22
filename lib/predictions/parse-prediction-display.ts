@@ -1,8 +1,6 @@
 import { keccak256, stringToHex } from "viem";
 import type { QuestionType } from "@/lib/sdk/reality-eth/reality-eth-utils";
-import { parseQuestionLocal } from "@/lib/reality-social/parse-question-local";
-
-const UNIT_SEP = "\u241F";
+import { getStandardQuestionType, parseQuestionLocal } from "@/lib/reality-social/parse-question-local";
 
 export type ParsedPredictionDisplay = {
   title: string;
@@ -17,76 +15,6 @@ const ZERO_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 const ONE_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000001" as const;
-
-function parseOutcomesSegment(segment: string): string[] {
-  const trimmed = segment.trim();
-  if (!trimmed) return [];
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) {
-      return parsed.map(String).filter(Boolean);
-    }
-  } catch {
-    // fall through
-  }
-  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-    return trimmed
-      .slice(1, -1)
-      .split('","')
-      .map((s) => s.replace(/^"|"$/g, "").trim())
-      .filter(Boolean);
-  }
-  return trimmed
-    .split(",")
-    .map((s) => s.replace(/^"|"$/g, "").trim())
-    .filter(Boolean);
-}
-
-function inferTypeFromOutcomes(outcomes: string[]): ParsedPredictionDisplay["type"] {
-  if (outcomes.length === 2) {
-    const lower = outcomes.map((o) => o.toLowerCase());
-    if (
-      (lower[0] === "yes" && lower[1] === "no") ||
-      (lower[0] === "no" && lower[1] === "yes")
-    ) {
-      return "bool";
-    }
-    return "single-select";
-  }
-  if (outcomes.length > 2) return "single-select";
-  return "bool";
-}
-
-/** Mirrors Reality.eth template IDs from `getTemplateIdForQuestionType` / templates.json. */
-const REALITY_TEMPLATE_ID_TO_TYPE: Record<
-  number,
-  ParsedPredictionDisplay["type"]
-> = {
-  0: "bool",
-  1: "uint",
-  2: "single-select",
-  3: "multiple-select",
-};
-
-function applyTemplateIdToDisplay(
-  parsed: ParsedPredictionDisplay,
-  templateId?: string | number | bigint | null
-): ParsedPredictionDisplay {
-  if (templateId == null) return parsed;
-  const id = Number(templateId);
-  if (!Number.isFinite(id)) return parsed;
-
-  const fromTemplate = REALITY_TEMPLATE_ID_TO_TYPE[id];
-  if (!fromTemplate) return parsed;
-
-  const next = { ...parsed, type: fromTemplate };
-  if (fromTemplate === "uint") {
-    next.outcomes = [];
-  } else if (fromTemplate === "bool" && next.outcomes.length === 0) {
-    next.outcomes = ["Yes", "No"];
-  }
-  return next;
-}
 
 function isValidQuestionType(value: string): value is ParsedPredictionDisplay["type"] {
   return (
@@ -155,55 +83,18 @@ export function parsePredictionDisplay(
   templateId?: string | number | bigint | null
 ): ParsedPredictionDisplay {
   const raw = (questionText ?? "").trim();
-  if (!raw) {
-    return {
-      title: "Untitled Prediction",
-      type: "bool",
-      outcomes: ["Yes", "No"],
-      category: "general",
-      language: "en_US",
-    };
-  }
+  // Share the lightweight parser with social sync; no jsdom/formatter import.
+  const parsed = parseQuestionLocal(raw, undefined, templateId);
+  if (parsed) return parsed;
 
-  // Unit-separator format (Creative TV default). Avoid @reality.eth/reality-eth-lib here —
-  // it pulls jsdom/html-encoding-sniffer and crashes Vercel Node (ERR_REQUIRE_ESM).
-  const local = parseQuestionLocal(raw);
-  if (local) {
-    return applyTemplateIdToDisplay(
-      {
-        ...local,
-        language: "en_US",
-      },
-      templateId
-    );
-  }
-
-  const parts = raw.split(UNIT_SEP);
-  const title = parts[0]?.trim() || raw;
-  const outcomes = parts[1] ? parseOutcomesSegment(parts[1]) : [];
-  const category = parts[parts.length - 2]?.trim() || parts[parts.length - 1]?.trim() || "general";
-  const language =
-    parts[parts.length - 1]?.trim().match(/^[a-z]{2}_[A-Z]{2}$/)
-      ? parts[parts.length - 1].trim()
-      : "en_US";
-
-  const resolvedCategory =
-    language.match(/^[a-z]{2}_[A-Z]{2}$/) && parts.length >= 3
-      ? parts[parts.length - 2]?.trim() || "general"
-      : category;
-
-  const type = inferTypeFromOutcomes(outcomes);
-
-  return applyTemplateIdToDisplay(
-    {
-      title,
-      type,
-      outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
-      category: resolvedCategory,
-      language: language.match(/^[a-z]{2}_[A-Z]{2}$/) ? language : "en_US",
-    },
-    templateId
-  );
+  const type = getStandardQuestionType(templateId) ?? "bool";
+  return {
+    title: raw || "Untitled Prediction",
+    type,
+    outcomes: type === "bool" ? ["Yes", "No"] : [],
+    category: "general",
+    language: "en_US",
+  };
 }
 
 function looksLikeUintAnswer(normalized: string): boolean {
@@ -267,8 +158,8 @@ export function answerBytesToLabel(
   const normalized = answerHex.toLowerCase();
 
   if (effectiveType === "bool") {
-    if (normalized === ONE_ANSWER.toLowerCase()) return "Yes";
-    if (normalized === ZERO_ANSWER.toLowerCase()) return "No";
+    if (/^0x0*1$/.test(normalized)) return "Yes";
+    if (/^0x0+$/.test(normalized)) return "No";
   }
 
   if (effectiveType === "uint") {

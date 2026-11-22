@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { serverLogger } from "@/lib/utils/logger";
@@ -23,12 +26,15 @@ let cachedAt = 0;
 const CACHE_TTL_MS = 60_000;
 
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "story.wip-price" });
+  if (!access.allowed) return access.response;
+
   const rl = await rateLimiters.standard(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, access);
 
   const now = Date.now();
   if (cachedPrice !== null && now - cachedAt < CACHE_TTL_MS) {
-    return NextResponse.json({ success: true, price: cachedPrice, cached: true });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ success: true, price: cachedPrice, cached: true }), access);
   }
 
   try {
@@ -50,17 +56,17 @@ export async function GET(request: NextRequest) {
 
     cachedPrice = price;
     cachedAt = now;
-    return NextResponse.json({ success: true, price, cached: false });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ success: true, price, cached: false }), access);
   } catch (error) {
     serverLogger.error("Failed to fetch WIP price:", error);
 
     // Serve a stale cache or fallback so the UI degrades gracefully.
     const price = cachedPrice ?? FALLBACK_WIP_USD;
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       success: true,
       price,
       cached: true,
       stale: true,
-    });
+    }), access);
   }
 }

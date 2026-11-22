@@ -2,6 +2,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockVerifyX402PaymentFromRequest = vi.fn();
+const mockCheckBotId = vi.fn();
+vi.mock("botid/server", () => ({ checkBotId: (...args: unknown[]) => mockCheckBotId(...args) }));
 
 vi.mock("@/lib/middleware/rateLimit", () => ({
   rateLimiters: {
@@ -35,6 +37,8 @@ describe("requirePlatformApiAccess", () => {
 
   beforeEach(() => {
     process.env.PLATFORM_API_ACCESS_ENABLED = "true";
+    process.env.CREATIVE_PLATFORM_INTERNAL_API_KEYS = "creative-guide:internal_secret";
+    mockCheckBotId.mockResolvedValue({ isHuman: true, isBot: false, isVerifiedBot: false, bypassed: false });
     process.env.CREATIVE_PLATFORM_ADMIN_API_KEYS = "crtv_admin_test";
     process.env.CREATIVE_PLATFORM_PARTNER_API_KEYS = "mixtape:crtv_pk_mixtape_test";
     process.env.X402_API_RECIPIENT = "0x31ee83aef931a1af321c505053040e98545a5614";
@@ -62,17 +66,14 @@ describe("requirePlatformApiAccess", () => {
     }
   });
 
-  it("allows partner API key", async () => {
+  it("requires payment even with an external partner API key", async () => {
     const request = new NextRequest("http://localhost/api/test", {
       headers: { Authorization: "Bearer crtv_pk_mixtape_test" },
     });
 
     const result = await requirePlatformApiAccess(request, { resource: "playback.resolve" });
-    expect(result.allowed).toBe(true);
-    if (result.allowed) {
-      expect(result.tier).toBe("partner");
-      expect(result.keyId).toBe("mixtape");
-    }
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.response.status).toBe(402);
   });
 
   it("returns 401 for invalid API key", async () => {
@@ -111,6 +112,7 @@ describe("requirePlatformApiAccess", () => {
 
   it("bypasses gating when access is disabled", async () => {
     process.env.PLATFORM_API_ACCESS_ENABLED = "false";
+    delete process.env.CREATIVE_PLATFORM_INTERNAL_API_KEYS;
     delete process.env.CREATIVE_PLATFORM_ADMIN_API_KEYS;
     delete process.env.CREATIVE_PLATFORM_PARTNER_API_KEYS;
     delete process.env.X402_API_RECIPIENT;
@@ -135,16 +137,24 @@ describe("requirePlatformApiAccess", () => {
     }
   });
 
-  it("allows same-site requests without auth when gating is enabled", async () => {
+  it("does not grant free browser access for malformed SDK error verdicts", async () => {
+    mockCheckBotId.mockResolvedValue({ isHuman: true, isBot: undefined });
+    const request = new NextRequest("http://localhost/api/test", {
+      headers: { "Sec-Fetch-Site": "same-origin" },
+    });
+    const result = await requirePlatformApiAccess(request, { resource: "playback.info" });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.response.status).toBe(402);
+  });
+
+  it("requires payment for same-site requests without credentials", async () => {
     const request = new NextRequest("http://localhost/api/livepeer/playback-info", {
       headers: { "Sec-Fetch-Site": "same-site" },
     });
 
     const result = await requirePlatformApiAccess(request, { resource: "playback.info" });
-    expect(result.allowed).toBe(true);
-    if (result.allowed) {
-      expect(result.tier).toBe("public");
-    }
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.response.status).toBe(402);
   });
 
   it("returns 402 for cross-site requests without auth", async () => {
@@ -162,7 +172,7 @@ describe("requirePlatformApiAccess", () => {
     }
   });
 
-  it("allows partner API key on cross-origin requests", async () => {
+  it("requires partner payment on cross-origin requests", async () => {
     const request = new NextRequest("https://tv.creativeplatform.xyz/api/video-assets/by-asset-id/uuid/playback", {
       headers: {
         Authorization: "Bearer crtv_pk_mixtape_test",
@@ -172,14 +182,11 @@ describe("requirePlatformApiAccess", () => {
     });
 
     const result = await requirePlatformApiAccess(request, { resource: "playback.resolve" });
-    expect(result.allowed).toBe(true);
-    if (result.allowed) {
-      expect(result.tier).toBe("partner");
-      expect(result.keyId).toBe("mixtape");
-    }
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.response.status).toBe(402);
   });
 
-  it("prefers partner API key over same-origin bypass", async () => {
+  it("does not let a partner key bypass payment with browser headers", async () => {
     const request = new NextRequest("http://localhost/api/livepeer/playback-info", {
       headers: {
         Authorization: "Bearer crtv_pk_mixtape_test",
@@ -188,10 +195,64 @@ describe("requirePlatformApiAccess", () => {
     });
 
     const result = await requirePlatformApiAccess(request, { resource: "playback.info" });
-    expect(result.allowed).toBe(true);
-    if (result.allowed) {
-      expect(result.tier).toBe("partner");
-      expect(result.keyId).toBe("mixtape");
-    }
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.response.status).toBe(402);
   });
+});
+
+
+describe("production cost boundaries", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
+  it("does not fail open in production when the enable flag is false", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PLATFORM_API_ACCESS_ENABLED", "false");
+    const result = await requirePlatformApiAccess(new NextRequest("https://tv.creativeplatform.xyz/api/test"), { resource: "rpc.story" });
+    expect(result.allowed).toBe(false);
+  });
+  it("allows only authenticated internal bots without payment", async () => {
+    vi.stubEnv("PLATFORM_API_ACCESS_ENABLED", "true");
+    vi.stubEnv("CREATIVE_PLATFORM_INTERNAL_API_KEYS", "creative-guide:internal_secret");
+    const result = await requirePlatformApiAccess(new NextRequest("http://localhost/api/test", {
+      headers: { Authorization: "Bearer internal_secret" },
+    }), { resource: "rpc.story" });
+    expect(result).toEqual({ allowed: true, tier: "internal", keyId: "creative-guide" });
+  });
+  it.each([false, true])("does not trust spoofed same-origin headers from a bot (verified=%s)", async (verified) => {
+    vi.stubEnv("PLATFORM_API_ACCESS_ENABLED", "true");
+    mockCheckBotId.mockResolvedValue({ isHuman: false, isBot: true, isVerifiedBot: verified });
+    mockVerifyX402PaymentFromRequest.mockResolvedValue({ ok: false, error: "Missing payment proof" });
+    const result = await requirePlatformApiAccess(new NextRequest("http://localhost/api/test", {
+      headers: { "Sec-Fetch-Site": "same-origin" },
+    }), { resource: "rpc.story" });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.response.status).toBe(402);
+  });
+  it("fails closed on BotID errors before payment verification or upstream work", async () => {
+    vi.stubEnv("PLATFORM_API_ACCESS_ENABLED", "true");
+    mockCheckBotId.mockRejectedValue(new Error("unavailable"));
+    const result = await requirePlatformApiAccess(new NextRequest("http://localhost/api/test", {
+      headers: { "Sec-Fetch-Site": "same-origin" },
+    }), { resource: "rpc.story" });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.response.status).toBe(503);
+    expect(mockVerifyX402PaymentFromRequest).not.toHaveBeenCalled();
+  });
+  it("preserves verified first-party browser access with a separate user-session bearer token", async () => {
+    vi.stubEnv("PLATFORM_API_ACCESS_ENABLED", "true");
+    mockCheckBotId.mockResolvedValue({ isHuman: true, isBot: false, bypassed: false });
+    const result = await requirePlatformApiAccess(new NextRequest("http://localhost/api/earn/position", {
+      headers: { "Sec-Fetch-Site": "same-origin", Authorization: "Bearer privy-user-token" },
+    }), { resource: "earn.position" });
+    expect(result).toEqual({ allowed: true, tier: "public" });
+  });
+  it("does not accept a production firewall bypass as proof of humanity", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    mockCheckBotId.mockResolvedValue({ isHuman: true, isBot: false, bypassed: true });
+    mockVerifyX402PaymentFromRequest.mockResolvedValue({ ok: false, error: "Missing payment proof" });
+    const result = await requirePlatformApiAccess(new NextRequest("http://localhost/api/test", {
+      headers: { "Sec-Fetch-Site": "same-origin" },
+    }), { resource: "rpc.story" });
+    expect(result.allowed).toBe(false);
+  });
+
 });

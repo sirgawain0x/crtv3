@@ -10,6 +10,7 @@ import { requestQuoteV0 } from "@alchemy/wallet-apis/experimental";
 import type { Address, Hex } from "viem";
 import { useWalletChain } from "./chain-context";
 import { useWalletClientContext } from "./wallet-context";
+import { limitGasCapabilities } from "./gas-policy";
 import { clearWalletAuth } from "@/lib/auth/wallet-auth-cache";
 import type { CompatSmartAccountClient, SendUserOperationArgs } from "./smart-wallet-client";
 
@@ -352,7 +353,7 @@ export function usePrepareSwap({ client }: { client?: SwapHookClient } = {}) {
       setIsPreparingSwap(true);
       try {
         const account = client.scaAddress ?? client.getAddress();
-        const capabilities = params.capabilities as Record<string, unknown> | undefined;
+        const capabilities = limitGasCapabilities(params.capabilities as Record<string, unknown> | undefined);
         const paymasterService = capabilities?.paymasterService as { policyId?: string } | undefined;
         const erc20 = capabilities?.erc20 as { tokenAddress?: string } | undefined;
 
@@ -371,7 +372,7 @@ export function usePrepareSwap({ client }: { client?: SwapHookClient } = {}) {
         return await requestQuoteV0(client as never, {
           ...params,
           account,
-          ...(quoteCapabilities ? { capabilities: quoteCapabilities } : {}),
+          capabilities: quoteCapabilities,
         } as never);
       } finally {
         setIsPreparingSwap(false);

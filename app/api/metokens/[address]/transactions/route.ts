@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBotIdDeep } from '@/lib/middleware/botIdGuard';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
@@ -14,6 +17,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  const access = await requirePlatformApiAccess(request, { resource: "metokens.transactions" });
+  if (!access.allowed) return access.response;
+
   try {
     const { address } = await params;
     const { searchParams } = new URL(request.url);
@@ -23,10 +29,10 @@ export async function GET(
     const userAddress = searchParams.get('userAddress');
 
     if (!address) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'MeToken address is required' },
         { status: 400 }
-      );
+      ), access);
     }
 
     const transactions = await meTokenSupabaseService.getMeTokenTransactions(address, {
@@ -35,7 +41,7 @@ export async function GET(
       userAddress: userAddress || undefined,
     });
 
-    return NextResponse.json({ data: transactions });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ data: transactions }), access);
   } catch (error) {
     serverLogger.error('Error fetching MeToken transactions:', error);
 
@@ -43,23 +49,23 @@ export async function GET(
     if (error instanceof Error) {
       // Check for database connection errors
       if (error.message.includes('connection') || error.message.includes('timeout')) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           {
             error: 'Database connection error',
             details: 'Unable to connect to the database. Please try again later.'
           },
           { status: 503 }
-        );
+        ), access);
       }
     }
 
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         error: 'Failed to fetch transactions',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
-    );
+    ), access);
   }
 }
 

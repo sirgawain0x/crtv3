@@ -7,6 +7,9 @@ import {
 } from "./parse-prediction-display";
 
 describe("parsePredictionDisplay", () => {
+  it('decodes the indexer short zero boolean representation as No, never as outcome index Yes', () => {
+    expect(answerBytesToLabel('0x00000000', parsePredictionDisplay('Result?\u241fgeneral\u241fen_US', 0))).toBe('No');
+  });
   it("parses unit-separated question text", () => {
     const raw =
       'Will it rain tomorrow?\u241f"Yes","No"\u241fcreative tv\u241fen_US';
@@ -28,6 +31,48 @@ describe("parsePredictionDisplay", () => {
     const parsed = parsePredictionDisplay(raw, 1);
     expect(parsed.type).toBe("uint");
     expect(parsed.title).toBe("How many views?");
+    expect(parsed.outcomes).toEqual([]);
+    expect(parsed.category).toBe("general");
+  });
+
+  it.each([1, "1", 1n])("honors numeric template ID %s and preserves locale", (templateId) => {
+    const parsed = parsePredictionDisplay("Combien?\u241fsports\u241ffr_FR", templateId);
+    expect(parsed).toEqual({
+      title: "Combien?", type: "uint", outcomes: [], category: "sports", language: "fr_FR",
+    });
+    expect(answerBytesToLabel("0x" + "0".repeat(63) + "1", parsed)).toBe("1");
+  });
+
+  it.each([2, "2", 2n])("keeps a Yes/No select template distinct from a boolean (%s)", (templateId) => {
+    const parsed = parsePredictionDisplay('Choose?\u241f"Yes","No"\u241fgeneral\u241fen_US', templateId);
+    expect(parsed.type).toBe("single-select");
+    expect(parsed.outcomes).toEqual(["Yes", "No"]);
+  });
+
+  it.each([3, "3", 3n])("honors multiple-select template ID %s", (templateId) => {
+    const parsed = parsePredictionDisplay('Pick several\u241f["A","B"]\u241fmusic\u241fes_ES', templateId);
+    expect(parsed.type).toBe("multiple-select");
+    expect(parsed.outcomes).toEqual(["A", "B"]);
+    expect(parsed.category).toBe("music");
+    expect(parsed.language).toBe("es_ES");
+  });
+
+  it.each([undefined, null, "unknown", "1.5", -1, 999, 9007199254740993n])("falls back safely with missing or unsupported template ID %s", (templateId) => {
+    const parsed = parsePredictionDisplay('Pick one\u241f"A","B"\u241fgeneral\u241fen_US', templateId);
+    expect(parsed.type).toBe("single-select");
+    expect(parsed.outcomes).toEqual(["A", "B"]);
+  });
+
+  it("does not treat a category as an outcome when metadata is missing", () => {
+    const parsed = parsePredictionDisplay("Will it happen?\u241fgeneral\u241fen_US");
+    expect(parsed.type).toBe("bool");
+    expect(parsed.outcomes).toEqual(["Yes", "No"]);
+  });
+
+  it("retains numeric template metadata for empty input", () => {
+    expect(parsePredictionDisplay("", 1)).toEqual({
+      title: "Untitled Prediction", type: "uint", outcomes: [], category: "general", language: "en_US",
+    });
   });
 
   it("maps bool answers", () => {

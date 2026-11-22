@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 /**
  * GET /api/story/license-terms
  *
@@ -18,8 +21,11 @@ import { serverLogger } from "@/lib/utils/logger";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "story.license-terms" });
+  if (!access.allowed) return access.response;
+
   const rl = await rateLimiters.standard(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, access);
 
   try {
     const { searchParams } = new URL(request.url);
@@ -34,18 +40,18 @@ export async function GET(request: NextRequest) {
     if (videoAssetId) {
       const assetId = parseInt(videoAssetId, 10);
       if (isNaN(assetId)) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           { error: "Invalid videoAssetId" },
           { status: 400 }
-        );
+        ), access);
       }
 
       const videoAsset = await getVideoAssetById(assetId);
       if (!videoAsset) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           { error: "Video asset not found" },
           { status: 404 }
-        );
+        ), access);
       }
 
       resolvedIpId = videoAsset.story_ip_id || resolvedIpId;
@@ -53,46 +59,46 @@ export async function GET(request: NextRequest) {
         videoAsset.story_license_terms_id || resolvedLicenseTermsId;
 
       if (!resolvedIpId) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           {
             registered: videoAsset.story_ip_registered,
             error: "Video is not registered as IP on Story Protocol",
           },
           { status: 404 }
-        );
+        ), access);
       }
 
       if (!resolvedLicenseTermsId) {
-        return NextResponse.json({
+        return withPlatformApiPaymentHeaders(NextResponse.json({
           ipId: resolvedIpId,
           licenseTermsId: null,
           terms: null,
           message: "No license terms attached to this IP asset",
-        });
+        }), access);
       }
     }
 
     if (!resolvedIpId || !resolvedLicenseTermsId) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: "Missing required params: provide videoAssetId, or both ipId and licenseTermsId" },
         { status: 400 }
-      );
+      ), access);
     }
 
     if (!/^\d+$/.test(resolvedLicenseTermsId)) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: "Invalid licenseTermsId format. Must be a numeric string." },
         { status: 400 }
-      );
+      ), access);
     }
 
     // Fetch license terms from Story Protocol
     const privateKey = process.env.STORY_PROTOCOL_PRIVATE_KEY;
     if (!privateKey) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: "Story Protocol not configured", hint: "STORY_PROTOCOL_PRIVATE_KEY required" },
         { status: 503 }
-      );
+      ), access);
     }
 
     const { privateKeyToAccount } = await import("viem/accounts");
@@ -106,7 +112,7 @@ export async function GET(request: NextRequest) {
 
       const terms = response.terms;
 
-      return NextResponse.json({
+      return withPlatformApiPaymentHeaders(NextResponse.json({
         ipId: resolvedIpId,
         licenseTermsId: resolvedLicenseTermsId,
         terms: {
@@ -123,10 +129,10 @@ export async function GET(request: NextRequest) {
           expiration: terms.expiration?.toString(),
           uri: terms.uri,
         },
-      });
+      }), access);
     } catch (err) {
       serverLogger.error("Failed to fetch license terms from Story SDK:", err);
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           ipId: resolvedIpId,
           licenseTermsId: resolvedLicenseTermsId,
@@ -134,13 +140,13 @@ export async function GET(request: NextRequest) {
           error: "Failed to fetch license terms from Story Protocol",
         },
         { status: 502 }
-      );
+      ), access);
     }
   } catch (error) {
     serverLogger.error("License terms lookup error:", error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch license terms" },
       { status: 500 }
-    );
+    ), access);
   }
 }

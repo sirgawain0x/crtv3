@@ -40,6 +40,13 @@ interface PredictionDetailsProps {
 
 type QuestionType = ParsedPredictionDisplay["type"];
 
+type PredictionMetadata = {
+  title?: string | null;
+  questionType?: string | null;
+  category?: string | null;
+  outcomes?: string[] | null;
+};
+
 type AnswerTimelineEntry = {
   answer: string;
   bond: string;
@@ -108,12 +115,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           throw questionError;
         }
 
-        let metadata: {
-          title?: string | null;
-          questionType?: string | null;
-          category?: string | null;
-          outcomes?: string[] | null;
-        } | null = null;
+        let metadata: PredictionMetadata | null = null;
 
         try {
           const metaRes = await fetch(
@@ -121,12 +123,16 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           );
           if (metaRes.ok) {
             const metaJson = (await metaRes.json()) as {
-              metadata?: typeof metadata;
+              metadata?: PredictionMetadata | null;
             };
             metadata = metaJson.metadata ?? null;
           }
         } catch (metaErr) {
           logger.debug("Prediction metadata fetch skipped:", metaErr);
+        }
+
+        if (!questionDataRaw.question?.trim() && !metadata?.title?.trim()) {
+          throw new Error('Prediction text is temporarily unavailable. Please retry.');
         }
 
         let subgraphOutcomes: unknown;
@@ -219,11 +225,8 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
 
         try {
           const answer = await getFinalAnswer(publicClient, questionId);
-          if (
-            answer &&
-            answer !==
-              "0x0000000000000000000000000000000000000000000000000000000000000000"
-          ) {
+          // Zero is the valid finalized boolean answer "No".
+          if (answer !== null) {
             setFinalAnswer(answer);
           }
         } catch {
@@ -285,7 +288,9 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
   const finalLabel = finalAnswer
     ? answerBytesToLabel(finalAnswer, parsed)
     : null;
-  const leadingLabel = question.best_answer
+  const hasSubmittedAnswer = question.bond > 0n || (question.finalize_ts ?? 0) > 0 ||
+    (Boolean(question.history_hash) && !/^0x0{64}$/i.test(question.history_hash));
+  const leadingLabel = hasSubmittedAnswer && question.best_answer
     ? answerBytesToLabel(question.best_answer, parsed)
     : null;
 

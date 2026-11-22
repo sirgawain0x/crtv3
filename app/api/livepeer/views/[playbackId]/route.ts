@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllViews } from '@/app/api/livepeer/views';
 import { createServiceClient } from '@/lib/sdk/supabase/service';
@@ -46,10 +47,10 @@ export async function GET(
     const { playbackId } = await params;
 
     if (!playbackId) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Playback ID is required', code: 'PLAYBACK_ID_REQUIRED' },
         { status: 400, headers: noStoreHeaders },
-      );
+      ), access);
     }
 
     const supabase = createServiceClient();
@@ -63,7 +64,7 @@ export async function GET(
 
     if (!viewsResult.ok && viewsResult.reason === 'not_configured') {
       if (dbViewCount > 0) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           {
             success: true,
             source: 'database' as const,
@@ -76,22 +77,22 @@ export async function GET(
             code: LIVEPEER_NOT_CONFIGURED,
           },
           { headers: noStoreHeaders },
-        );
+        ), access);
       }
 
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: 'Livepeer is not configured',
           code: LIVEPEER_NOT_CONFIGURED,
         },
         { status: 503, headers: noStoreHeaders },
-      );
+      ), access);
     }
 
     const displayTotal = mergeViewCounts(dbViewCount, livepeerTotal);
     const source = resolveViewCountSource(livepeerTotal, dbViewCount);
 
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         success: true,
         source,
@@ -106,12 +107,12 @@ export async function GET(
           : {}),
       },
       { headers: noStoreHeaders },
-    );
+    ), access);
   } catch (error) {
     serverLogger.error('Error fetching view metrics:', error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Internal server error', code: 'VIEW_METRICS_ERROR' },
       { status: 500, headers: noStoreHeaders },
-    );
+    ), access);
   }
 }

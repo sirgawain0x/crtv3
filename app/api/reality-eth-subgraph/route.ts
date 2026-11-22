@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
@@ -14,8 +17,11 @@ import {
 } from '@/lib/subgraph/creative-platform-proxy';
 
 export async function POST(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "subgraph.predictions" });
+  if (!access.allowed) return access.response;
+
   const rl = await rateLimiters.generous(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, access);
 
   try {
     const rawBody = await request.json();
@@ -29,13 +35,13 @@ export async function POST(request: NextRequest) {
     const candidateEndpoints = resolveSubgraphEndpoints('reality-eth');
 
     if (candidateEndpoints.length === 0) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: 'Reality.eth Subgraph Not Configured',
           hint: STUDIO_URL_HINT,
         },
         { status: 503 },
-      );
+      ), access);
     }
 
     let lastHttpError: { status: number; details: string; endpoint: string } | null = null;
@@ -85,12 +91,12 @@ export async function POST(request: NextRequest) {
         dataKeys: payload.data ? Object.keys(payload.data) : [],
       });
 
-      return NextResponse.json(data);
+      return withPlatformApiPaymentHeaders(NextResponse.json(data), access);
     }
 
     if (lastGraphQlError) {
       const isDeploymentMissing = lastGraphQlError.message.toLowerCase().includes('does not exist');
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           errors: [{ message: lastGraphQlError.message }],
           hint: isDeploymentMissing
@@ -98,11 +104,11 @@ export async function POST(request: NextRequest) {
             : 'Subgraph query failed. Verify Graph Studio deployment is synced.',
         },
         { status: 502 },
-      );
+      ), access);
     }
 
     if (lastHttpError) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: 'Reality.eth Subgraph Query Failed',
           details: lastHttpError.details,
@@ -115,23 +121,23 @@ export async function POST(request: NextRequest) {
                 : 'Subgraph server error. The selected provider may be down or misconfigured.',
         },
         { status: lastHttpError.status },
-      );
+      ), access);
     }
 
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'No subgraph endpoint available', hint: STUDIO_URL_HINT },
       { status: 503 },
-    );
+    ), access);
   } catch (error) {
     serverLogger.error('Error proxying Reality.eth subgraph request:', error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         error: 'Internal Server Error',
         message: error instanceof Error ? error.message : 'Unknown error',
         hint: STUDIO_URL_HINT,
       },
       { status: 500 },
-    );
+    ), access);
   }
 }
 

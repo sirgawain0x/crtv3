@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useIsMember } from "../unlock/useIsMember";
 import { buildSponsoredAttestationGasContext } from "@/lib/eas/attestation-gas";
+import { isGasSponsorshipEnabled, isUsdcGasPaymentEnabled } from "@/lib/wallet/gas-policy";
 import { buildMeTokenCreationGasContext } from "@/lib/metokens/metoken-gas";
 import {
   resolveMemberForTradeGas,
@@ -48,8 +49,8 @@ export function useGasSponsorship() {
         });
 
         return resolveGasContextForMethod(preferredMethod, memberForContext, {
-            sponsoredPolicyId: SPONSORED_POLICY_ID,
-            usdcPolicyId: USDC_POLICY_ID,
+            sponsoredPolicyId: isGasSponsorshipEnabled() ? SPONSORED_POLICY_ID : undefined,
+            usdcPolicyId: isUsdcGasPaymentEnabled() ? USDC_POLICY_ID : undefined,
         });
     };
 
@@ -59,7 +60,7 @@ export function useGasSponsorship() {
      * When set, you do not need STORY_PROTOCOL_PRIVATE_KEY to pay gas for Story deploy/interactions.
      */
     const getStoryGasContext = (): { context: GasSponsorshipContext | undefined; isSponsored: boolean } => {
-        if (STORY_POLICY_ID) {
+        if (isGasSponsorshipEnabled() && STORY_POLICY_ID) {
             return {
                 context: {
                     paymasterService: { policyId: STORY_POLICY_ID },

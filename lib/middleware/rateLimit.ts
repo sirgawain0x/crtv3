@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serverLogger } from '@/lib/utils/logger';
+import { getCostProtectedRoute } from '@/lib/middleware/cost-protected-routes';
 
 /**
  * Rate limiting configuration
@@ -111,6 +112,32 @@ function checkRateLimit(
   };
 }
 
+/** Atomic shared window when Upstash REST is configured; no per-instance fallback on failure. */
+async function checkSharedRateLimit(key: string, config: RateLimitConfig) {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!url && !token) {
+    if (process.env.RATE_LIMIT_REQUIRE_SHARED_STORE === 'true') throw new Error('Shared rate limiter required');
+    return checkRateLimit(key, config);
+  }
+  if (!url || !token || !url.startsWith('https://')) throw new Error('Shared rate limiter misconfigured');
+  const script = "local n = redis.call('INCR', KEYS[1]); if n == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end; return {n, redis.call('PTTL', KEYS[1])}";
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(['EVAL', script, '1', `crtv:rate:${key}`, String(config.windowMs)]),
+    signal: AbortSignal.timeout(3000),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Shared rate limiter unavailable');
+  const payload = await response.json();
+  const [count, ttl] = Array.isArray(payload.result) ? payload.result : [];
+  if (payload.error || !Number.isInteger(count) || count < 1 || !Number.isInteger(ttl) || ttl < 0) {
+    throw new Error('Invalid shared rate limit response');
+  }
+  return { allowed: count <= config.maxRequests, remaining: Math.max(0, config.maxRequests - count), resetTime: Date.now() + ttl };
+}
+
 /**
  * Rate limiting middleware for Next.js API routes
  * 
@@ -136,9 +163,15 @@ export async function rateLimit(
 ): Promise<NextResponse | null> {
   const key = config.keyGenerator
     ? config.keyGenerator(request)
-    : getClientIp(request);
+    : `${request.method}:${getCostProtectedRoute(request.nextUrl.pathname, request.method)?.path ?? request.nextUrl.pathname}:${config.maxRequests}:${config.windowMs}:${getClientIp(request)}`;
 
-  const result = checkRateLimit(key, config);
+  let result;
+  try {
+    result = await checkSharedRateLimit(key, config);
+  } catch {
+    serverLogger.warn('Rate limiter unavailable');
+    return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
+  }
 
   if (!result.allowed) {
     const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);

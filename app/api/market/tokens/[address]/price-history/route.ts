@@ -1,3 +1,5 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { formatEther } from 'viem';
@@ -20,6 +22,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  const access = await requirePlatformApiAccess(request, { resource: 'market.history' });
+  if (!access.allowed) return access.response;
+
   try {
     const { address } = await params;
     const { searchParams } = new URL(request.url);
@@ -28,10 +33,10 @@ export async function GET(
     const interval = searchParams.get('interval') as 'hour' | 'day' || 'hour';
 
     if (!address) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Token address is required' },
         { status: 400 }
-      );
+      ), access);
     }
 
     const supabase = await createClient();
@@ -47,23 +52,23 @@ export async function GET(
       serverLogger.error('Error fetching MeToken:', meTokenError);
       // If it's a "not found" error, return 404
       if (meTokenError.code === 'PGRST116') {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           { error: 'Token not found' },
           { status: 404 }
-        );
+        ), access);
       }
       // Otherwise return 500
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Failed to fetch token information', details: meTokenError.message },
         { status: 500 }
-      );
+      ), access);
     }
 
     if (!meToken) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Token not found' },
         { status: 404 }
-      );
+      ), access);
     }
 
     const now = new Date();
@@ -125,14 +130,14 @@ export async function GET(
     if (txError) {
       serverLogger.error('Error fetching transactions:', txError);
       // Return empty history instead of error if query fails
-      return NextResponse.json({
+      return withPlatformApiPaymentHeaders(NextResponse.json({
         data: [],
         token: {
           address: meToken.address,
           current_price: currentPrice,
           current_tvl: currentTvl,
         },
-      });
+      }), access);
     }
 
     // Group transactions by time interval
@@ -338,20 +343,20 @@ export async function GET(
       });
     }
 
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       data: history,
       token: {
         address: meToken.address,
         current_price: currentPrice,
         current_tvl: currentTvl,
       },
-    });
+    }), access);
   } catch (error) {
     serverLogger.error('Error fetching price history:', error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Failed to fetch price history', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
-    );
+    ), access);
   }
 }
 

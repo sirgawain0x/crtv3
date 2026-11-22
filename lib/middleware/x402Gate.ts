@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { USDC_TOKEN_ADDRESSES } from "@/lib/contracts/USDCToken";
-import { consumePaymentReceipt } from "@/lib/middleware/paymentReplayGuard";
-import {
-  parsePaymentProofHeader,
-  verifyUsdcPaymentProof,
-} from "@/lib/middleware/verifyUsdcPayment";
+import { encodePaymentRequiredHeader } from "@x402/core/http";
+import type { PaymentRequired, PaymentRequirements } from "@x402/core/types";
+import { settleX402Payment } from "@/lib/payments/x402-facilitator";
+import { CREATIVE_TREASURY_ADDRESS, X402_NETWORK } from "@/lib/payments/x402-config";
 
 export type X402GateOptions = {
   resource: string;
@@ -15,14 +14,15 @@ export type X402GateOptions = {
 
 export const PLATFORM_API_CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers":
-    "Content-Type, Authorization, X-Payment-Proof, X-PAYMENT",
+    "Content-Type, Authorization, PAYMENT-SIGNATURE, X-Wallet-Address, X-Wallet-Timestamp, X-Wallet-Signature",
+  "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE",
 };
 
 export function getX402Recipient(env: NodeJS.ProcessEnv = process.env): string | null {
-  const recipient = env.X402_API_RECIPIENT?.trim();
-  return recipient || null;
+  const recipient = env.X402_API_RECIPIENT?.trim() || CREATIVE_TREASURY_ADDRESS;
+  return recipient.toLowerCase() === CREATIVE_TREASURY_ADDRESS.toLowerCase() ? CREATIVE_TREASURY_ADDRESS : null;
 }
 
 export function getX402PriceForResource(
@@ -45,70 +45,40 @@ export function getX402PriceForResource(
   return defaults[resource] || env.X402_DEFAULT_PRICE?.trim() || "10000";
 }
 
+export function buildX402Requirements(options: Pick<X402GateOptions, "priceUsdc" | "recipient">): PaymentRequirements {
+  return {
+    scheme: "exact",
+    network: X402_NETWORK,
+    amount: options.priceUsdc,
+    payTo: options.recipient,
+    maxTimeoutSeconds: 300,
+    asset: USDC_TOKEN_ADDRESSES.base,
+    extra: { name: "USD Coin", version: "2" },
+  };
+}
+
 export function buildX402PaymentRequiredResponse(options: X402GateOptions): NextResponse {
-  return NextResponse.json(
-    {
-      error: "Payment Required",
-      x402Version: 1,
-      accepts: [
-        {
-          scheme: "exact",
-          network: "base",
-          maxAmountRequired: options.priceUsdc,
-          resource: options.resource,
-          description: `Creative TV Platform API: ${options.resource}`,
-          mimeType: "application/json",
-          payTo: options.recipient,
-          maxTimeoutSeconds: 300,
-          asset: USDC_TOKEN_ADDRESSES.base,
-        },
-      ],
-      paymentInstructions: {
-        header: "X-Payment-Proof",
-        format: "base64url(JSON.stringify({ transactionHash, amount }))",
-        note: "Send a Base USDC transfer to payTo, then retry with the proof header.",
-      },
+  const challenge: PaymentRequired = {
+    x402Version: 2,
+    resource: {
+      url: options.requestUrl || options.resource,
+      description: `Creative TV Platform API: ${options.resource}`,
+      mimeType: "application/json",
     },
-    {
-      status: 402,
-      headers: PLATFORM_API_CORS_HEADERS,
-    },
-  );
+    accepts: [buildX402Requirements(options)],
+  };
+  return NextResponse.json(challenge, {
+    status: 402,
+    headers: { ...PLATFORM_API_CORS_HEADERS, "PAYMENT-REQUIRED": encodePaymentRequiredHeader(challenge), "Cache-Control": "no-store" },
+  });
 }
 
 export async function verifyX402PaymentFromRequest(
   request: NextRequest,
   options: { recipient: string; priceUsdc: string; resource?: string },
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const proof =
-    parsePaymentProofHeader(request.headers.get("X-Payment-Proof")) ||
-    parsePaymentProofHeader(request.headers.get("X-PAYMENT"));
-
-  if (!proof) {
-    return { ok: false, error: "Missing payment proof" };
-  }
-
-  let requiredAmount: bigint;
-  try {
-    requiredAmount = BigInt(options.priceUsdc);
-  } catch {
-    return { ok: false, error: "Invalid price configuration" };
-  }
-
-  const verification = await verifyUsdcPaymentProof(proof, {
-    recipient: options.recipient,
-    requiredAmount,
-  });
-
-  if (!verification.valid) {
-    return { ok: false, error: verification.error };
-  }
-
-  const resource = options.resource?.trim() || "platform-api";
-  const replay = await consumePaymentReceipt(proof.transactionHash, resource);
-  if (!replay.ok) {
-    return { ok: false, error: replay.error };
-  }
-
-  return { ok: true };
+): Promise<{ ok: true; paymentResponse?: string } | { ok: false; error: string; unavailable?: boolean }> {
+  const signature = request.headers.get("PAYMENT-SIGNATURE");
+  if (!signature) return { ok: false, error: "Missing payment proof" };
+  if (!/^[1-9][0-9]{0,77}$/.test(options.priceUsdc)) return { ok: false, error: "Invalid price configuration" };
+  return settleX402Payment(signature, buildX402Requirements(options));
 }

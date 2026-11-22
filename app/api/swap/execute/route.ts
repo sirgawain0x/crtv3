@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkBotIdDeep } from '@/lib/middleware/botIdGuard';
 import { executeSwap } from '@/lib/sdk/alchemy/swap-client';
 import { BASE_TOKENS, type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
+import { extractBearerToken, getPlatformApiKeysFromEnv, matchPlatformApiKey } from '@/lib/middleware/platformApiKeys';
 
 export async function POST(request: NextRequest) {
-  const verification = await checkBotIdDeep();
-  if (verification.isBot) {
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  // This route spends from a server-held wallet. Public users and paid agents
+  // must use their own wallet; payment alone cannot authorize this signer.
+  if (process.env.ALCHEMY_SERVER_SWAPS_ENABLED !== 'true') {
+    return NextResponse.json({ error: 'Server wallet swaps are disabled' }, { status: 503 });
+  }
+  const token = extractBearerToken(request.headers.get('authorization'));
+  const access = token ? matchPlatformApiKey(token, getPlatformApiKeysFromEnv()) : null;
+  if (access?.tier !== 'admin') {
+    return NextResponse.json({ error: 'Admin authentication required' }, { status: 401 });
   }
   const rl = await rateLimiters.strict(request);
   if (rl) return rl;
@@ -81,21 +87,12 @@ export async function POST(request: NextRequest) {
       hasApiKey: !!apiKey,
       hasPolicyId: !!policyId,
       hasPrivateKey: !!privateKey,
-      apiKeyPrefix: apiKey ? apiKey.slice(0, 10) + '...' : 'MISSING',
     });
 
     if (!apiKey) {
       serverLogger.error('Missing NEXT_PUBLIC_ALCHEMY_API_KEY');
       return NextResponse.json(
         { error: 'Alchemy API key not configured. Please set NEXT_PUBLIC_ALCHEMY_API_KEY environment variable.' },
-        { status: 500 }
-      );
-    }
-
-    if (!policyId) {
-      serverLogger.error('Missing NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID');
-      return NextResponse.json(
-        { error: 'Alchemy paymaster policy ID not configured. Please set NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID environment variable.' },
         { status: 500 }
       );
     }

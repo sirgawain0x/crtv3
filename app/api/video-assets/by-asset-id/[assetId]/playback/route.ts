@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from "next/server";
 import { getVideoAssetByAssetId } from "@/services/video-assets";
 import { serverLogger } from "@/lib/utils/logger";
@@ -34,38 +35,38 @@ export async function GET(
     const { assetId } = await params;
 
     if (!assetId) {
-      return jsonWithCors({ error: "Asset ID is required" }, { status: 400 });
+      return withPlatformApiPaymentHeaders(jsonWithCors({ error: "Asset ID is required" }, { status: 400 }), access);
     }
 
     const asset = await getVideoAssetByAssetId(assetId);
 
     if (!asset || asset.status !== "published") {
-      return jsonWithCors({ error: "Video asset not found" }, { status: 404 });
+      return withPlatformApiPaymentHeaders(jsonWithCors({ error: "Video asset not found" }, { status: 404 }), access);
     }
 
     if (!asset.playback_id) {
-      return jsonWithCors({ error: "Playback ID not available" }, { status: 404 });
+      return withPlatformApiPaymentHeaders(jsonWithCors({ error: "Playback ID not available" }, { status: 404 }), access);
     }
 
     const siteOrigin =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://tv.creativeplatform.xyz");
 
-    return jsonWithCors({
+    return withPlatformApiPaymentHeaders(jsonWithCors({
       playbackId: asset.playback_id,
       title: asset.title,
       thumbnailUri: asset.thumbnailUri,
       requiresMetoken: Boolean(asset.requires_metoken),
       fallbackUrl: `${siteOrigin}/discover/${asset.asset_id}`,
-    });
+    }), access);
   } catch (error) {
     serverLogger.error("Error fetching playback by asset ID:", error);
-    return jsonWithCors(
+    return withPlatformApiPaymentHeaders(jsonWithCors(
       {
         error: "Failed to fetch playback",
         details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
-    );
+    ), access);
   }
 }
