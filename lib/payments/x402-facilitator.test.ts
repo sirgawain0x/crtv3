@@ -20,6 +20,7 @@ beforeEach(() => {
   vi.clearAllMocks(); mocks.configurations.length = 0;
   vi.stubEnv('CDP_API_KEY_ID', 'test-key-id');
   vi.stubEnv('CDP_API_KEY_SECRET', 'test-key-secret');
+  for (const key of ['CDP_API_KEY', 'CDP_API_SECRET', 'COINBASE_CDP_API_KEY_ID', 'COINBASE_CDP_API_KEY_SECRET']) vi.stubEnv(key, '');
   vi.stubEnv('X402_FACILITATOR_URL', CDP_FACILITATOR_URL);
   mocks.jwt.mockImplementation(async (options: { requestMethod: string; requestPath: string }) => `${options.requestMethod}:${options.requestPath}`);
   mocks.supported.mockResolvedValue({ kinds: [{ x402Version: 2, scheme: 'exact', network: X402_NETWORK }] });
@@ -29,6 +30,32 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('Coinbase facilitator settlement boundary', () => {
+  it.each([
+    ['CDP_API_KEY', 'CDP_API_SECRET'],
+    ['COINBASE_CDP_API_KEY_ID', 'COINBASE_CDP_API_KEY_SECRET'],
+  ])('reuses the existing %s credential pair', async (idName, secretName) => {
+    vi.stubEnv('CDP_API_KEY_ID', '');
+    vi.stubEnv('CDP_API_KEY_SECRET', '');
+    vi.stubEnv(idName, 'existing-id');
+    vi.stubEnv(secretName, 'existing-secret');
+    createX402Facilitator();
+    await mocks.configurations[0].createAuthHeaders();
+    expect(mocks.jwt).toHaveBeenCalledWith(expect.objectContaining({ apiKeyId: 'existing-id', apiKeySecret: 'existing-secret' }));
+  });
+  it('prefers the explicit x402 pair over the legacy pair', async () => {
+    vi.stubEnv('CDP_API_KEY', 'legacy-id');
+    vi.stubEnv('CDP_API_SECRET', 'legacy-secret');
+    createX402Facilitator();
+    await mocks.configurations[0].createAuthHeaders();
+    expect(mocks.jwt).toHaveBeenCalledWith(expect.objectContaining({ apiKeyId: 'test-key-id', apiKeySecret: 'test-key-secret' }));
+  });
+  it('fails closed on a partial pair instead of mixing credentials', () => {
+    vi.stubEnv('CDP_API_KEY_SECRET', '');
+    vi.stubEnv('CDP_API_KEY', 'legacy-id');
+    vi.stubEnv('CDP_API_SECRET', 'legacy-secret');
+    expect(() => createX402Facilitator()).toThrow('Coinbase CDP server credentials are not configured');
+    expect(mocks.configurations).toHaveLength(0);
+  });
   it('uses Coinbase with operation-scoped server authentication', async () => {
     createX402Facilitator();
     const config = mocks.configurations[0];
