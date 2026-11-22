@@ -1,3 +1,5 @@
+import { consumePaymentReceipt } from "@/lib/middleware/paymentReplayGuard";
+import { CREATIVE_TREASURY_ADDRESS } from "@/lib/payments/x402-config";
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBotIdDeep } from '@/lib/middleware/botIdGuard';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -10,7 +12,7 @@ import { publicClient } from '@/lib/viem';
 import { USDC_TOKEN_ADDRESSES } from '@/lib/contracts/USDCToken';
 
 /** Expected USDC recipient for AI thumbnail generation (x402 paid-content) */
-const AI_THUMBNAIL_RECIPIENT = '0x31ee83aef931a1af321c505053040e98545a5614' as const;
+const AI_THUMBNAIL_RECIPIENT = CREATIVE_TREASURY_ADDRESS;
 
 /** Required USDC amounts (6 decimals): nano-banana 0.5, gemini-3-pro 1.0 */
 const MODEL_PRICE: Record<string, string> = {
@@ -104,7 +106,8 @@ async function verifyPaymentProof(
       };
     }
 
-    return { valid: true };
+    const consumed = await consumePaymentReceipt(transactionHash, "ai-thumbnail-redemption");
+    return consumed.ok ? { valid: true } : { valid: false, error: consumed.error };
   } catch (err) {
     serverLogger.error('[GenerateThumbnail] Payment verification error:', err);
     return {

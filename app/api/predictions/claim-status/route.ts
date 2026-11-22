@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { isAddress, createPublicClient, http, fallback } from "viem";
 import { base } from "@account-kit/infra";
@@ -10,8 +13,11 @@ import { enrichPredictionDisplaySync } from "@/lib/predictions/enrich-prediction
 import { getUserClaimStatus } from "@/lib/predictions/claim-status";
 
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "predictions.claim-status" });
+  if (!access.allowed) return access.response;
+
   const rl = await rateLimiters.generous(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, access);
 
   const questionId = request.nextUrl.searchParams.get("questionId")?.trim();
   const address = request.nextUrl.searchParams.get("address")?.trim();
@@ -20,17 +26,17 @@ export async function GET(request: NextRequest) {
     ?.trim();
 
   if (!questionId || !/^0x[a-fA-F0-9]{64}$/.test(questionId)) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "Valid questionId is required" },
       { status: 400 }
-    );
+    ), access);
   }
 
   if (!address || !isAddress(address)) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "Valid address is required" },
       { status: 400 }
-    );
+    ), access);
   }
 
   const publicClient = createPublicClient({
@@ -64,16 +70,16 @@ export async function GET(request: NextRequest) {
       parsed,
     });
 
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       status: result.status,
       winningAnswerLabel: result.winningAnswerLabel,
       winningBondTotal: result.winningBondTotal.toString(),
       contractBalance: result.contractBalance.toString(),
-    });
+    }), access);
   } catch (e) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: e instanceof Error ? e.message : "Failed to check claim status" },
       { status: 500 }
-    );
+    ), access);
   }
 }

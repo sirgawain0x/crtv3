@@ -19,19 +19,24 @@ describe("requireHumanOrVerifiedBot", () => {
   });
 
   it("allows humans", async () => {
-    mockCheckBotId.mockResolvedValue({ isBot: false, isVerifiedBot: false });
+    mockCheckBotId.mockResolvedValue({ isHuman: true, isBot: false, isVerifiedBot: false });
     const result = await requireHumanOrVerifiedBot("test");
     expect(result.allowed).toBe(true);
   });
 
-  it("allows verified bots", async () => {
+  it("blocks malformed SDK error verdicts even when marked human", async () => {
+    mockCheckBotId.mockResolvedValue({ isHuman: true, isBot: undefined });
+    expect((await requireHumanOrVerifiedBot("test")).allowed).toBe(false);
+  });
+
+  it("blocks verified external bots without paid or internal authentication", async () => {
     mockCheckBotId.mockResolvedValue({
       isBot: true,
       isVerifiedBot: true,
       verifiedBotName: "chatgpt-operator",
     });
     const result = await requireHumanOrVerifiedBot("test");
-    expect(result.allowed).toBe(true);
+    expect(result.allowed).toBe(false);
   });
 
   it("blocks unverified bots", async () => {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCostProtectedRoute } from "@/lib/middleware/cost-protected-routes";
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -29,7 +30,8 @@ export function proxy(req: NextRequest) {
         ? ["https://tv.creativeplatform.xyz"]
         : ["http://localhost:3000"];
 
-    if (origin && !allowedOrigins.includes(origin)) {
+    const paidApi = isCostProtectedRoute(pathname, req.method);
+    if (origin && !allowedOrigins.includes(origin) && !paidApi) {
       return new NextResponse(null, {
         status: 400,
         statusText: "Bad Request",
@@ -38,15 +40,15 @@ export function proxy(req: NextRequest) {
     }
 
     const res = NextResponse.next();
-    res.headers.set("Access-Control-Allow-Credentials", "true");
-    res.headers.set("Access-Control-Allow-Origin", origin || "*");
+    if (!paidApi) res.headers.set("Access-Control-Allow-Credentials", "true");
+    res.headers.set("Access-Control-Allow-Origin", paidApi ? "*" : origin || "*");
     res.headers.set(
       "Access-Control-Allow-Methods",
-      "GET,DELETE,PATCH,POST,PUT"
+      "GET,DELETE,PATCH,POST,PUT,OPTIONS"
     );
     res.headers.set(
       "Access-Control-Allow-Headers",
-      "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
+      "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, PAYMENT-SIGNATURE, X-Wallet-Address, X-Wallet-Timestamp, X-Wallet-Signature"
     );
 
     // Handle preflight

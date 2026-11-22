@@ -1,3 +1,5 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
@@ -7,37 +9,40 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ assetId: string }> },
 ) {
+  const access = await requirePlatformApiAccess(request, { resource: 'video.asset' });
+  if (!access.allowed) return access.response;
+
   try {
     const { assetId } = await params;
 
     if (!assetId) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Asset ID is required', code: 'ASSET_ID_REQUIRED' },
         { status: 400 },
-      );
+      ), access);
     }
 
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(assetId)) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: 'Invalid asset ID format. Expected UUID format.',
           code: 'INVALID_ASSET_ID',
         },
         { status: 400 },
-      );
+      ), access);
     }
 
     const client = getFullLivepeer();
     if (!client) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: 'Livepeer is not configured',
           code: LIVEPEER_NOT_CONFIGURED,
         },
         { status: 503 },
-      );
+      ), access);
     }
 
     const assetResponse = await client.asset.get(assetId);
@@ -48,24 +53,24 @@ export async function GET(
       Array.isArray(assetResponse.errors) &&
       assetResponse.errors.length > 0
     ) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: 'Asset not found',
           details: assetResponse.errors,
           code: 'ASSET_NOT_FOUND',
         },
         { status: 404 },
-      );
+      ), access);
     }
 
     if (!assetResponse || !assetResponse.asset) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Asset not found', code: 'ASSET_NOT_FOUND' },
         { status: 404 },
-      );
+      ), access);
     }
 
-    return NextResponse.json(assetResponse);
+    return withPlatformApiPaymentHeaders(NextResponse.json(assetResponse), access);
   } catch (error: unknown) {
     serverLogger.error('Error fetching asset:', error);
 
@@ -78,22 +83,22 @@ export async function GET(
     }
 
     if (errorMessage === 'LIVEPEER_NOT_CONFIGURED') {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: 'Livepeer is not configured',
           code: LIVEPEER_NOT_CONFIGURED,
         },
         { status: 503 },
-      );
+      ), access);
     }
 
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         error: errorMessage,
         details: err?.errors || undefined,
         code: 'ASSET_FETCH_ERROR',
       },
       { status: 500 },
-    );
+    ), access);
   }
 }

@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
+import { queryMetokensServer } from '@/lib/subgraph/query-metokens-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
@@ -43,6 +46,9 @@ export interface MarketStats {
 
 // GET /api/market/tokens - Get market tokens with filtering and sorting
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: 'market.tokens' });
+  if (!access.allowed) return access.response;
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -78,9 +84,6 @@ export async function GET(request: NextRequest) {
         serverLogger.debug('Market API: Supabase has few tokens, checking subgraph for sync...');
 
         // Use the proxy endpoint which has better error handling and fallback logic
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
-          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-        const subgraphEndpoint = `${baseUrl}/api/metokens-subgraph`;
 
         const GET_ALL_SUBSCRIBES = `
           query GetAllSubscribes($first: Int = 100, $skip: Int = 0) {
@@ -94,16 +97,10 @@ export async function GET(request: NextRequest) {
         `;
 
         // Use fetch instead of graphql-request to go through the proxy
-        const subgraphResponse = await fetch(subgraphEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            query: GET_ALL_SUBSCRIBES,
-            variables: { first: 50, skip: 0 },
-          }),
-        });
+        const subgraphData = await queryMetokensServer(GET_ALL_SUBSCRIBES, { first: 50, skip: 0 });
+        const subgraphResponse = subgraphData
+          ? Response.json({ data: subgraphData })
+          : Response.json({ error: 'Subgraph temporarily unavailable' }, { status: 502 });
 
         if (!subgraphResponse.ok) {
           const errorText = await subgraphResponse.text();
@@ -598,13 +595,13 @@ export async function GET(request: NextRequest) {
     if (search) cacheTags.push(`search:${search}`);
     response.headers.set("x-vercel-cache-tags", cacheTags.join(','));
 
-    return response;
+    return withPlatformApiPaymentHeaders(response, access);
   } catch (error) {
     serverLogger.error('Error fetching market tokens:', error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Failed to fetch market tokens', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
-    );
+    ), access);
   }
 }
 

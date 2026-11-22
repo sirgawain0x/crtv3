@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import {
   livepeerStudioApiBaseUrl,
@@ -20,23 +23,26 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> },
 ) {
+  const access = await requirePlatformApiAccess(request, { resource: "views.realtime" });
+  if (!access.allowed) return access.response;
+
   try {
     const { playbackId } = await params;
 
     if (!playbackId) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Playback ID is required', code: 'PLAYBACK_ID_REQUIRED' },
         { status: 400, headers: noStoreHeaders },
-      );
+      ), access);
     }
 
     const token = resolveLivepeerStudioAuthToken();
     if (!token) {
       serverLogger.warn('Livepeer real-time views skipped: set LIVEPEER_FULL_API_KEY or LIVEPEER_API_KEY');
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Livepeer is not configured', code: 'LIVEPEER_NOT_CONFIGURED' },
         { status: 503, headers: noStoreHeaders },
-      );
+      ), access);
     }
 
     const headers = new Headers();
@@ -54,20 +60,20 @@ export async function GET(
 
     if (!response.ok) {
       serverLogger.warn(`Livepeer real-time views API ${response.status} for playbackId=${playbackId}`);
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Failed to fetch real-time viewership', code: 'UPSTREAM_ERROR' },
         { status: response.status, headers: noStoreHeaders },
-      );
+      ), access);
     }
 
     const data = await response.json();
 
     if (hasLivepeerErrors(data)) {
       serverLogger.warn(`Livepeer real-time views API returned errors for playbackId=${playbackId}`);
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Failed to fetch real-time viewership', code: 'UPSTREAM_ERROR' },
         { status: 502, headers: noStoreHeaders },
-      );
+      ), access);
     }
 
     const stats = Array.isArray(data) ? data : [];
@@ -75,19 +81,19 @@ export async function GET(
     // Sum viewCount from returned dimensions (should match our playbackId query filter)
     const viewerCount = stats.reduce((sum, item) => sum + Number(item?.viewCount || 0), 0);
 
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         success: true,
         playbackId,
         viewerCount,
       },
       { headers: noStoreHeaders },
-    );
+    ), access);
   } catch (error) {
     serverLogger.error('Error fetching real-time viewership:', error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Internal server error', code: 'REALTIME_VIEWS_ERROR' },
       { status: 500, headers: noStoreHeaders },
-    );
+    ), access);
   }
 }

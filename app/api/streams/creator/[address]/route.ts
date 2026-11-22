@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveStreamForCreator } from '@/services/streams';
 
@@ -5,10 +8,13 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> },
 ) {
+  const access = await requirePlatformApiAccess(request, { resource: "streams.creator" });
+  if (!access.allowed) return access.response;
+
   try {
     const { address } = await params;
     if (!address?.trim()) {
-      return NextResponse.json({ error: 'Address is required' }, { status: 400 });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: 'Address is required' }, { status: 400 }), access);
     }
 
     const legacyCreatorAddress =
@@ -19,7 +25,7 @@ export async function GET(
       legacyCreatorAddress?.toLowerCase(),
     );
     if (!stream) {
-      return NextResponse.json({
+      return withPlatformApiPaymentHeaders(NextResponse.json({
         playback_id: null,
         name: null,
         thumbnail_url: null,
@@ -33,10 +39,10 @@ export async function GET(
         story_license_terms_id: null,
         story_commercial_rev_share: null,
         lens_live_post_id: null,
-      });
+      }), access);
     }
 
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       stream_id: stream.stream_id,
       playback_id: stream.playback_id,
       name: stream.name,
@@ -51,14 +57,14 @@ export async function GET(
       story_license_terms_id: stream.story_license_terms_id ?? null,
       story_commercial_rev_share: stream.story_commercial_rev_share ?? null,
       lens_live_post_id: stream.lens_live_post_id ?? null,
-    });
+    }), access);
   } catch (error) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         error: 'Failed to fetch stream',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 },
-    );
+    ), access);
   }
 }

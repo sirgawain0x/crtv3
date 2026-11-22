@@ -1,25 +1,23 @@
 /**
  * Client-side x402 Payment Hook
  * 
- * This hook provides x402 payment functionality using the user's connected smart account.
- * x402-fetch requires wallet access to sign transactions, so this must run client-side.
+ * This hook provides x402 payment functionality using the user's connected funding-wallet signer.
+ * @x402/fetch uses the connected funding-wallet signer for EIP-3009 authorizations.
  * 
- * @see https://github.com/x402-protocol/x402-fetch
+ * @see https://github.com/x402-foundation/x402
  */
 
 import { useCallback, useState, useMemo } from 'react';
-import { useSmartAccountClient } from '@/lib/wallet/react';
+import { usePrivySigner } from '@/lib/wallet/react';
+import { CREATIVE_TREASURY_ADDRESS, X402_NETWORK } from '@/lib/payments/x402-config';
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from '@/lib/contracts/USDCToken';
 import { base, alchemy } from '@account-kit/infra';
 import { erc20Abi, createPublicClient } from 'viem';
 import { logger } from '@/lib/utils/logger';
 
 async function loadX402Fetch() {
-  const mod = await import('x402-fetch');
-  return {
-    wrapFetchWithPayment: mod.wrapFetchWithPayment,
-    decodeXPaymentResponse: mod.decodeXPaymentResponse,
-  };
+  const [payments, evm] = await Promise.all([import('@x402/fetch'), import('@x402/evm/exact/client')]);
+  return { ...payments, ExactEvmScheme: evm.ExactEvmScheme };
 }
 
 // x402 Payment Configuration for USDC on Base
@@ -58,7 +56,7 @@ export interface X402PaymentResponse {
 }
 
 export function useX402Payment() {
-  const { client } = useSmartAccountClient({ type: 'MultiOwnerModularAccount' });
+  const signer = usePrivySigner();
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastPayment, setLastPayment] = useState<X402PaymentResponse | null>(null);
 
@@ -74,7 +72,7 @@ export function useX402Payment() {
   }, []);
 
   /**
-   * Make an x402 payment using the user's connected smart account
+   * Make an x402 payment using the user's connected funding-wallet signer
    * 
    * @param options Payment options including service name, amount, and endpoint
    * @returns Payment response with transaction details
@@ -86,19 +84,19 @@ export function useX402Payment() {
 
     try {
       // Check if client is available
-      if (!client) {
+      if (!signer) {
         throw new Error('Wallet not connected. Please connect your wallet to make payments.');
       }
 
       // Check if account is available
-      if (!client.account) {
+      if (!signer.address) {
         throw new Error('Smart account not initialized. Please try reconnecting your wallet.');
       }
 
       const {
         service,
         amount = X402_CONFIG.defaultAmount,
-        endpoint = 'https://x402.payai.network/api/base/paid-content',
+        endpoint = '/api/payments/x402',
         recipientAddress,
         additionalData = {},
       } = options;
@@ -110,10 +108,17 @@ export function useX402Payment() {
         logger.debug(`Recipient: ${recipientAddress}`);
       }
 
-      const { wrapFetchWithPayment, decodeXPaymentResponse } = await loadX402Fetch();
-
-      // Wrap fetch with x402 payment capability
-      const fetchWithPayment = (wrapFetchWithPayment as any)(fetch, client.account);
+      if (endpoint !== '/api/payments/x402') throw new Error('Use the Creative TV payment endpoint');
+      const { wrapFetchWithPayment, decodePaymentResponseHeader, x402Client, ExactEvmScheme } = await loadX402Fetch();
+      const paymentClient = new x402Client()
+        .register(X402_NETWORK, new ExactEvmScheme(signer))
+        .registerPolicy((version, requirements) => version === 2 ? requirements.filter((requirement) =>
+          requirement.scheme === 'exact' && requirement.network === X402_NETWORK &&
+          requirement.asset.toLowerCase() === X402_CONFIG.token.address.toLowerCase() &&
+          requirement.payTo.toLowerCase() === CREATIVE_TREASURY_ADDRESS.toLowerCase() &&
+          BigInt(requirement.amount) > 0n && BigInt(requirement.amount) <= BigInt(amount),
+        ) : []);
+      const fetchWithPayment = wrapFetchWithPayment(fetch, paymentClient);
 
       // Make the x402 payment request
       const response = await fetchWithPayment(endpoint, {
@@ -122,30 +127,27 @@ export function useX402Payment() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          ...additionalData,
           service,
           amount,
           token: X402_CONFIG.token.address,
           chain: 'base',
-          recipient: recipientAddress,
-          ...additionalData,
+          recipient: recipientAddress || CREATIVE_TREASURY_ADDRESS,
         }),
       });
 
       // Decode the payment response from headers
-      const paymentHeader = response.headers.get('x-payment-response');
+      if (!response.ok) throw new Error(`Payment service returned HTTP ${response.status}`);
+      const paymentHeader = response.headers.get('PAYMENT-RESPONSE');
       if (!paymentHeader) {
         throw new Error('No payment response received from server');
       }
 
-      const paymentResponse = decodeXPaymentResponse(paymentHeader);
+      const paymentResponse = decodePaymentResponseHeader(paymentHeader);
 
-      // Wait for transaction receipt if we have a transaction hash
-      if (paymentResponse.transaction) {
-        logger.debug(`Waiting for transaction receipt: ${paymentResponse.transaction}`);
-        await client.waitForTransactionReceipt({
-          hash: paymentResponse.transaction as `0x${string}`
-        });
-        logger.debug('Transaction confirmed');
+      if (!paymentResponse.success || paymentResponse.network !== X402_NETWORK ||
+          !/^0x[0-9a-fA-F]{64}$/.test(paymentResponse.transaction)) {
+        throw new Error('Payment settlement was not confirmed');
       }
 
       // Parse the response data
@@ -160,7 +162,7 @@ export function useX402Payment() {
           chain: 'base',
           service,
           timestamp: Date.now(),
-          transactionHash: paymentResponse.transaction, // x402-fetch uses 'transaction' not 'transactionHash'
+          transactionHash: paymentResponse.transaction,
         },
         data,
       };
@@ -182,7 +184,7 @@ export function useX402Payment() {
     } finally {
       setIsProcessing(false);
     }
-  }, [client]);
+  }, [signer]);
 
   /**
    * Check if the user has sufficient USDC balance for a payment
@@ -192,13 +194,13 @@ export function useX402Payment() {
    */
   const checkBalance = useCallback(async (amount: string = X402_CONFIG.defaultAmount): Promise<boolean> => {
     try {
-      if (!client || !client.account?.address) {
+      if (!signer?.address) {
         logger.debug('Balance check: No client or account address');
         return false;
       }
 
       const requiredAmount = BigInt(amount);
-      const userAddress = client.account.address;
+      const userAddress = signer.address;
 
       logger.debug('Checking USDC balance', {
         userAddress,
@@ -228,14 +230,14 @@ export function useX402Payment() {
       // Return false on error to be safe (payment will fail anyway if balance is insufficient)
       return false;
     }
-  }, [client, publicClient]);
+  }, [signer, publicClient]);
 
   return {
     makePayment,
     checkBalance,
     isProcessing,
     lastPayment,
-    isConnected: !!client,
+    isConnected: !!signer,
     config: X402_CONFIG,
   };
 }

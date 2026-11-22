@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from "next/server";
 import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -18,27 +19,27 @@ import { evaluateCampaignDraft } from "@/lib/decision-models/campaign-gate";
  * BotID: humans + verified bots (must stay in instrumentation-client protect list).
  */
 export async function POST(req: NextRequest) {
-  const botGuard = await requireHumanOrVerifiedBot("campaigns-create");
+  const botGuard = await requireHumanOrVerifiedBot("campaigns-create", req);
   if (!botGuard.allowed) return botGuard.response;
   const rl = await rateLimiters.standard(req);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, botGuard);
 
   try {
     const json = await req.json();
     const parsed = CampaignFormSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: parsed.error.flatten().fieldErrors },
         { status: 400 }
-      );
+      ), botGuard);
     }
 
     const body = parsed.data;
     if (!body.brandAddress) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: "brandAddress is required" },
         { status: 400 }
-      );
+      ), botGuard);
     }
     const brandAddress = body.brandAddress.toLowerCase();
 
@@ -46,10 +47,10 @@ export async function POST(req: NextRequest) {
       await requireWalletAuthFor(req, brandAddress);
     } catch (authErr) {
       if (authErr instanceof WalletAuthError) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           { error: authErr.message },
           { status: authErr.status }
-        );
+        ), botGuard);
       }
       throw authErr;
     }
@@ -71,14 +72,14 @@ export async function POST(req: NextRequest) {
     });
 
     if (decision.evaluated && !decision.brandSafe) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: "Campaign failed brand-safety review",
           code: "CAMPAIGN_GATE_REJECTED",
           decision,
         },
         { status: 422 }
-      );
+      ), botGuard);
     }
 
     const grovePayload = {
@@ -104,10 +105,10 @@ export async function POST(req: NextRequest) {
 
     const grove = await groveService.uploadJson(grovePayload);
     if (!grove.success || !grove.hash) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: grove.error || "Grove upload failed" },
         { status: 502 }
-      );
+      ), botGuard);
     }
 
     const ipfsUri = grove.hash.startsWith("ipfs://")
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
       description: body.campaignDescription,
     });
 
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       success: true,
       campaignId: campaign.id,
       productKitId: productKit.id,
@@ -142,15 +143,15 @@ export async function POST(req: NextRequest) {
       hash: grove.hash,
       url: grove.url,
       decision,
-    });
+    }), botGuard);
   } catch (error) {
     serverLogger.error("[POST /api/campaigns] failed:", error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         error:
           error instanceof Error ? error.message : "Failed to create campaign",
       },
       { status: 500 }
-    );
+    ), botGuard);
   }
 }

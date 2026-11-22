@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, formatEther } from 'viem';
 import { baseMainnet } from '@/lib/utils/chains/base';
@@ -34,14 +37,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  const access = await requirePlatformApiAccess(request, { resource: "market.fresh" });
+  if (!access.allowed) return access.response;
+
   try {
     const { address } = await params;
     
     if (!address) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'MeToken address is required' },
         { status: 400 }
-      );
+      ), access);
     }
 
     const meTokenAddress = address.toLowerCase() as `0x${string}`;
@@ -59,17 +65,17 @@ export async function GET(
 
     // Validate that we got the required data
     if (!tokenInfo) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Failed to fetch MeToken info from blockchain' },
         { status: 404 }
-      );
+      ), access);
     }
 
     if (!protocolInfo) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Failed to fetch MeToken protocol info from blockchain' },
         { status: 404 }
-      );
+      ), access);
     }
 
     // Calculate TVL using hub collateral decimals (USDC=6; DAI/USDS/GHO=18)
@@ -97,7 +103,7 @@ export async function GET(
       // Continue without subgraph data
     }
 
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       data: {
         address: meTokenAddress,
         owner_address: tokenInfo.owner.toLowerCase(),
@@ -117,16 +123,16 @@ export async function GET(
         creation_data: creationData,
         fetched_at: new Date().toISOString(),
       },
-    });
+    }), access);
   } catch (error) {
     serverLogger.error('Error fetching fresh MeToken data:', error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { 
         error: 'Failed to fetch fresh MeToken data',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
-    );
+    ), access);
   }
 }
 

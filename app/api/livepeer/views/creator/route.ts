@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { isAddress } from 'viem';
 import {
@@ -37,16 +40,19 @@ function parseDateParam(
 }
 
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "views.creator" });
+  if (!access.allowed) return access.response;
+
   const rl = await rateLimiters.generous(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, access);
 
   const { searchParams } = request.nextUrl;
   const creatorIdRaw = searchParams.get('creatorId')?.trim() ?? '';
   if (!creatorIdRaw || !isAddress(creatorIdRaw)) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Valid creatorId is required', code: 'INVALID_CREATOR_ID' },
       { status: 400, headers: noStoreHeaders },
-    );
+    ), access);
   }
 
   const creatorId = creatorIdRaw.toLowerCase();
@@ -55,10 +61,10 @@ export async function GET(request: NextRequest) {
     await requireWalletAuthFor(request, creatorId);
   } catch (authErr) {
     if (authErr instanceof WalletAuthError) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: authErr.message, code: 'UNAUTHORIZED' },
         { status: authErr.status, headers: noStoreHeaders },
-      );
+      ), access);
     }
     throw authErr;
   }
@@ -93,10 +99,10 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       serverLogger.error('Creator analytics DB fetch failed:', error);
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: 'Failed to load creator videos', code: 'DATABASE_ERROR' },
         { status: 503, headers: noStoreHeaders },
-      );
+      ), access);
     }
 
     const dbVideos = (dbRows ?? []) as CreatorDbVideo[];
@@ -115,7 +121,7 @@ export async function GET(request: NextRequest) {
       livepeerAvailable: livepeer.available,
     });
 
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         success: true,
         creatorId,
@@ -125,12 +131,12 @@ export async function GET(request: NextRequest) {
         ...analytics,
       },
       { headers: noStoreHeaders },
-    );
+    ), access);
   } catch (error) {
     serverLogger.error('Creator analytics error:', error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Internal server error', code: 'CREATOR_ANALYTICS_ERROR' },
       { status: 500, headers: noStoreHeaders },
-    );
+    ), access);
   }
 }

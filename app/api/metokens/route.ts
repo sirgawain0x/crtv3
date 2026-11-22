@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBotIdDeep } from '@/lib/middleware/botIdGuard';
 import { createClient } from '@/lib/sdk/supabase/server';
@@ -7,6 +10,9 @@ import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // GET /api/metokens - Get MeTokens with optional filtering
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "metokens.list" });
+  if (!access.allowed) return access.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const owner = searchParams.get('owner');
@@ -22,15 +28,15 @@ export async function GET(request: NextRequest) {
     if (address) {
       // Get specific MeToken by address
       result = await meTokenSupabaseService.getMeTokenByAddress(address);
-      return NextResponse.json({ data: result });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ data: result }), access);
     } else if (owner) {
       // Get MeToken by owner
       result = await meTokenSupabaseService.getMeTokenByOwner(owner);
-      return NextResponse.json({ data: result });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ data: result }), access);
     } else if (search) {
       // Search MeTokens
       result = await meTokenSupabaseService.searchMeTokens(search, limit);
-      return NextResponse.json({ data: result });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ data: result }), access);
     } else {
       // Get all MeTokens with pagination
       result = await meTokenSupabaseService.getAllMeTokens({
@@ -40,7 +46,7 @@ export async function GET(request: NextRequest) {
         sortOrder,
         search: search || undefined,
       });
-      return NextResponse.json({ data: result });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ data: result }), access);
     }
   } catch (error) {
     serverLogger.error('Error fetching MeTokens:', error);
@@ -48,17 +54,17 @@ export async function GET(request: NextRequest) {
     // Handle specific error cases
     if (error instanceof Error) {
       if (error.message.includes('Failed to fetch MeToken')) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           { error: 'MeToken not found', data: null },
           { status: 404 }
-        );
+        ), access);
       }
     }
     
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Failed to fetch MeTokens' },
       { status: 500 }
-    );
+    ), access);
   }
 }
 
