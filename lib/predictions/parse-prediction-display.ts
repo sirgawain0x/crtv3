@@ -158,8 +158,8 @@ export function answerBytesToLabel(
   const normalized = answerHex.toLowerCase();
 
   if (effectiveType === "bool") {
-    if (normalized === ONE_ANSWER.toLowerCase()) return "Yes";
-    if (normalized === ZERO_ANSWER.toLowerCase()) return "No";
+    if (/^0x0*1$/.test(normalized)) return "Yes";
+    if (/^0x0+$/.test(normalized)) return "No";
   }
 
   if (effectiveType === "uint") {

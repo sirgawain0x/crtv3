@@ -68,7 +68,7 @@ Preserve the ledger on rollback. Never remove authorization reservations after a
 ### Verification
 
 - Original staging release: 205 test files / 1,106 tests, TypeScript and full build passed. The naming compatibility change subsequently passed 18 facilitator tests and TypeScript.
-- Isolated production candidate: 174 test files / 866 tests and TypeScript passed. Changed-file lint passed using TypeScript undefined-name checks and the React Hooks plugin required by existing directives; existing unused-variable warnings remain.
+- Isolated production candidate: 177 test files / 880 tests and TypeScript passed. Changed-file lint passed using TypeScript undefined-name checks and the React Hooks plugin required by existing directives; existing unused-variable warnings remain.
 - Gateway: seven tests passed, including real SDK payment challenges and mocked upfront-settlement/replay behavior. Typecheck/build passed.
 - Live gateway checks passed again after staging configuration: approved Safe, Base, Coinbase, public 402, private 401 and authenticated Creative TV answer.
 - Staging merge `9a67c151b4bea19e78509abae7130ffae91827b6` deployed READY as `dpl_8m5V9qRQoYti1K7mbCvYrQehja3q`. The corrected API returns a 402 Base USDC Safe challenge. The human browser's market API returns 200; the predictions list renders the question title and resolved answer.
@@ -88,3 +88,11 @@ Gateway rollback target: `hermes-x402-gateway-00005-h5j`.
 Production rollback deployment recorded before this release: `dpl_GFpJQU4TyoYwBqaSqDDEmiiE1kbB`; recheck its eligibility before rollout. Never reactivate free gas sponsorship as part of an app rollback.
 
 `node --import tsx scripts/check-x402-readiness.ts` performs read-only facilitator, receipt-store and gateway checks. It does not transfer funds. Feature payments use `/api/payments/x402` and the connected funding-wallet signer, which needs Base USDC; payment redemption is one-use.
+
+### Final prediction and API checks
+
+Browser verification reproduced a missing prediction detail title. The detail loader was scanning from block zero. It now loads indexed immutable text, verifies its Reality.eth content hash against chain state, and only falls back to the ten most recent blocks. The DOM-based write formatter is loaded only for question creation, not during reads. A live Base read verified text recovery for the affected question without an Alchemy key.
+
+The indexer supplied a short zero-answer default and a creation timestamp despite no on-chain answer. The list now requires answer evidence and does not infer a final result from that timestamp. Details preserve a finalized boolean zero answer as No, avoid announcing an unanswered default as leading, and show a retry state when text cannot be recovered. No transaction-submission method was changed.
+
+The first isolated hosted cost-control preview passed its build and live API probes: unpaid market/feature calls returned 402 to the approved Safe; the existing Coinbase credentials authenticated and the invalid-signature probe returned a normal 402 rejection before settlement. The actual production-candidate AI handler also passed a live integration check: own-agent credentials alone returned 401; an ephemeral wallet signature plus that credential returned an answer through the staging gateway. No wallet payment was signed in that check. The final preview must include the additional prediction fixes before promotion.

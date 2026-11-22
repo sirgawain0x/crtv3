@@ -2,7 +2,7 @@ import { type Address, type PublicClient, type WalletClient, encodeFunctionData,
 import { base } from "@account-kit/infra";
 import { getRealityEthContract, getRealityEthContractAddress, getRealityEthABI } from "./reality-eth-client";
 import { queryRealityEthSubgraph } from "@/lib/subgraph/query-reality-eth-subgraph";
-import { encodeQuestionText, validateQuestionData, type QuestionData } from "./reality-eth-utils";
+import type { QuestionData } from "./reality-eth-utils";
 import { serverLogger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 
@@ -367,38 +367,57 @@ export async function getQuestion(
       structData = questionDataRaw;
     }
 
-    // 2. Fetch question text from event logs
-    // Event: LogNewQuestion(bytes32 indexed question_id, address indexed user, uint256 template_id, string question, ...)
+    // Recover immutable text from the index before making any log RPC request.
+    // Verify it against on-chain content_hash; indexed state never replaces chain state.
     let questionText = "";
-
-    try {
-      // Use a more recent block if possible to avoid 503 errors on public RPCs
-      // Base Mainnet started logging Reality.eth around block 2000000 (rough estimate for older deployments)
-      // or just retry gracefully. 
-      // For now, we wrap in try/catch so the main data still loads.
-      const logs = await publicClient.getLogs({
-        address: contractAddress,
-        event: parseAbi(['event LogNewQuestion(bytes32 indexed question_id, address indexed user, uint256 template_id, string question, bytes32 indexed content_hash, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce, uint256 created)'])[0],
-        args: {
-          question_id: questionId as `0x${string}`
-        },
-        fromBlock: 0n // Explicit 0n instead of 'earliest' sometimes helps, but main fix is try/catch
-      });
-
-      if (logs.length > 0) {
-        const logArgs = logs[0].args as {
-          question?: string;
-          template_id?: bigint | number;
-        };
-        questionText = logArgs.question ?? "";
-        structData.template_id = logArgs.template_id;
-      } else {
-        serverLogger.warn(`No LogNewQuestion event found for ${questionId}. Title might be missing.`);
+    const acceptText = (candidate: unknown, templateId: unknown): boolean => {
+      if (typeof candidate !== "string" || !candidate.trim() || templateId == null) return false;
+      try {
+        const template = BigInt(String(templateId));
+        const contentHash = keccak256(encodePacked(
+          ['uint256', 'uint32', 'string'],
+          [template, Number(structData.opening_ts), candidate],
+        ));
+        if (contentHash.toLowerCase() !== String(structData.content_hash).toLowerCase()) return false;
+        questionText = candidate;
+        structData.template_id = template;
+        return true;
+      } catch {
+        return false;
       }
-    } catch (logError) {
-      serverLogger.warn("⚠️ Failed to fetch question text logs (likely RPC 503 or timeout). Returning Untitled.", logError);
-      // Fallback to untitled, do not crash
-      questionText = "Untitled Prediction (Error loading valid title)";
+    };
+    try {
+      const indexed = await queryRealityEthSubgraph<{
+        question?: { id: string; question: string; template_id: string };
+      }>(`query QuestionText($id: ID!) {
+        question(id: $id) { id question template_id }
+      }`, { id: questionId.toLowerCase() });
+      if (indexed?.question?.id?.toLowerCase() === questionId.toLowerCase()) {
+        acceptText(indexed.question.question, indexed.question.template_id);
+      }
+    } catch {
+      serverLogger.warn("Prediction text index unavailable; trying only recent creation logs.");
+    }
+
+    // A newly created question may not be indexed yet. Bound the fallback to ten
+    // blocks; never scan chain history on page loads or metadata requests.
+    if (!questionText) {
+      try {
+        const latest = await publicClient.getBlockNumber();
+        const logs = await publicClient.getLogs({
+          address: contractAddress,
+          event: parseAbi(['event LogNewQuestion(bytes32 indexed question_id, address indexed user, uint256 template_id, string question, bytes32 indexed content_hash, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce, uint256 created)'])[0],
+          args: { question_id: questionId as `0x${string}` },
+          fromBlock: latest > 9n ? latest - 9n : 0n,
+          toBlock: latest,
+        });
+        for (const log of logs) {
+          const args = log.args as { question?: string; template_id?: bigint | number };
+          if (acceptText(args.question, args.template_id)) break;
+        }
+      } catch {
+        serverLogger.warn("Prediction text unavailable in bounded recent logs.");
+      }
     }
 
     return {
@@ -859,6 +878,7 @@ export async function createQuestionWithData(
   questionData: QuestionData,
   params: Omit<CreateQuestionParams, "questionText">
 ): Promise<`0x${string}`> {
+  const { encodeQuestionText, validateQuestionData } = await import("./reality-eth-utils");
   // Validate question data
   const validation = validateQuestionData(questionData);
   if (!validation.valid) {

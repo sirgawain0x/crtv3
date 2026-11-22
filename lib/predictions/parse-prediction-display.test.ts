@@ -7,6 +7,9 @@ import {
 } from "./parse-prediction-display";
 
 describe("parsePredictionDisplay", () => {
+  it('decodes the indexer short zero boolean representation as No, never as outcome index Yes', () => {
+    expect(answerBytesToLabel('0x00000000', parsePredictionDisplay('Result?\u241fgeneral\u241fen_US', 0))).toBe('No');
+  });
   it("parses unit-separated question text", () => {
     const raw =
       'Will it rain tomorrow?\u241f"Yes","No"\u241fcreative tv\u241fen_US';
