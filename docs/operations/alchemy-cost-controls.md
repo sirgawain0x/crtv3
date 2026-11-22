@@ -67,9 +67,13 @@ Feature payments now use `/api/payments/x402`, which enforces service prices and
 
 ## Verification evidence and remaining release steps
 
-- App: 205 test files / 1,106 tests passed; TypeScript passed. Production build and browser preview verification are separate gates.
+- App: 205 test files / 1,106 tests passed; TypeScript and the full production build passed. Changed-file lint passed with TypeScript undefined-name checking and the existing React Hooks inline directives supported; existing unused-variable warnings remain. Browser preview verification is still a separate gate.
 - Gateway: seven tests passed, including real SDK payment challenge and mocked upfront settlement/replay behavior; typecheck and build passed.
 - Live gateway staging: health/manifest passed; unpaid calls returned 402; anonymous private calls returned 401; one authenticated Creative TV call returned 200 and an answer. No paid settlement was submitted by these smoke checks.
 - Vercel CLI deployment access expired; reconnect the account before setting branch preview secrets and creating the app preview. The connected Vercel API could not access this project either.
 - Before promotion: verify browser playback, membership, wallet funding/signing and BotID on the preview; run a single wallet-approved paid call and replay check; verify shared rate limits; record deployment IDs and rollback targets.
 - Gateway promotion uses the exact tested revision, never `latest`: `gcloud run services update-traffic hermes-x402-gateway --project creative-ai-491118 --region us-central1 --to-revisions hermes-x402-gateway-crtv-x402-20261122=100`. Gateway rollback target is `hermes-x402-gateway-00005-h5j`. Keep free gas sponsorship inactive on rollback.
+
+Release review: https://github.com/sirgawain0x/crtv3/pull/460 (draft, base staging). GitHub started the branch preview automatically; it still needs branch-scoped runtime configuration and browser/payment verification. The original checkout remains unchanged by the release port.
+
+The built production app was also served locally for an API smoke test: unpaid AI request → 402 to the approved Safe; spoofed browser headers → 503 when hosted BotID was unavailable; own-agent key without wallet proof → 401; temporary own-agent key plus a locally signed ephemeral EOA proof → 200 through the staging gateway and real Creative TV model. The ephemeral account had no funds, no payment was signed, and no chain transaction was submitted. This verifies the server path, not the hosted human-browser or paid-wallet flows.
