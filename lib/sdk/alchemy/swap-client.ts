@@ -8,6 +8,7 @@ import {
 } from "@alchemy/wallet-apis";
 import { serverLogger } from "@/lib/utils/logger";
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import { isGasSponsorshipEnabled } from "@/lib/wallet/gas-policy";
 
 export const config = {
   policyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID!,
@@ -29,9 +30,9 @@ function getClientParams() {
     transport: alchemyWalletTransport({ apiKey }),
     chain: base,
     signer: privateKeyToAccount(privateKey as Hex),
-    paymaster: {
+    ...(isGasSponsorshipEnabled() && config.policyId ? { paymaster: {
       policyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID!,
-    },
+    } } : {}),
   };
 }
 
@@ -53,6 +54,9 @@ let account: { address: Address } | null = null;
 let client: SwapWalletClient | null = null;
 
 export async function initializeSwapClient() {
+  if (process.env.ALCHEMY_SERVER_SWAPS_ENABLED !== "true") {
+    throw new Error("Server wallet swaps are disabled");
+  }
   if (client && account) return client;
 
   try {
@@ -95,13 +99,16 @@ export async function executeSwap(params: {
   fromAmount: Hex;
   minimumToAmount?: Hex;
 }) {
+  if (process.env.ALCHEMY_SERVER_SWAPS_ENABLED !== "true") {
+    throw new Error("Server wallet swaps are disabled");
+  }
   serverLogger.debug("Starting swap execution with params:", params);
 
   const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
   const policyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
   const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
 
-  if (!apiKey || !policyId || !privateKey) {
+  if (!apiKey || !privateKey) {
     throw new Error("Swap environment variables are not fully configured");
   }
 
@@ -118,11 +125,11 @@ export async function executeSwap(params: {
         toToken: params.toToken,
         fromAmount: params.fromAmount,
         minimumToAmount: params.minimumToAmount,
-        capabilities: {
+        ...(isGasSponsorshipEnabled() && policyId ? { capabilities: {
           paymaster: {
-            policyId: config.policyId,
+            policyId,
           },
-        },
+        } } : {}),
       },
     ],
   };

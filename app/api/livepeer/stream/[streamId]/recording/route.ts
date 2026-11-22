@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from "next/server";
 import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -11,20 +12,20 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ streamId: string }> },
 ) {
-  const botCheck = await requireHumanOrVerifiedBot("stream-recording");
+  const botCheck = await requireHumanOrVerifiedBot("stream-recording", request);
   if (!botCheck.allowed) return botCheck.response;
   const limited = await rateLimiters.standard(request);
-  if (limited) return limited;
+  if (limited) return withPlatformApiPaymentHeaders(limited, botCheck);
 
   try {
     const { address: caller } = await requireWalletAuth(request);
     const { streamId } = await params;
     if (!streamId?.trim()) {
-      return NextResponse.json({ error: "streamId is required" }, { status: 400 });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: "streamId is required" }, { status: 400 }), botCheck);
     }
     const body = await request.json().catch(() => null);
     if (typeof body?.record !== "boolean") {
-      return NextResponse.json({ error: "record must be a boolean" }, { status: 400 });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: "record must be a boolean" }, { status: 400 }), botCheck);
     }
     const database = await createServiceClient();
     const { data: stream, error: lookupError } = await database
@@ -33,12 +34,12 @@ export async function POST(
       .eq("stream_id", streamId.trim())
       .maybeSingle();
     if (lookupError) throw new Error("Stream lookup failed");
-    if (!stream) return NextResponse.json({ error: "Stream not found" }, { status: 404 });
+    if (!stream) return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Stream not found" }, { status: 404 }), botCheck);
     const owner = stream.creator_id.toLowerCase();
     if (caller !== owner &&
         !(await isPermittedSigner(owner, caller)) &&
         !(await isPermittedSigner(caller, owner))) {
-      return NextResponse.json({ error: "Not authorized to modify this stream" }, { status: 403 });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Not authorized to modify this stream" }, { status: 403 }), botCheck);
     }
 
     // Never persist a preference that the provider rejected. If persistence
@@ -53,15 +54,15 @@ export async function POST(
       .select("id")
       .maybeSingle();
     if (saveError || !saved) throw new Error("Recording preference persistence failed");
-    return NextResponse.json({ ok: true, record: body.record });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ ok: true, record: body.record }), botCheck);
   } catch (error) {
     if (error instanceof WalletAuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: error.message }, { status: error.status }), botCheck);
     }
     serverLogger.error("Failed to update stream recording settings");
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "Could not confirm recording settings. Refresh and try again." },
       { status: 502 },
-    );
+    ), botCheck);
   }
 }

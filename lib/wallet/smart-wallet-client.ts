@@ -5,6 +5,7 @@ import {
 import type { LocalAccount } from "viem/accounts";
 import type { Address, Chain, Hash, Hex } from "viem";
 import { http, type Transport } from "viem";
+import { limitGasCapabilities } from "./gas-policy";
 
 const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ?? "";
 
@@ -120,7 +121,7 @@ function mapSendCallsCapabilities(
     capabilities.permissions = { context: permissionsContext };
   }
 
-  return Object.keys(capabilities).length > 0 ? capabilities : undefined;
+  return limitGasCapabilities(capabilities);
 }
 
 type WalletClientParams = {
@@ -150,11 +151,19 @@ export async function createCompatSmartAccountClient(
     account: scaAddress,
   });
 
+  const sendCalls = clientWithAccount.sendCalls.bind(clientWithAccount);
+
   const compat = Object.assign(clientWithAccount, {
     account: { address: scaAddress },
     scaAddress,
     chain,
     getAddress: () => scaAddress,
+    sendCalls(args: Record<string, unknown>) {
+      return sendCalls({
+        ...args,
+        capabilities: limitGasCapabilities(args.capabilities as Record<string, unknown> | undefined),
+      });
+    },
     async sendUserOperation(args: SendUserOperationArgs) {
       const uoArray = Array.isArray(args.uo) ? args.uo : args.uo ? [args.uo] : [];
       if (uoArray.length === 0) {

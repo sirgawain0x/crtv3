@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from 'next/server';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText, tool } from 'ai';
@@ -12,6 +13,10 @@ import {
   CREATIVE_GUIDE_RECIPIENT,
 } from '@/lib/agent/creative-guide/constants';
 import { verifyCreativeGuidePaymentProof } from '@/lib/agent/creative-guide/verify-payment';
+import {
+  chatWithCreativeTv,
+  isHermesCreativeTvConfigured,
+} from '@/lib/agent/hermes-creative-tv';
 import { routeCreativeGuideMessage } from '@/lib/decision-models/creative-guide-router';
 
 /**
@@ -60,17 +65,17 @@ function paymentRequiredResponse() {
 }
 
 export async function POST(req: NextRequest) {
-  const botGuard = await requireHumanOrVerifiedBot('creative-guide');
+  const botGuard = await requireHumanOrVerifiedBot('creative-guide', req);
   if (!botGuard.allowed) return botGuard.response;
 
   const rl = await rateLimiters.standard(req);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, botGuard);
 
   let body: any;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }), botGuard);
   }
 
   let verifiedAddress: string;
@@ -80,22 +85,22 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const status = err instanceof Error && 'status' in err ? (err as any).status : 401;
     const message = err instanceof Error ? err.message : 'Wallet authentication required';
-    return NextResponse.json({ error: message }, { status });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: message }, { status }), botGuard);
   }
 
   // Free path: reveal upload dropzone (wallet auth only).
   if (body?.action === 'reveal_dropzone') {
     serverLogger.info('[CreativeGuide] reveal_dropzone for', verifiedAddress);
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       reveal: true,
       steps: UPLOAD_STEPS,
       addressPresent: Boolean(verifiedAddress),
-    });
+    }), botGuard);
   }
 
   const messages = Array.isArray(body?.messages) ? body.messages : [];
   if (messages.length === 0 && body?.action !== 'reveal_dropzone') {
-    return NextResponse.json({ error: 'No messages provided' }, { status: 400 });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: 'No messages provided' }, { status: 400 }), botGuard);
   }
 
   // Free path: canned responses (wallet auth only).
@@ -118,12 +123,12 @@ export async function POST(req: NextRequest) {
         'source=',
         canned.source,
       );
-      return NextResponse.json({
+      return withPlatformApiPaymentHeaders(NextResponse.json({
         type: 'canned',
         content: canned.content,
         action: canned.action,
         source: canned.source,
-      });
+      }), botGuard);
     }
   }
 
@@ -133,7 +138,7 @@ export async function POST(req: NextRequest) {
     | undefined;
 
   if (!paymentProof?.transactionHash || !paymentProof?.amount) {
-    return paymentRequiredResponse();
+    return withPlatformApiPaymentHeaders(paymentRequiredResponse(), botGuard);
   }
 
   const paymentVerification = await verifyCreativeGuidePaymentProof(
@@ -141,17 +146,51 @@ export async function POST(req: NextRequest) {
     paymentProof.amount,
   );
   if (!paymentVerification.valid) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: paymentVerification.error ?? 'Invalid payment proof' },
       { status: 402 },
-    );
+    ), botGuard);
+  }
+
+  if (isHermesCreativeTvConfigured()) {
+    try {
+      const sanitized = messages
+        .filter(
+          (m: any) =>
+            m &&
+            (m.role === 'user' || m.role === 'assistant') &&
+            typeof m.content === 'string' &&
+            m.content.trim().length > 0,
+        )
+        .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content.trim() }));
+
+      const res = await chatWithCreativeTv(
+        [{ role: 'system', content: SYSTEM_PROMPT }, ...sanitized],
+        { user: verifiedAddress, signal: req.signal },
+      );
+
+      return withPlatformApiPaymentHeaders(new Response(`0:${JSON.stringify(res.content)}\n`, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'X-Vercel-AI-Data-Stream': 'v1',
+        },
+      }), botGuard);
+    } catch (error) {
+      serverLogger.error('[CreativeGuide] Hermes creative-tv fallback error:', error);
+      if (!getApiKey()) {
+        const message =
+          error instanceof Error ? error.message : 'Creative Guide response failed';
+        return withPlatformApiPaymentHeaders(NextResponse.json({ error: message }, { status: 502 }), botGuard);
+      }
+    }
   }
 
   if (!getApiKey()) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Google Gemini API key not configured' },
       { status: 500 },
-    );
+    ), botGuard);
   }
 
   try {
@@ -180,11 +219,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return result.toDataStreamResponse();
+    return withPlatformApiPaymentHeaders(result.toDataStreamResponse(), botGuard);
   } catch (error) {
     serverLogger.error('[CreativeGuide] streamText error:', error);
     const message =
       error instanceof Error ? error.message : 'Creative Guide response failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: message }, { status: 500 }), botGuard);
   }
 }

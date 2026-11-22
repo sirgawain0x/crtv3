@@ -504,7 +504,7 @@ const CreateThumbnailForm = ({
       const result = await makePayment({
         service: 'ai-thumbnail-generation',
         amount: '1000000', // 1 USDC (6 decimals) on Base
-        endpoint: 'https://x402.payai.network/api/base/paid-content',
+        endpoint: '/api/payments/x402',
       });
 
       return result;
@@ -543,8 +543,8 @@ const CreateThumbnailForm = ({
       const paymentResult = await makePayment({
         service: 'ai-thumbnail-generation',
         amount: price.toString(),
-        endpoint: 'https://x402.payai.network/api/base/paid-content',
-        recipientAddress: '0x31ee83aef931a1af321c505053040e98545a5614',
+        endpoint: '/api/payments/x402',
+        recipientAddress: '0xf46F1BA19A9280F752a451d0973b047D81c63D70',
       });
 
       if (!paymentResult.success) {

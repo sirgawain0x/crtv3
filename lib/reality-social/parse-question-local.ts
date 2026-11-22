@@ -8,6 +8,7 @@
  * Encoding matches Creative TV's unit-separator question format (`\u241F`).
  */
 import { keccak256, stringToHex } from "viem";
+import standardTemplates from "@reality.eth/contracts/config/templates.json";
 
 const UNIT_SEP = "\u241F";
 
@@ -21,7 +22,20 @@ export type LocalParsedQuestion = {
   type: "bool" | "uint" | "single-select" | "multiple-select";
   outcomes: string[];
   category: string;
+  language: string;
 };
+
+export type QuestionTemplateId = string | number | bigint | null;
+
+/** Read static template metadata without importing the formatter's server dependencies. */
+export function getStandardQuestionType(templateId?: QuestionTemplateId): LocalParsedQuestion["type"] | undefined {
+  const id = String(templateId ?? "").trim();
+  if (!/^(0|[1-9][0-9]*)$/.test(id)) return undefined;
+  for (const type of ["bool", "uint", "single-select", "multiple-select"] as const) {
+    if (String(standardTemplates.base_ids[type]) === id) return type;
+  }
+  return undefined;
+}
 
 function parseOutcomesSegment(segment: string): string[] {
   const trimmed = segment.trim();
@@ -66,11 +80,12 @@ function inferTypeFromOutcomes(
 
 /**
  * Parse encoded question `data` without loading reality-eth-lib / jsdom.
- * `templateText` is accepted for API symmetry but not required for unit-sep data.
+ * Explicit template metadata takes precedence over outcome-based inference.
  */
 export function parseQuestionLocal(
   data: string,
-  _templateText?: string
+  templateText?: string,
+  templateId?: QuestionTemplateId,
 ): LocalParsedQuestion | null {
   const raw = (data ?? "").trim();
   if (!raw) return null;
@@ -81,23 +96,32 @@ export function parseQuestionLocal(
     return null;
   }
 
-  const outcomes = parts[1] ? parseOutcomesSegment(parts[1]) : [];
+  const declaredType = templateText?.match(
+    /"type"\s*:\s*"(bool|uint|single-select|multiple-select)"/,
+  )?.[1] as LocalParsedQuestion["type"] | undefined;
+  const templateType = getStandardQuestionType(templateId) ?? declaredType;
   const language =
     parts[parts.length - 1]?.trim().match(/^[a-z]{2}_[A-Z]{2}$/)
       ? parts[parts.length - 1].trim()
       : "";
+  const fields = parts.slice(1, language ? -1 : undefined);
+  // Standard bool/uint questions contain title, category, language. Select
+  // questions add an outcomes field; older bool encodings may have an empty one.
+  const hasOutcomes = fields.length >= 2;
+  const outcomes = hasOutcomes && templateType !== "bool" && templateType !== "uint"
+    ? parseOutcomesSegment(fields[0])
+    : [];
   const category =
-    language && parts.length >= 3
-      ? parts[parts.length - 2]?.trim() || "general"
-      : parts[parts.length - 1]?.trim() || "general";
+    fields[fields.length - 1]?.trim() || "general";
 
-  const type = inferTypeFromOutcomes(outcomes);
+  const type = templateType ?? inferTypeFromOutcomes(outcomes);
 
   return {
     title,
     type,
-    outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
+    outcomes: type === "bool" ? ["Yes", "No"] : outcomes,
     category: category || "general",
+    language: language || "en_US",
   };
 }
 

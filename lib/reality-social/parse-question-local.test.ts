@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { keccak256, stringToHex } from "viem";
+import standardTemplates from "@reality.eth/contracts/config/templates.json";
 import {
   answerStringLocal,
   parseQuestionLocal,
@@ -28,6 +29,35 @@ describe("parseQuestionLocal", () => {
   it("returns null for empty or badly formatted titles", () => {
     expect(parseQuestionLocal("")).toBeNull();
     expect(parseQuestionLocal(`[Badly formatted question]${SEP}${SEP}en_US`)).toBeNull();
+  });
+
+  it("uses numeric template text supplied by social sync", () => {
+    const parsed = parseQuestionLocal(`How many?${SEP}finance${SEP}de_DE`, standardTemplates.content["1"]);
+    expect(parsed).toEqual({
+      title: "How many?", type: "uint", outcomes: [], category: "finance", language: "de_DE",
+    });
+    expect(answerStringLocal(parsed!, "0x" + "0".repeat(63) + "1")).toBe("1");
+    expect(answerStringLocal(parsed!, "0x" + "0".repeat(64))).toBe("0");
+  });
+
+  it.each(["single-select", "multiple-select"] as const)("honors %s template text even for Yes/No outcomes", (type) => {
+    const template = type === "single-select" ? standardTemplates.content["2"] : standardTemplates.content["3"];
+    const parsed = parseQuestionLocal(`Choose?${SEP}"Yes","No"${SEP}general${SEP}en_US`, template);
+    expect(parsed?.type).toBe(type);
+    expect(parsed?.outcomes).toEqual(["Yes", "No"]);
+  });
+
+  it("supports legacy empty outcome slots in numeric questions", () => {
+    const parsed = parseQuestionLocal(`How many?${SEP}${SEP}general${SEP}en_US`, standardTemplates.content["1"]);
+    expect(parsed?.type).toBe("uint");
+    expect(parsed?.outcomes).toEqual([]);
+    expect(parsed?.category).toBe("general");
+  });
+
+  it("retains safe defaults for a plain title or malformed template text", () => {
+    expect(parseQuestionLocal("Will it happen?", "not a template")).toEqual({
+      title: "Will it happen?", type: "bool", outcomes: ["Yes", "No"], category: "general", language: "en_US",
+    });
   });
 });
 

@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { serverLogger } from "@/lib/utils/logger";
@@ -33,15 +36,18 @@ type SubgraphQuestion = {
 };
 
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "predictions.stake-stats" });
+  if (!access.allowed) return access.response;
+
   const rl = await rateLimiters.generous(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, access);
 
   const idsParam = request.nextUrl.searchParams.get("ids")?.trim();
   if (!idsParam) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "ids query parameter is required" },
       { status: 400 }
-    );
+    ), access);
   }
 
   const ids = idsParam
@@ -50,25 +56,25 @@ export async function GET(request: NextRequest) {
     .filter((id) => /^0x[a-f0-9]{64}$/.test(id));
 
   if (ids.length === 0) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "At least one valid questionId is required" },
       { status: 400 }
-    );
+    ), access);
   }
 
   if (ids.length > MAX_IDS) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: `Maximum ${MAX_IDS} question IDs per request` },
       { status: 400 }
-    );
+    ), access);
   }
 
   const endpoints = resolveSubgraphEndpoints("reality-eth");
   if (endpoints.length === 0) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "Reality.eth subgraph not configured" },
       { status: 503 }
-    );
+    ), access);
   }
 
   let questions: SubgraphQuestion[] | null = null;
@@ -107,10 +113,10 @@ export async function GET(request: NextRequest) {
   }
 
   if (questions === null) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "Failed to fetch stake stats from subgraph" },
       { status: 502 }
-    );
+    ), access);
   }
 
   const stats: Record<string, ReturnType<typeof computeListStakeSummary>> = {};
@@ -124,12 +130,12 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  return NextResponse.json(
+  return withPlatformApiPaymentHeaders(NextResponse.json(
     { stats },
     {
       headers: {
         "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
       },
     }
-  );
+  ), access);
 }

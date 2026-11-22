@@ -1,5 +1,6 @@
 import { type Hex, type Address } from "viem";
 import { serverLogger } from "@/lib/utils/logger";
+import { limitGasCapabilities } from "@/lib/wallet/gas-policy";
 import { USDS_TOKEN_ADDRESSES } from "@/lib/contracts/USDSToken";
 import { GHO_TOKEN_ADDRESSES } from "@/lib/contracts/GHOToken";
 
@@ -177,11 +178,11 @@ export class AlchemySwapService {
       chainId: "0x2105", // Base mainnet chain ID
       fromToken: BASE_TOKENS[fromToken],
       toToken: BASE_TOKENS[toToken],
-      capabilities: capabilities !== undefined ? capabilities : (this.paymasterPolicyId ? {
+      capabilities: limitGasCapabilities(capabilities !== undefined ? capabilities : (this.paymasterPolicyId ? {
         paymasterService: {
           policyId: this.paymasterPolicyId,
         },
-      } : undefined),
+      } : undefined)),
       slippage: `0x${slippage.toString(16)}`,
       returnRawCalls: true,
     } as any;

@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from "next/server";
 import { forwardPinataAgentChat } from "@/lib/pinata/chat";
 import {
@@ -146,11 +147,11 @@ async function forwardWithRecovery(options: {
 }
 
 export async function POST(request: NextRequest) {
-  const botGuard = await requireHumanOrVerifiedBot("song-cup-agent-chat");
+  const botGuard = await requireHumanOrVerifiedBot("song-cup-agent-chat", request);
   if (!botGuard.allowed) return botGuard.response;
 
   const rl = await rateLimiters.standard(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, botGuard);
 
   const config = getSongCupAgentConfig();
   const {
@@ -162,14 +163,14 @@ export async function POST(request: NextRequest) {
     devicePrivateKeyPem,
   } = config;
   if (!enabled || !baseUrl || !gatewayToken) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         success: false,
         error:
           "Song Cup agent is not configured. Set SONG_CUP_PINATA_AGENT_ID (or SONG_CUP_PINATA_BASE_URL) and SONG_CUP_PINATA_GATEWAY_TOKEN.",
       },
       { status: 503 },
-    );
+    ), botGuard);
   }
 
   let body: AgentChatBody;
@@ -180,25 +181,25 @@ export async function POST(request: NextRequest) {
     }
     body = parsed as AgentChatBody;
   } catch {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { success: false, error: "Invalid JSON body" },
       { status: 400 },
-    );
+    ), botGuard);
   }
 
   const message = body.message?.trim();
   if (!message) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { success: false, error: "message is required" },
       { status: 400 },
-    );
+    ), botGuard);
   }
 
   if (message.length > 2000) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { success: false, error: "message is too long" },
       { status: 400 },
-    );
+    ), botGuard);
   }
 
   try {
@@ -215,14 +216,14 @@ export async function POST(request: NextRequest) {
       signal: request.signal,
     });
 
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       success: true,
       reply: result.reply || "(no reply)",
       ...(result.session ? { session: result.session } : {}),
-    });
+    }), botGuard);
   } catch (err) {
     serverLogger.error("Song Cup agent chat failed:", err);
     const error = mapSongCupAgentError(err);
-    return NextResponse.json({ success: false, error }, { status: 503 });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ success: false, error }, { status: 503 }), botGuard);
   }
 }

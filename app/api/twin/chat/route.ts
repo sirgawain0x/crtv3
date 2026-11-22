@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import { CREATOR_PROFILE_TWIN_ROUTING_SELECT } from "@/lib/sdk/supabase/creator-profiles-select";
@@ -70,25 +73,28 @@ function extractReplyFromJsonl(body: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "agent.twin" });
+  if (!access.allowed) return access.response;
+
   const rl = await rateLimiters.standard(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, access);
 
   let body: TwinChatBody;
   try {
     body = (await request.json()) as TwinChatBody;
   } catch {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { success: false, error: "Invalid JSON body" },
       { status: 400 }
-    );
+    ), access);
   }
 
   const { creatorAddress, message, streamId, session } = body;
   if (!creatorAddress || !message) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { success: false, error: "creatorAddress and message are required" },
       { status: 400 }
-    );
+    ), access);
   }
 
   let routing: TwinRouting | null;
@@ -96,20 +102,20 @@ export async function POST(request: NextRequest) {
     routing = await loadRouting(creatorAddress);
   } catch (err) {
     serverLogger.error("Twin routing lookup failed:", err);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { success: false, error: "Failed to look up twin routing" },
       { status: 500 }
-    );
+    ), access);
   }
 
   if (!routing) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         success: false,
         error: "This creator has not connected a twin yet.",
       },
       { status: 503 }
-    );
+    ), access);
   }
 
   const url = routing.legacyEndpoint
@@ -128,15 +134,15 @@ export async function POST(request: NextRequest) {
           ? AbortSignal.any([request.signal, AbortSignal.timeout(60_000)])
           : AbortSignal.timeout(60_000),
       });
-      return NextResponse.json({
+      return withPlatformApiPaymentHeaders(NextResponse.json({
         success: true,
         reply: result.reply || "(no reply)",
         ...(result.session ? { session: result.session } : {}),
-      });
+      }), access);
     } catch (err) {
       serverLogger.error("Twin gateway chat failed:", err);
       const msg = err instanceof Error ? err.message : "Twin endpoint unreachable";
-      return NextResponse.json({ success: false, error: msg }, { status: 503 });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ success: false, error: msg }, { status: 503 }), access);
     }
   }
 
@@ -173,14 +179,14 @@ export async function POST(request: NextRequest) {
 
     if (!upstream.ok) {
       const text = await upstream.text().catch(() => "");
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           success: false,
           error: `Twin endpoint returned ${upstream.status}`,
           detail: text.slice(0, 500),
         },
         { status: 502 }
-      );
+      ), access);
     }
 
     const contentType = upstream.headers.get("content-type") || "";
@@ -190,24 +196,24 @@ export async function POST(request: NextRequest) {
     // back to legacy JSON / plain-text shapes for the deprecated path.
     if (contentType.includes("ndjson") || contentType.includes("event-stream") || /\n\s*\{/.test(raw)) {
       const reply = extractReplyFromJsonl(raw);
-      return NextResponse.json({ success: true, reply });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ success: true, reply }), access);
     }
     if (contentType.includes("application/json")) {
       try {
         const json = JSON.parse(raw);
-        return NextResponse.json({
+        return withPlatformApiPaymentHeaders(NextResponse.json({
           success: true,
           ...json,
           reply: json.reply ?? json.message ?? json.content ?? "",
-        });
+        }), access);
       } catch {
-        return NextResponse.json({ success: true, reply: raw });
+        return withPlatformApiPaymentHeaders(NextResponse.json({ success: true, reply: raw }), access);
       }
     }
-    return NextResponse.json({ success: true, reply: raw });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ success: true, reply: raw }), access);
   } catch (err) {
     serverLogger.error("Twin endpoint request failed:", err);
     const msg = err instanceof Error ? err.message : "Twin endpoint unreachable";
-    return NextResponse.json({ success: false, error: msg }, { status: 503 });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ success: false, error: msg }, { status: 503 }), access);
   }
 }

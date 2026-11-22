@@ -5,6 +5,7 @@ export type PlatformApiKeyTier = "admin" | "partner";
 export type ParsedPlatformApiKeys = {
   adminSecrets: string[];
   partnerKeys: Map<string, string>;
+  internalKeys: Map<string, string>;
 };
 
 function safeEqual(a: string, b: string): boolean {
@@ -30,7 +31,7 @@ let cachedKeys: ParsedPlatformApiKeys | null = null;
 let cachedEnvFingerprint: string | null = null;
 
 function platformApiKeysEnvFingerprint(env: NodeJS.ProcessEnv): string {
-  return `${env.CREATIVE_PLATFORM_ADMIN_API_KEYS ?? ""}|${env.CREATIVE_PLATFORM_PARTNER_API_KEYS ?? ""}`;
+  return `${env.CREATIVE_PLATFORM_ADMIN_API_KEYS ?? ""}|${env.CREATIVE_PLATFORM_PARTNER_API_KEYS ?? ""}|${env.CREATIVE_PLATFORM_INTERNAL_API_KEYS ?? ""}`;
 }
 
 export function parsePlatformApiKeysFromEnv(env: NodeJS.ProcessEnv = process.env): ParsedPlatformApiKeys {
@@ -49,7 +50,14 @@ export function parsePlatformApiKeysFromEnv(env: NodeJS.ProcessEnv = process.env
     }
   }
 
-  return { adminSecrets, partnerKeys };
+  const internalKeys = new Map<string, string>();
+  for (const entry of parseCommaList(env.CREATIVE_PLATFORM_INTERNAL_API_KEYS)) {
+    const separator = entry.indexOf(":");
+    const id = entry.slice(0, separator).trim();
+    const secret = entry.slice(separator + 1).trim();
+    if (separator > 0 && id && secret) internalKeys.set(id, secret);
+  }
+  return { adminSecrets, partnerKeys, internalKeys };
 }
 
 /** Cached in production to avoid re-parsing env on every Platform API request. */
@@ -79,11 +87,15 @@ export function extractBearerToken(authorizationHeader: string | null): string |
 export function matchPlatformApiKey(
   token: string,
   keys: ParsedPlatformApiKeys,
-): { tier: PlatformApiKeyTier; keyId?: string } | null {
+): { tier: PlatformApiKeyTier | "internal"; keyId?: string } | null {
   for (const secret of keys.adminSecrets) {
     if (safeEqual(token, secret)) {
       return { tier: "admin" };
     }
+  }
+
+  for (const [keyId, secret] of keys.internalKeys) {
+    if (safeEqual(token, secret)) return { tier: "internal", keyId };
   }
 
   for (const [keyId, secret] of keys.partnerKeys.entries()) {
@@ -96,6 +108,8 @@ export function matchPlatformApiKey(
 }
 
 export function isPlatformApiAccessConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  // A missing or disabled flag must never turn production into a free API.
+  if (env.NODE_ENV === "production") return true;
   if (env.PLATFORM_API_ACCESS_ENABLED === "false") {
     return false;
   }
@@ -107,6 +121,7 @@ export function isPlatformApiAccessConfigured(env: NodeJS.ProcessEnv = process.e
   return (
     keys.adminSecrets.length > 0 ||
     keys.partnerKeys.size > 0 ||
+    keys.internalKeys.size > 0 ||
     Boolean(env.X402_API_RECIPIENT?.trim())
   );
 }

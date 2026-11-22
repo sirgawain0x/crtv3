@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from 'next/server';
 import {
   platformApiOptionsResponse,
@@ -20,5 +21,5 @@ export async function GET(request: NextRequest) {
     return access.response;
   }
 
-  return handlePlaybackInfo(request);
+  return withPlatformApiPaymentHeaders(handlePlaybackInfo(request), access);
 }
