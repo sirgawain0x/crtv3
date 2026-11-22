@@ -15,8 +15,15 @@ export function createX402Facilitator() {
   if (configuredUrl.replace(/\/+$/, '') !== CDP_FACILITATOR_URL) {
     throw new Error('Coinbase CDP facilitator URL is required');
   }
-  const apiKeyId = process.env.CDP_API_KEY_ID?.trim();
-  const apiKeySecret = process.env.CDP_API_KEY_SECRET?.trim().replace(/\\n/g, '\n');
+  // Reuse the server credential names already used by Coinbase onboarding.
+  // Choose one complete pair; never mix an ID and secret from different pairs.
+  const credentials = [
+    { apiKeyId: process.env.CDP_API_KEY_ID, apiKeySecret: process.env.CDP_API_KEY_SECRET },
+    { apiKeyId: process.env.CDP_API_KEY, apiKeySecret: process.env.CDP_API_SECRET },
+    { apiKeyId: process.env.COINBASE_CDP_API_KEY_ID, apiKeySecret: process.env.COINBASE_CDP_API_KEY_SECRET },
+  ].find(({ apiKeyId, apiKeySecret }) => apiKeyId?.trim() || apiKeySecret?.trim());
+  const apiKeyId = credentials?.apiKeyId?.trim();
+  const apiKeySecret = credentials?.apiKeySecret?.trim().replace(/\\n/g, '\n');
   if (!apiKeyId || !apiKeySecret) throw new Error('Coinbase CDP server credentials are not configured');
   return new HTTPFacilitatorClient({
     url: CDP_FACILITATOR_URL,
