@@ -117,14 +117,15 @@ export async function verifyUsdcPaymentProof(
 }
 
 export function parsePaymentProofHeader(headerValue: string | null): UsdcPaymentProof | null {
-  if (!headerValue?.trim()) {
+  if (!headerValue?.trim() || headerValue.length > 2048) {
     return null;
   }
 
   try {
     const json = Buffer.from(headerValue.trim(), "base64url").toString("utf8");
     const parsed = JSON.parse(json) as { transactionHash?: string; amount?: string };
-    if (!parsed.transactionHash || !parsed.amount) {
+    if (typeof parsed.transactionHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(parsed.transactionHash) ||
+        typeof parsed.amount !== "string" || !/^[1-9][0-9]{0,77}$/.test(parsed.amount)) {
       return null;
     }
     return { transactionHash: parsed.transactionHash, amount: parsed.amount };

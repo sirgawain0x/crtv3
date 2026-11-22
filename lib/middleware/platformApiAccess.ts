@@ -14,8 +14,9 @@ import {
   verifyX402PaymentFromRequest,
 } from "@/lib/middleware/x402Gate";
 import { serverLogger } from "@/lib/utils/logger";
+import { checkBotId } from "botid/server";
 
-export type PlatformApiAccessTier = "admin" | "partner" | "x402" | "public";
+export type PlatformApiAccessTier = "admin" | "internal" | "x402" | "public";
 
 export type PlatformApiAccessOptions = {
   resource: string;
@@ -23,7 +24,7 @@ export type PlatformApiAccessOptions = {
 };
 
 export type PlatformApiAccessResult =
-  | { allowed: true; tier: PlatformApiAccessTier; keyId?: string }
+  | { allowed: true; tier: PlatformApiAccessTier; keyId?: string; paymentResponse?: string }
   | { allowed: false; response: NextResponse };
 
 function unauthorizedResponse(message: string): NextResponse {
@@ -41,10 +42,12 @@ function mergePlatformApiHeaders(response: NextResponse): NextResponse {
   return new NextResponse(response.body, { status: response.status, headers });
 }
 
-/** Allow first-party Creative TV browser traffic without Platform API credentials. */
+/** Browser hint only; never sufficient authorization without BotID verification. */
 export function isSameOriginAppRequest(request: NextRequest): boolean {
   const fetchSite = request.headers.get("sec-fetch-site");
-  return fetchSite === "same-origin" || fetchSite === "same-site";
+  if (fetchSite !== "same-origin") return false;
+  const origin = request.headers.get("origin");
+  return !origin || origin === request.nextUrl.origin;
 }
 
 async function tryAllowSameOriginAppRequest(
@@ -63,7 +66,22 @@ async function tryAllowSameOriginAppRequest(
     return { allowed: false, response: mergePlatformApiHeaders(rl) };
   }
 
-  return { allowed: true, tier: 'public' };
+  try {
+    const verification = await checkBotId({ advancedOptions: { checkLevel: "basic" } });
+    if (verification.isHuman && !verification.isBot &&
+        !(verification.bypassed && process.env.NODE_ENV === "production")) {
+      return { allowed: true, tier: "public" };
+    }
+  } catch {
+    serverLogger.warn("[platformApiAccess] Browser verification unavailable", { resource });
+    return {
+      allowed: false,
+      response: NextResponse.json({ error: "Browser verification unavailable", code: "VERIFICATION_UNAVAILABLE" },
+        { status: 503, headers: PLATFORM_API_CORS_HEADERS }),
+    };
+  }
+  // Verified crawlers and spoofed browser headers must use authenticated or paid access.
+  return null;
 }
 
 export async function requirePlatformApiAccess(
@@ -79,16 +97,14 @@ export async function requirePlatformApiAccess(
 
   if (bearer) {
     const match = matchPlatformApiKey(bearer, keys);
-    if (match) {
-      if (match.tier === "partner") {
-        const rl = await rateLimiters.apiKey(request, match.keyId ?? "partner");
+    if (match && match.tier !== "partner") {
+        const rl = await rateLimiters.apiKey(request, `${match.tier}:${match.keyId ?? "admin"}`);
         if (rl) {
           return {
             allowed: false,
             response: mergePlatformApiHeaders(rl),
           };
         }
-      }
 
       serverLogger.debug("[platformApiAccess] allowed", {
         tier: match.tier,
@@ -99,10 +115,20 @@ export async function requirePlatformApiAccess(
       return { allowed: true, tier: match.tier, keyId: match.keyId };
     }
 
-    return { allowed: false, response: unauthorizedResponse("Invalid API key") };
+    if (!match) {
+      // First-party private APIs also carry Privy bearer tokens. BotID verifies
+      // the browser here; the handler still verifies the user's session.
+      const browser = await tryAllowSameOriginAppRequest(request, options.resource);
+      if (browser) return browser;
+      if (!request.headers.has("PAYMENT-SIGNATURE")) {
+        return { allowed: false, response: unauthorizedResponse("Invalid API key") };
+      }
+    }
   }
 
-  const sameOriginResult = await tryAllowSameOriginAppRequest(request, options.resource);
+  const sameOriginResult = !bearer
+    ? await tryAllowSameOriginAppRequest(request, options.resource)
+    : null;
   if (sameOriginResult) {
     return sameOriginResult;
   }
@@ -110,14 +136,17 @@ export async function requirePlatformApiAccess(
   const recipient = getX402Recipient();
   const priceUsdc = options.priceUsdc ?? getX402PriceForResource(options.resource);
 
-  if (!recipient) {
+  if (!recipient || !/^[1-9][0-9]{0,77}$/.test(priceUsdc)) {
     return {
       allowed: false,
-      response: unauthorizedResponse(
-        "API key required. Configure CREATIVE_PLATFORM_*_API_KEYS or X402_API_RECIPIENT.",
-      ),
+      response: NextResponse.json({ error: "Paid API access is temporarily unavailable", code: "PAYMENT_UNAVAILABLE" },
+        { status: 503, headers: PLATFORM_API_CORS_HEADERS }),
     };
   }
+
+  // Bound invalid-proof traffic before it can trigger receipt/block RPC reads.
+  const paymentLimit = await rateLimiters.generous(request);
+  if (paymentLimit) return { allowed: false, response: mergePlatformApiHeaders(paymentLimit) };
 
   const payment = await verifyX402PaymentFromRequest(request, {
     recipient,
@@ -128,7 +157,7 @@ export async function requirePlatformApiAccess(
     serverLogger.debug("[platformApiAccess] x402 payment verified", {
       resource: options.resource,
     });
-    return { allowed: true, tier: "x402" };
+    return { allowed: true, tier: "x402", ...(payment.paymentResponse ? { paymentResponse: payment.paymentResponse } : {}) };
   }
 
   if (payment.error !== "Missing payment proof") {
@@ -136,7 +165,7 @@ export async function requirePlatformApiAccess(
       allowed: false,
       response: NextResponse.json(
         { error: payment.error, code: "PAYMENT_INVALID" },
-        { status: 402, headers: PLATFORM_API_CORS_HEADERS },
+        { status: payment.unavailable ? 503 : 402, headers: PLATFORM_API_CORS_HEADERS },
       ),
     };
   }

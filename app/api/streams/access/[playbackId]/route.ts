@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { getStreamByPlaybackId } from "@/services/streams";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
@@ -7,15 +10,18 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> },
 ) {
+  const access = await requirePlatformApiAccess(_request, { resource: "streams.access" });
+  if (!access.allowed) return access.response;
+
   try {
     const { playbackId } = await params;
     if (!playbackId?.trim()) {
-      return NextResponse.json({ error: "playbackId is required" }, { status: 400 });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: "playbackId is required" }, { status: 400 }), access);
     }
 
     const stream = await getStreamByPlaybackId(playbackId);
     if (!stream) {
-      return NextResponse.json({ error: "Stream not found" }, { status: 404 });
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Stream not found" }, { status: 404 }), access);
     }
 
     const requiresMetoken = isMeTokenGateActive(
@@ -38,7 +44,7 @@ export async function GET(
       meTokenAddress = meToken?.address ?? null;
     }
 
-    return NextResponse.json({
+    return withPlatformApiPaymentHeaders(NextResponse.json({
       requiresMetoken,
       metokenPrice: requiresMetoken ? stream.metoken_price : null,
       meTokenSymbol,
@@ -46,14 +52,14 @@ export async function GET(
       creatorAddress: stream.creator_id,
       streamName: stream.name ?? null,
       thumbnailUrl: stream.thumbnail_url ?? null,
-    });
+    }), access);
   } catch (error) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       {
         error: "Failed to fetch stream access metadata",
         details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
-    );
+    ), access);
   }
 }

@@ -1,3 +1,4 @@
+import { consumePaymentReceipt } from "@/lib/middleware/paymentReplayGuard";
 import {
   CREATIVE_GUIDE_PAYMENT_MAX_AGE_MS,
   CREATIVE_GUIDE_PRICE,
@@ -12,7 +13,7 @@ export async function verifyCreativeGuidePaymentProof(
   transactionHash: string,
   amount: string
 ): Promise<{ valid: boolean; error?: string }> {
-  return verifyUsdcPaymentProof({
+  const verified = await verifyUsdcPaymentProof({
     transactionHash,
     amount,
     recipient: CREATIVE_GUIDE_RECIPIENT,
@@ -20,4 +21,7 @@ export async function verifyCreativeGuidePaymentProof(
     maxAgeMs: CREATIVE_GUIDE_PAYMENT_MAX_AGE_MS,
     logLabel: "CreativeGuide",
   });
+  if (!verified.valid) return verified;
+  const consumed = await consumePaymentReceipt(transactionHash, "creative-guide-redemption");
+  return consumed.ok ? { valid: true } : { valid: false, error: consumed.error };
 }

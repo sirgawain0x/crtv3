@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from "next/server";
 import { getPublishedVideoAssets } from "@/services/video-assets";
 import { serverLogger } from "@/lib/utils/logger";
@@ -57,10 +58,10 @@ export async function GET(request: NextRequest) {
 
     // Validate limit
     if (limit < 1 || limit > 100) {
-      return NextResponse.json(
+      return withPlatformApiPaymentHeaders(NextResponse.json(
         { error: "Limit must be between 1 and 100" },
         { status: 400, headers: noStoreHeaders }
-      );
+      ), access);
     }
 
     // Fetch published videos from Supabase
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
       search,
     });
 
-    return NextResponse.json(result, { headers: noStoreHeaders });
+    return withPlatformApiPaymentHeaders(NextResponse.json(result, { headers: noStoreHeaders }), access);
   } catch (error) {
     serverLogger.error("Error fetching published videos:", error);
     
@@ -82,34 +83,34 @@ export async function GET(request: NextRequest) {
     if (error instanceof Error) {
       // Check for database connection errors
       if (error.message.includes('connection') || error.message.includes('timeout')) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           { 
             error: 'Database connection error',
             details: 'Unable to connect to the database. Please try again later.'
           },
           { status: 503, headers: noStoreHeaders }
-        );
+        ), access);
       }
       
       // Check for validation errors
       if (error.message.includes('validation') || error.message.includes('invalid')) {
-        return NextResponse.json(
+        return withPlatformApiPaymentHeaders(NextResponse.json(
           { 
             error: 'Validation error',
             details: error.message
           },
           { status: 400, headers: noStoreHeaders }
-        );
+        ), access);
       }
     }
     
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { 
         error: "Failed to fetch published videos",
         details: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500, headers: noStoreHeaders }
-    );
+    ), access);
   }
 }
 

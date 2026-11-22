@@ -1,3 +1,5 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
@@ -43,6 +45,9 @@ export interface MarketStats {
 
 // GET /api/market/tokens - Get market tokens with filtering and sorting
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: 'market.tokens' });
+  if (!access.allowed) return access.response;
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -598,13 +603,13 @@ export async function GET(request: NextRequest) {
     if (search) cacheTags.push(`search:${search}`);
     response.headers.set("x-vercel-cache-tags", cacheTags.join(','));
 
-    return response;
+    return withPlatformApiPaymentHeaders(response, access);
   } catch (error) {
     serverLogger.error('Error fetching market tokens:', error);
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: 'Failed to fetch market tokens', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
-    );
+    ), access);
   }
 }
 

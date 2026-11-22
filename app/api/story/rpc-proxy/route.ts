@@ -1,7 +1,16 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { serverLogger } from "@/lib/utils/logger";
 
 const RPC_PROXY_UPSTREAM_TIMEOUT_MS = 20_000;
+const ALLOWED_RPC_METHODS = new Set([
+  "eth_chainId", "eth_blockNumber", "eth_getBalance", "eth_getCode",
+  "eth_getTransactionCount", "eth_call", "eth_estimateGas", "eth_gasPrice",
+  "eth_maxPriorityFeePerGas", "eth_getTransactionByHash", "eth_getTransactionReceipt",
+  "eth_sendRawTransaction", "net_version",
+]);
 
 /**
  * Return a JSON-RPC 2.0 error response so the client never parses empty/invalid JSON.
@@ -22,28 +31,40 @@ function jsonRpcError(id: number | undefined, code: number, message: string) {
  * Security:
  * - API key is stored server-side only (STORY_ALCHEMY_API_KEY, not NEXT_PUBLIC_)
  * - Client-side code calls this proxy instead of the RPC directly
- * - Not protected by BotID so client-side RPC (e.g. eth_getBalance for funding wallet) works.
+ * - Basic BotID verifies browser access; external agents require payment.
  *   Sensitive actions (mint, transfer) use separate routes that are BotID-protected.
  */
 export async function POST(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "rpc.story" });
+  if (!access.allowed) return access.response;
+
   let body: { method?: string; params?: unknown; id?: number };
   try {
-    body = await request.json();
+    const payload = await request.text();
+    if (payload.length > 65_536) {
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: "RPC payload too large" }, { status: 413 }), access);
+    }
+    body = JSON.parse(payload);
   } catch {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "Invalid JSON in request body" },
       { status: 400 }
-    );
+    ), access);
   }
 
-  if (!body.method || body.params === undefined) {
-    return NextResponse.json(
+  if (!body || typeof body !== "object" || Array.isArray(body) ||
+      typeof body.method !== "string" || !Array.isArray(body.params)) {
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: "Invalid RPC request: method and params required" },
       { status: 400 }
-    );
+    ), access);
   }
 
   const rpcId = body.id ?? 1;
+
+  if (!ALLOWED_RPC_METHODS.has(body.method)) {
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: "RPC method not allowed" }, { status: 403 }), access);
+  }
 
   try {
     // Get server-side environment variables (not exposed to client)
@@ -88,7 +109,7 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
       if (fetchError instanceof Error && fetchError.name === "AbortError") {
         serverLogger.warn("RPC proxy upstream timeout", { method: body.method });
-        return jsonRpcError(rpcId, -32000, "Gateway timeout");
+        return withPlatformApiPaymentHeaders(jsonRpcError(rpcId, -32000, "Gateway timeout"), access);
       }
       throw fetchError;
     }
@@ -103,7 +124,7 @@ export async function POST(request: NextRequest) {
         error: rawBody.slice(0, 200),
         method: body.method,
       });
-      return jsonRpcError(rpcId, -32000, response.statusText || "RPC request failed");
+      return withPlatformApiPaymentHeaders(jsonRpcError(rpcId, -32000, response.statusText || "RPC request failed"), access);
     }
 
     let data: { jsonrpc?: string; id?: number; result?: unknown; error?: { code: number; message: string } };
@@ -111,18 +132,18 @@ export async function POST(request: NextRequest) {
       data = rawBody ? JSON.parse(rawBody) : {};
     } catch {
       serverLogger.error("RPC proxy: invalid JSON from upstream", { method: body.method });
-      return jsonRpcError(rpcId, -32700, "Invalid JSON from upstream");
+      return withPlatformApiPaymentHeaders(jsonRpcError(rpcId, -32700, "Invalid JSON from upstream"), access);
     }
 
     if (data.error) {
       serverLogger.warn("RPC returned error:", { method: body.method, error: data.error });
     }
 
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { jsonrpc: "2.0", id: data.id ?? rpcId, result: data.result, error: data.error }
-    );
+    ), access);
   } catch (error) {
     serverLogger.error("RPC proxy error:", error);
-    return jsonRpcError(rpcId, -32603, error instanceof Error ? error.message : "Internal server error");
+    return withPlatformApiPaymentHeaders(jsonRpcError(rpcId, -32603, error instanceof Error ? error.message : "Internal server error"), access);
   }
 }

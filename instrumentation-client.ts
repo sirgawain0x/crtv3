@@ -1,4 +1,5 @@
 import { initBotId } from 'botid/client/core';
+import { COST_PROTECTED_ROUTES } from '@/lib/middleware/cost-protected-routes';
 import { runRealityLocalStorageSecurityMigration } from '@/lib/predictions/reality-localstorage-security';
 
 runRealityLocalStorageSecurityMigration();
@@ -29,6 +30,12 @@ if (!botIdGlobal.__crtvBotIdInit) {
 
   initBotId({
     protect: [
+      // Cost gates use Basic verification, including previously open read proxies.
+      ...COST_PROTECTED_ROUTES.map(({ path, method }) => ({
+        path,
+        method,
+        advancedOptions: { checkLevel: 'basic' as const },
+      })),
       botIdDeepAnalysisRoute('/api/swap/execute', 'POST'),
       botIdDeepAnalysisRoute('/api/ipfs/upload', 'POST'),
       botIdDeepAnalysisRoute('/api/creator-profiles/upsert', 'POST'),
@@ -98,6 +105,8 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/', 'POST'),
       botIdDeepAnalysisRoute('/studio', 'POST'),
       botIdDeepAnalysisRoute('/studio/*', 'POST'),
-    ],
+    ].filter((route, index, routes) =>
+      routes.findIndex((candidate) => candidate.path === route.path && candidate.method === route.method) === index,
+    ),
   });
 }

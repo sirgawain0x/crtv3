@@ -1,3 +1,4 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
@@ -26,30 +27,30 @@ const bodySchema = z.object({
  * Must stay in instrumentation-client protect list for browser header injection.
  */
 export async function POST(request: NextRequest) {
-  const botGuard = await requireHumanOrVerifiedBot("predictions-gate");
+  const botGuard = await requireHumanOrVerifiedBot("predictions-gate", request);
   if (!botGuard.allowed) return botGuard.response;
   const rl = await rateLimiters.standard(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, botGuard);
 
   let json: unknown;
   try {
     json = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Invalid JSON" }, { status: 400 }), botGuard);
   }
 
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json(
+    return withPlatformApiPaymentHeaders(NextResponse.json(
       { error: parsed.error.flatten().fieldErrors },
       { status: 400 }
-    );
+    ), botGuard);
   }
 
   const decision = await evaluatePredictionDraft(parsed.data);
 
-  return NextResponse.json({
+  return withPlatformApiPaymentHeaders(NextResponse.json({
     success: true,
     decision,
-  });
+  }), botGuard);
 }

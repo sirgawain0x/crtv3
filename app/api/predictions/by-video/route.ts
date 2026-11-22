@@ -1,3 +1,6 @@
+import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
+
+import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -26,22 +29,25 @@ import { getVideoPredictionLinks } from "@/lib/predictions/video-prediction-link
  * fetches. This route serves browser/client callers.
  */
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "predictions.by-video" });
+  if (!access.allowed) return access.response;
+
   const verification = await checkBotIdDeep();
   if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Access denied" }, { status: 403 }), access);
   }
   const rl = await rateLimiters.generous(request);
-  if (rl) return rl;
+  if (rl) return withPlatformApiPaymentHeaders(rl, access);
 
   const videoAssetId = request.nextUrl.searchParams.get("videoAssetId") ?? "";
   const result = await getVideoPredictionLinks(videoAssetId);
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: result.error }, { status: result.status }), access);
   }
 
-  return NextResponse.json({
+  return withPlatformApiPaymentHeaders(NextResponse.json({
     videoAssetId: videoAssetId.trim().toLowerCase(),
     predictions: result.predictions,
-  });
+  }), access);
 }

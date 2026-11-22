@@ -1,4 +1,5 @@
 import { DEFAULT_ATTESTATION_PAYMASTER_POLICY_ID } from "@/lib/eas/config";
+import { isGasSponsorshipEnabled } from "@/lib/wallet/gas-policy";
 
 const POLICY_UUID =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -17,6 +18,7 @@ export function stripEnvQuotes(value?: string): string | undefined {
  * Priority: dedicated attestation env → explicit config → repo default → general paymaster env.
  */
 export function resolveAttestationPaymasterPolicyId(explicitPolicyId?: string): string | undefined {
+  if (!isGasSponsorshipEnabled()) return undefined;
   const candidates = [
     stripEnvQuotes(process.env.NEXT_PUBLIC_ATTESTATION_SPONSORED_POLICY_ID),
     stripEnvQuotes(explicitPolicyId),

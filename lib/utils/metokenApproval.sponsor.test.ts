@@ -10,8 +10,9 @@ describe("sendMeTokenSponsoredUserOp", () => {
     vi.unstubAllEnvs();
   });
 
-  it("includes Alchemy paymaster policy on subscribe-path UserOps", async () => {
+  it("includes the Alchemy paymaster policy only when sponsorship is explicitly enabled", async () => {
     vi.stubEnv("NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID", TEST_POLICY_ID);
+    vi.stubEnv("NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED", "true");
 
     const sendUserOperation = vi.fn().mockResolvedValue({ hash: "call-id-1" });
     const client = {
