@@ -16,9 +16,9 @@ const request=(body:unknown)=>new NextRequest('https://staging.example/api/migra
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('VERCEL_ENV','preview');vi.stubEnv('VIDEO_PROVIDER','frameworks');vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://zxpobpucayevlrzdxhmr.supabase.co');auth.mockResolvedValue({address:'admin'});run.mockResolvedValue({sourceId:source.assetId,state:'processing',action:'created'});remote.mockReturnValue({verify:()=>{},read:()=>{}});});afterEach(()=>vi.unstubAllEnvs());
 describe('isolated admin import boundary',()=>{
  it('inspects only the exact ready reservation without fetching originals or creating another upload',async()=>{
-  find.mockResolvedValue({state:'ready',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes,frameworks_playback_id:'verified-target'});
+  find.mockResolvedValue({state:'ready',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes,frameworks_playback_id:'verified-target',frameworks_asset_id:'verified-artifact'});
   inspect.mockResolvedValue({playableManifest:false,hops:[{status:403,code:'PLAYBACK_ACCESS_DENIED'}]});
-  const response=await POST(request({mode:'inspect-playback',source}));expect(response.status).toBe(200);expect(inspect).toHaveBeenCalledWith('verified-target');expect(remote).not.toHaveBeenCalled();expect(run).not.toHaveBeenCalled();
+  const response=await POST(request({mode:'inspect-playback',source}));expect(response.status).toBe(200);expect(inspect).toHaveBeenCalledWith('verified-target',expect.any(Function),'verified-artifact');expect(remote).not.toHaveBeenCalled();expect(run).not.toHaveBeenCalled();
   find.mockResolvedValue({state:'ready',livepeer_playback_id:'different-source'});expect((await POST(request({mode:'inspect-playback',source}))).status).toBe(409);expect(inspect).toHaveBeenCalledTimes(1);
  });
  it.each([['VERCEL_ENV','production'],['NEXT_PUBLIC_SUPABASE_URL','https://zdeiezfoemibjgrkyzvs.supabase.co'],['VIDEO_PROVIDER','livepeer']])('denies the wrong %s before authorization or provider work',async(name,value)=>{
