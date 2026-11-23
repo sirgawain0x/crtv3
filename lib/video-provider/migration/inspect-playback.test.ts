@@ -3,6 +3,17 @@ vi.mock('../frameworks/playback',()=>({buildAuthorizedViewerPlayHlsUrl:()=> 'htt
 import {inspectMigrationPlayback} from './inspect-playback';
 afterEach(()=>vi.restoreAllMocks());
 describe('safe staged playback diagnostics',()=>{
+ it('checks legacy edge credential transport without changing policy or exposing tokens',async()=>{
+  const fetcher=vi.fn().mockResolvedValueOnce(new Response(null,{status:307,headers:{location:'https://edge.frameworks.network/hls/video/index.m3u8?tkn=session'}}))
+   .mockResolvedValueOnce(new Response('#EXTM3U\n#EXT-X-ERROR: Not allowed to play (CONN_PLAY)\n#EXT-X-ENDLIST'))
+   .mockResolvedValueOnce(new Response('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000\nmedia.m3u8'));
+  const result=await inspectMigrationPlayback('verified',fetcher);
+  expect(result.playableManifest).toBe(true);expect(result.hops[1].credentialParameters).toEqual(['tkn']);
+  expect(result.hops[2].alternateTransport).toBe(true);
+  const retry=fetcher.mock.calls[2][0] as URL;
+  expect(retry.searchParams.get('fwjwt')).toBe('PRIVATE');expect(retry.searchParams.get('jwt')).toBe('PRIVATE');
+  expect(JSON.stringify(result)).not.toContain('PRIVATE');
+ });
  it('follows reviewed redirects, verifies an actual manifest and excludes bearer URLs',async()=>{
   const fetcher=vi.fn().mockResolvedValueOnce(new Response(null,{status:307,headers:{location:'https://edge.frameworks.network/hls/video/index.m3u8?fwjwt=PRIVATE'}})).mockResolvedValueOnce(new Response('#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000000\nmedia.m3u8',{headers:{'content-type':'application/vnd.apple.mpegurl'}}));
   const result=await inspectMigrationPlayback('verified',fetcher);expect(result.playableManifest).toBe(true);expect(result.hops).toHaveLength(2);expect(JSON.stringify(result)).not.toContain('PRIVATE');
