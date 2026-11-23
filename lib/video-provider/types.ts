@@ -72,6 +72,7 @@ export type PlaybackThumbnailSource = {
 };
 
 export type PlaybackInfoResult = {
+  error?: unknown;
   playbackInfo?: {
     meta?: { source?: PlaybackThumbnailSource[] };
   };

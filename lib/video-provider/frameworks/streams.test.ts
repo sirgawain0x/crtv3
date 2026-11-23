@@ -404,7 +404,8 @@ describe("frameworks streams (#404)", () => {
         data: {
           createClip: {
             __typename: "Clip",
-            id: "clip-1",
+            id: "Q2xpcDpjbGlwLTE=",
+            clipHash: "clip-hash-1",
             playbackId: "clip-pb",
             status: "ready",
           },
@@ -424,8 +425,16 @@ describe("frameworks streams (#404)", () => {
     expect(body.variables.input.streamId).toBe("stream-global");
     expect(body.variables.input.startUnix).toBe(1_700_000_000);
     expect(body.variables.input.stopUnix).toBe(1_700_000_060);
+    expect(created.assetId).toBe("clip-hash-1");
     expect(created.newPlaybackId).toBe("clip-pb");
     expect(created.playbackUrl).toContain("clip-pb");
+  });
+
+  it("does not persist a GraphQL node ID when the clip hash is missing", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ data: { createClip: { __typename: "Clip", id: "Q2xpcDpjbGlwLTE=", playbackId: "clip-pb", status: "ready" } } }) });
+    const result = await getVideoProvider().streams.createClip({ playbackId: "live-pb", streamId: "stream-global", sessionId: "session", startTime: 1700000000000, endTime: 1700000060000 });
+    expect(result.assetId).toBe("");
+    expect(result.error).toContain("canonical clip hash");
   });
 
   it("multistream.delete calls deletePushTarget", async () => {

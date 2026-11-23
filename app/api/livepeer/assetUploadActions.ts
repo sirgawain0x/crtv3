@@ -9,6 +9,9 @@ import {
   FrameWorksUploadsAssetsUnavailableError,
   requireVideoProviderForUploadsAndAssets,
 } from "@/lib/video-provider";
+import { resolveVideoProviderId } from "@/lib/video-provider/config";
+import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { registerProtectedVod } from "@/lib/video-provider/frameworks/vod-access";
 import { WebhookContext } from "./token-gate/route";
 import { serverLogger } from "@/lib/utils/logger";
 import {
@@ -127,6 +130,10 @@ export const getLivepeerUploadUrl = async (
     const session = result.data as LivepeerUploadSession | undefined;
     if (!session) return session;
 
+    if (resolveVideoProviderId() === 'frameworks') {
+      if (!session.asset?.id || !session.asset.playbackId) throw new Error('Missing protected upload identity');
+      await registerProtectedVod(createServiceClient(), {assetId:session.asset.id,playbackId:session.asset.playbackId,creator:creatorAddress});
+    }
     const uploadId = session.uploadId?.trim();
     const uploadTicket = uploadId
       ? maybeMintUploadSessionTicket(uploadId, creatorAddress)

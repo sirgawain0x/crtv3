@@ -7,6 +7,7 @@ import {
 } from '@/lib/video-provider';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
+import { isVideoAssetId } from '@/lib/video-provider/asset-id';
 
 export async function GET(
   request: NextRequest,
@@ -25,12 +26,10 @@ export async function GET(
       ), access);
     }
 
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(assetId)) {
+    if (!isVideoAssetId(assetId)) {
       return withPlatformApiPaymentHeaders(NextResponse.json(
         {
-          error: 'Invalid asset ID format. Expected UUID format.',
+          error: 'Invalid asset ID format.',
           code: 'INVALID_ASSET_ID',
         },
         { status: 400 },

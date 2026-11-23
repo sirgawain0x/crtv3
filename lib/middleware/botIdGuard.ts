@@ -32,7 +32,7 @@ export async function requireHumanOrVerifiedBot(
   }
   const verification = await checkBotIdDeep();
 
-  if (!verification.isHuman || verification.isBot ||
+  if (verification.isHuman !== true || verification.isBot !== false ||
       (verification.bypassed && process.env.NODE_ENV === "production")) {
     serverLogger.warn("[botIdGuard] access denied", {
       context,

@@ -92,6 +92,7 @@ type CreateClipMutation = {
   createClip: {
     __typename: string;
     id?: string;
+    clipHash?: string;
     playbackId?: string;
     status?: string;
     message?: string;
@@ -237,6 +238,7 @@ const CREATE_CLIP = `
       __typename
       ... on Clip {
         id
+        clipHash
         playbackId
         status
       }
@@ -563,7 +565,10 @@ export const frameworksStreams = {
         };
       }
       const playbackId = result.playbackId ?? "";
-      const assetId = result.id ?? "";
+      const assetId = result.clipHash?.trim() ?? "";
+      if (!assetId) {
+        return { playbackUrl: "", assetId: "", newPlaybackId: "", error: "FrameWorks returned no canonical clip hash" };
+      }
       if (!playbackId) {
         return {
           playbackUrl: "",

@@ -68,7 +68,7 @@ async function tryAllowSameOriginAppRequest(
 
   try {
     const verification = await checkBotId({ advancedOptions: { checkLevel: "basic" } });
-    if (verification.isHuman && !verification.isBot &&
+    if (verification.isHuman === true && verification.isBot === false &&
         !(verification.bypassed && process.env.NODE_ENV === "production")) {
       return { allowed: true, tier: "public" };
     }

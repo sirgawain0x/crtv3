@@ -13,6 +13,12 @@ describe("parseCreativeTVUrl", () => {
     });
   });
 
+  it("parses FrameWorks artifact URLs", () => {
+    const hash = "a".repeat(64);
+    expect(parseCreativeTVUrl(`${origin}/discover/${hash}`).kind).toBe("discover");
+    expect(parseCreativeTVUrl(`${origin}/discover/id,asset_id.eq.other`).kind).toBe("invalid");
+  });
+
   it("parses relative discover paths", () => {
     expect(parseCreativeTVUrl(`/discover/${uuid}`, { origin })).toEqual({
       kind: "discover",

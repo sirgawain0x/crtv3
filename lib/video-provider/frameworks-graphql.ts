@@ -20,6 +20,8 @@ export async function frameworksGraphqlRequest<T>(
 
   const res = await fetch(frameworksGraphqlUrl(), {
     method: "POST",
+    cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

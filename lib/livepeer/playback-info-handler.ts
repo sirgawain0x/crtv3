@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
-import { isLivepeerConfigured, LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
+import { resolveFrameworksPlaybackAlias } from '@/lib/video-provider/frameworks/playback-alias';
+import { getVideoProvider } from '@/lib/video-provider';
+import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
 
 const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
@@ -13,9 +14,10 @@ const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
  */
 export async function handlePlaybackInfo(request: NextRequest): Promise<NextResponse> {
   try {
-    if (!isLivepeerConfigured()) {
+    const provider = getVideoProvider();
+    if (!provider.isConfigured()) {
       return NextResponse.json(
-        { error: 'Livepeer playback is not configured on this deployment', code: LIVEPEER_NOT_CONFIGURED },
+        { error: 'Video playback is not configured on this deployment', code: LIVEPEER_NOT_CONFIGURED },
         { status: 503 },
       );
     }
@@ -41,18 +43,12 @@ export async function handlePlaybackInfo(request: NextRequest): Promise<NextResp
       );
     }
 
-    const client = getFullLivepeer();
-    if (!client) {
-      return NextResponse.json(
-        {
-          error: 'Livepeer is not configured',
-          code: LIVEPEER_NOT_CONFIGURED,
-        },
-        { status: 503 },
-      );
+    let canonicalPlaybackId = playbackId;
+    if (provider.id === 'frameworks') {
+      try { canonicalPlaybackId = await resolveFrameworksPlaybackAlias(playbackId); }
+      catch { return NextResponse.json({ error: 'Playback lookup unavailable' }, { status: 503 }); }
     }
-
-    const response = await client.playback.get(playbackId);
+    const response = await provider.playback.get(canonicalPlaybackId);
 
     if (response.error) {
       return NextResponse.json(

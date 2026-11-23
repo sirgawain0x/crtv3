@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WalletAuthError, type WalletAuthArgs } from "@/lib/auth/require-wallet";
 
+vi.mock("@/lib/sdk/supabase/service", () => ({ createServiceClient: () => ({}) }));
+vi.mock("@/lib/video-provider/frameworks/vod-access", () => ({ registerProtectedVod: vi.fn(async () => {}) }));
+
 const CREATOR = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const OTHER = "0xcccccccccccccccccccccccccccccccccccccccc";
 const UPLOAD_ID = "upload-auth-test";
@@ -67,7 +70,7 @@ describe("assetUploadActions wallet auth", () => {
     it("binds creator from session wallet, not the client-supplied address", async () => {
       mockVerifyWalletAuthArgs.mockResolvedValue({ address: OTHER });
       mockCreate.mockResolvedValue({
-        data: { uploadId: UPLOAD_ID, asset: { id: "a1" } },
+        data: { uploadId: UPLOAD_ID, asset: { id: "a1", playbackId:"p1" } },
       });
       const { getLivepeerUploadUrl } = await import("./assetUploadActions");
       const session = await getLivepeerUploadUrl(authArgs, "file.mp4", CREATOR, 100);
@@ -82,7 +85,7 @@ describe("assetUploadActions wallet auth", () => {
     it("succeeds with verified wallet and mints upload ticket", async () => {
       mockVerifyWalletAuthArgs.mockResolvedValue({ address: CREATOR });
       mockCreate.mockResolvedValue({
-        data: { uploadId: UPLOAD_ID, asset: { id: "asset-1" } },
+        data: { uploadId: UPLOAD_ID, asset: { id: "asset-1", playbackId:"play-1" } },
       });
       const { getLivepeerUploadUrl } = await import("./assetUploadActions");
       const session = await getLivepeerUploadUrl(authArgs, "file.mp4", CREATOR, 512);

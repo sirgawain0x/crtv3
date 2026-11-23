@@ -24,6 +24,11 @@ describe("requireHumanOrVerifiedBot", () => {
     expect(result.allowed).toBe(true);
   });
 
+  it("blocks malformed SDK error verdicts even when marked human", async () => {
+    mockCheckBotId.mockResolvedValue({ isHuman: true, isBot: undefined });
+    expect((await requireHumanOrVerifiedBot("test")).allowed).toBe(false);
+  });
+
   it("blocks verified external bots without paid or internal authentication", async () => {
     mockCheckBotId.mockResolvedValue({
       isBot: true,

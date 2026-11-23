@@ -1,5 +1,8 @@
 # Alchemy cost controls
 
+**Payment replay migration: COMPLETE.** Both production migrations (`20261122173608`, `20261122173706`) are applied and verified: a global duplicate key, RLS, no anonymous/user read grants, and server SELECT/INSERT only. PR #462 is merged at `d25573da50baa82af6cf166c9ce661edfe8b30d4` and deployed to production as `dpl_6muM1Gv2U3HDfygVpc4MUTSfuLof`. The existing Hermes key is configured server-only in Production, the tested gateway revision is serving normal traffic, and live unpaid/invalid-signature checks passed. A funded wallet smoke and distributed spending caps remain separate follow-ups; they do not represent pending replay schema work. Older staging/promotion notes below are historical checkpoints.
+
+
 TL;DR: Keep free gas sponsorship paused at Alchemy. Application guards are a second layer; browser-visible API keys and policy IDs can be used directly against the provider.
 
 ## Runtime policy
@@ -27,53 +30,80 @@ Set server-only `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` to use a
 
 Default buckets separate routes and normalize the guarded dynamic route patterns so changing token addresses does not reset a bucket. Internal/admin keys have separate bounded buckets. Invalid payment proof traffic is limited before receipt RPC verification. Malformed/oversized proofs are rejected locally.
 
-## Production rollout
+## Release state — November 22, 2026
 
-1. Keep the live Creative TV free gas policy inactive. On November 22, 2026 its provider state was changed from Active to Inactive and visibly verified. The existing USDC-paid policy was left active. This does not pause other apps' policies in the shared Alchemy account.
-2. Set policy-side total, per-wallet and per-operation caps; inspect other apps contributing to the shared gas balance. Do not infer bot abuse from an invoice alone.
-3. Restrict browser and server API keys separately at Alchemy. Origin allowlists are one layer and do not authenticate an arbitrary HTTP client. Keep private keys server-side and use provider method/network restrictions where available.
-4. Configure named internal service keys (`CREATIVE_PLATFORM_INTERNAL_API_KEYS=id:secret`) privately on both caller and server. Never ship these keys in a browser bundle. Existing external partner keys no longer receive a free exemption.
-5. Verify the Base USDC recipient, resource prices, receipt table's transaction-hash uniqueness, and shared rate store in the deployment environment.
-6. Carry this patch onto the reviewed release revision, preserving unrelated workspace changes. Check TypeScript, tests, production compilation and preview behavior before rollout. The release branch `codex/x402-staging-release` is isolated from the older checkout and based on staging commit `0e8f803ff3d3fffe9974113307e46f5aecba4872`. Newer staging stream ownership and video-provider checks are preserved.
-7. Preview smoke: ordinary browser playback/membership/session flows; unpaid machine gets 402 before upstream work; spoofed browser bot has no free bypass; internal bot succeeds only with its secret; paid proof works once; replay is denied; expensive Story RPC methods are blocked. Check mobile browsers and embeds for BotID compatibility.
-8. Verify provider metrics after release. Already incurred or in-flight gas can still settle after pausing. Record a rollback deployment, but do not reactivate free sponsorship as part of an application rollback.
+The production candidate is isolated on `codex/x402-production-release`, based on main `465d186c3c788dc8ba30863628fa19e1b99a07d1`. It carries the cost/payment fixes from PR #460 and the existing-Coinbase-credential compatibility from PR #461. The unreleased FrameWorks provider migration is excluded. The current production video provider remains intact; recording changes retain wallet ownership/delegation checks and conditional persistence from the tested staging route.
 
-The receipt migrations and a zero-traffic gateway staging revision have been deployed. Production app rollout, gateway traffic promotion, provider allowlist changes and live wallet-paid E2E verification remain pending. Provider-wide spend attribution still needs dashboard data.
+The candidate also requires an explicit boolean BotID verdict: the installed SDK can turn an upstream JSON error into `isHuman: true` with a missing `isBot` field. Such malformed verdicts cannot grant free access. Invalid payment signatures returned as SDK `VerifyError` HTTP 400/402 become a normal payment rejection. Authentication failures stay unavailable; only errors after a settlement attempt are described as potentially pending.
 
-## Coinbase facilitator and Hermes gateway release gates
+An admitted market server query uses the configured subgraph upstream directly, with existing server authentication and a timeout, instead of re-entering the newly paid public app proxy. This creates no additional free HTTP entry point.
 
-G2 selected the Hermes Safe treasury `0xf46F1BA19A9280F752a451d0973b047D81c63D70` for Creative TV payments. Local server configuration and browser feature-payment recipients now match it. Update the production `X402_API_RECIPIENT` to this exact address before releasing; stale recipients fail closed.
+### Existing credentials
 
-G2 selected Coinbase's hosted facilitator instead of operating a mainnet gas wallet. Set `X402_FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402`, `CDP_API_KEY_ID`, and `CDP_API_KEY_SECRET` on the server. The existing Coinbase SDK generates separate short-lived JWTs scoped to the method, host and path for `/supported`, `/verify`, and `/settle`. No alternate provider fallback is allowed. Do not put credentials in browser variables. The previous custom-facilitator bearer token is no longer used.
+The facilitator uses one complete credential pair, in this order:
+1. `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET`.
+2. Existing onboarding names `CDP_API_KEY` + `CDP_API_SECRET`.
+3. `COINBASE_CDP_API_KEY_ID` + `COINBASE_CDP_API_KEY_SECRET`.
 
-The authenticated Coinbase `/supported` read on November 22 confirmed x402 v2 exact Base mainnet support. No self-hosted signer funding or mainnet upgrade is required. Coinbase's published facilitator fee is free for the first 1,000 onchain transactions per month and $0.001 per additional transaction; gas is covered by that fee. Track merchant settlement fees as well as AI/hosting costs, and retain the app's rate limits. This is not a configured account-wide spending cap.
+A partial selected pair fails closed. IDs and secrets from different pairs are never combined. The facilitator remains pinned to `https://api.cdp.coinbase.com/platform/v2/x402`; no alternate-provider fallback is allowed. Credentials are server-only.
 
-The live Hermes gateway at `https://hermes-x402-gateway-1037240986506.us-central1.run.app` uses Coinbase settlement, Base mainnet and the approved Safe. The Creative TV route has been deployed to a tagged staging revision, `hermes-x402-gateway-crtv-x402-20261122`, at `https://crtv-x402-staging---hermes-x402-gateway-3ortoh2aiq-uc.a.run.app`. All normal gateway traffic remains on `hermes-x402-gateway-00005-h5j` until promotion.
+The app's `HERMES_GATEWAY_API_KEY` matches GCP Secret Manager `creative-tv-gateway-internal` version 1. G2 explicitly approved copying that existing dedicated key into Vercel project crtv4 staging server-only secrets; that transfer is complete. Temporary transfer files were deleted. The production target has not yet been configured with the key by this task.
 
-The gateway now provides:
-- `POST /v1/internal/creative-tv`: dedicated server-only `CREATIVE_TV_APP_API_KEY` bearer credential; no public free access.
-- `POST /v1/x402/creative-tv`: $0.01 Base USDC, approved Safe, `paymentFlow: upfront`. Settlement must succeed before AI runs. No automatic retry of ambiguous settlement results.
-- An advertised `creative-tv` skill; input/body limits, 1,024 output tokens and a 90-second upstream deadline.
+### Gateway
 
-The app adapter now uses the internal gateway route with `HERMES_GATEWAY_API_KEY`, rather than exposing the backend Hermes key to the app. For staging, point `HERMES_X402_GATEWAY_URL` at the tagged URL. The dedicated credential is in GCP Secret Manager, `creative-tv-gateway-internal` version 1; only the gateway service account was granted access by this release. Configure the matching value privately in the app's branch preview, then use the canonical gateway URL after gateway promotion. Never place either credential in a public variable or the browser.
+The tested staging revision is `hermes-x402-gateway-crtv-x402-20261122` at:
+`https://crtv-x402-staging---hermes-x402-gateway-3ortoh2aiq-uc.a.run.app`.
 
-On November 22, both receipt migrations were applied to the connected Supabase project: `20261122173608_secure_x402_payment_receipts.sql` and `20261122173706_restrict_x402_receipt_service_permissions.sql`. RLS is enabled; `anon` and `authenticated` cannot access receipts; `service_role` has SELECT/INSERT only. A live transaction verified global duplicate rejection and rolled back all test rows. Supabase default grants initially gave the service role broad access, so the second migration explicitly removes those grants. No existing app records were modified.
+It provides `POST /v1/internal/creative-tv` using the dedicated app credential and `POST /v1/x402/creative-tv` charging $0.01 Base USDC to Safe `0xf46F1BA19A9280F752a451d0973b047D81c63D70`. Public payment uses upfront settlement before AI. Input/body limits, a 1,024-token output budget and a 90-second upstream deadline bound each request. The Creative TV skill is advertised. Existing unrelated gateway routes are preserved.
 
-Keep these migrations during rollback. Never delete reservations automatically after ambiguous settlement timeouts. Reconcile the transaction instead of resubmitting it. No payment may proceed if replay reservation storage fails.
+The canonical gateway is `https://hermes-x402-gateway-1037240986506.us-central1.run.app`. Its normal traffic remains on `hermes-x402-gateway-00005-h5j` until the tested revision is promoted. Keep the app's preview URL pointed at the tagged revision until promotion.
 
-`pnpm exec tsx scripts/check-x402-readiness.ts` makes read-only checks of facilitator networks, receipt-store availability, and Hermes health/discovery. It fails until these release gates are met. It does not submit a transaction or spend funds.
+### Replay ledger
 
-Feature payments now use `/api/payments/x402`, which enforces service prices and the Safe recipient server-side. The browser signs from its connected funding wallet; that address needs Base USDC. It does not automatically move tokens from the smart account or spend from a server-held payer key. Feature receipt redemption is one-use. Review smart-account funding UX in staging before release.
+Both migrations are applied to connected Supabase project `zdeiezfoemibjgrkyzvs`:
+- `20261122173608_secure_x402_payment_receipts.sql`
+- `20261122173706_restrict_x402_receipt_service_permissions.sql`
 
-## Verification evidence and remaining release steps
+Live catalog checks confirmed RLS, no anon/authenticated access, SELECT/INSERT-only service access and a global transaction-hash primary key. A duplicate test across different resources was rejected; all test writes were rolled back. Supabase defaults initially gave the service role broader grants, so the second migration explicitly removes them.
 
-- App: 205 test files / 1,106 tests passed; TypeScript and the full production build passed. Changed-file lint passed with TypeScript undefined-name checking and the existing React Hooks inline directives supported; existing unused-variable warnings remain. Browser preview verification is still a separate gate.
-- Gateway: seven tests passed, including real SDK payment challenge and mocked upfront settlement/replay behavior; typecheck and build passed.
-- Live gateway staging: health/manifest passed; unpaid calls returned 402; anonymous private calls returned 401; one authenticated Creative TV call returned 200 and an answer. No paid settlement was submitted by these smoke checks.
-- Vercel CLI deployment access expired; reconnect the account before setting branch preview secrets and creating the app preview. The connected Vercel API could not access this project either.
-- Before promotion: verify browser playback, membership, wallet funding/signing and BotID on the preview; run a single wallet-approved paid call and replay check; verify shared rate limits; record deployment IDs and rollback targets.
-- Gateway promotion uses the exact tested revision, never `latest`: `gcloud run services update-traffic hermes-x402-gateway --project creative-ai-491118 --region us-central1 --to-revisions hermes-x402-gateway-crtv-x402-20261122=100`. Gateway rollback target is `hermes-x402-gateway-00005-h5j`. Keep free gas sponsorship inactive on rollback.
+Preserve the ledger on rollback. Never remove authorization reservations after ambiguous settlement timeouts; reconcile the transaction instead of submitting it again. Storage failure cannot grant payment access.
 
-Release review: https://github.com/sirgawain0x/crtv3/pull/460 (draft, base staging). GitHub started the branch preview automatically; it still needs branch-scoped runtime configuration and browser/payment verification. The original checkout remains unchanged by the release port.
+### Verification
 
-The built production app was also served locally for an API smoke test: unpaid AI request → 402 to the approved Safe; spoofed browser headers → 503 when hosted BotID was unavailable; own-agent key without wallet proof → 401; temporary own-agent key plus a locally signed ephemeral EOA proof → 200 through the staging gateway and real Creative TV model. The ephemeral account had no funds, no payment was signed, and no chain transaction was submitted. This verifies the server path, not the hosted human-browser or paid-wallet flows.
+- Original staging release: 205 test files / 1,106 tests, TypeScript and full build passed. The naming compatibility change subsequently passed 18 facilitator tests and TypeScript.
+- Isolated production candidate: 177 test files / 880 tests and TypeScript passed. Changed-file lint passed using TypeScript undefined-name checks and the React Hooks plugin required by existing directives; existing unused-variable warnings remain.
+- Gateway: seven tests passed, including real SDK payment challenges and mocked upfront-settlement/replay behavior. Typecheck/build passed.
+- Live gateway checks passed again after staging configuration: approved Safe, Base, Coinbase, public 402, private 401 and authenticated Creative TV answer.
+- Staging merge `9a67c151b4bea19e78509abae7130ffae91827b6` deployed READY as `dpl_8m5V9qRQoYti1K7mbCvYrQehja3q`. The corrected API returns a 402 Base USDC Safe challenge. The human browser's market API returns 200; the predictions list renders the question title and resolved answer.
+- The live invalid-signature probe exposed the SDK VerifyError classification described above; the production candidate fixes it and has regression coverage. No real payment was signed or submitted during these probes.
+- Earlier built-app smoke: unpaid AI request returned 402; spoofed browser hints failed closed; an own-agent credential without wallet proof returned 401; a locally signed ephemeral EOA proof plus temporary own-agent key traversed app → staging gateway → Creative TV AI and returned 200. The temporary account had no funds and signed no payment.
+
+### Remaining promotion gates
+
+1. Verify the isolated production candidate's hosted build and invalid-signature probe, then run one wallet-approved paid request and confirm replay denial. Do not treat a protected-preview login page as an application response.
+2. Review global rate limits. Neither preview nor production currently advertises Upstash/Redis variables in project metadata. Local counters are not a distributed spending cap. No new paid rate-limit service has been provisioned.
+3. Configure production server-only Hermes access and public Safe/CDP/gas-off settings. Reuse the existing Coinbase credentials. Keep sponsorship switches and server-funded swaps off.
+4. Promote the exact tested gateway revision, then deploy the reviewed production candidate using production settings. Do not directly promote a preview carrying staging-only secrets or the unreleased streaming migration.
+5. Verify production challenge/receipt behavior and monitor Alchemy and model usage. Provider-side origin/method/network restrictions and account-wide spend attribution remain separate controls; public browser provider keys cannot be secured solely by app middleware.
+
+Gateway promotion: `gcloud run services update-traffic hermes-x402-gateway --project creative-ai-491118 --region us-central1 --to-revisions hermes-x402-gateway-crtv-x402-20261122=100`.
+Gateway rollback target: `hermes-x402-gateway-00005-h5j`.
+Production rollback deployment recorded before this release: `dpl_GFpJQU4TyoYwBqaSqDDEmiiE1kbB`; recheck its eligibility before rollout. Never reactivate free gas sponsorship as part of an app rollback.
+
+`node --import tsx scripts/check-x402-readiness.ts` performs read-only facilitator, receipt-store and gateway checks. It does not transfer funds. Feature payments use `/api/payments/x402` and the connected funding-wallet signer, which needs Base USDC; payment redemption is one-use.
+
+### Final prediction and API checks
+
+Browser verification reproduced a missing prediction detail title. The detail loader was scanning from block zero. It now loads indexed immutable text, verifies its Reality.eth content hash against chain state, and only falls back to the ten most recent blocks. The DOM-based write formatter is loaded only for question creation, not during reads. A live Base read verified text recovery for the affected question without an Alchemy key.
+
+The indexer supplied a short zero-answer default and a creation timestamp despite no on-chain answer. The list now requires answer evidence and does not infer a final result from that timestamp. Details preserve a finalized boolean zero answer as No, avoid announcing an unanswered default as leading, and show a retry state when text cannot be recovered. No transaction-submission method was changed.
+
+The first isolated hosted cost-control preview passed its build and live API probes: unpaid market/feature calls returned 402 to the approved Safe; the existing Coinbase credentials authenticated and the invalid-signature probe returned a normal 402 rejection before settlement. The actual production-candidate AI handler also passed a live integration check: own-agent credentials alone returned 401; an ephemeral wallet signature plus that credential returned an answer through the staging gateway. No wallet payment was signed in that check. The final preview must include the additional prediction fixes before promotion.
+
+### PR #462 review corrections
+
+All platform-admitted responses now override browser, CDN and Vercel CDN cache headers with private/no-store behavior, including human and internal requests without payment receipts. This prevents an admitted browser response from seeding a shared cache that could bypass the access gate. Streaming bodies and existing exposed headers are preserved.
+
+The by-video and Precog routes rely on the central human/internal/settled-payment gate instead of running a second human-only Deep Analysis check after admission. Wallet/ownership checks on other routes remain intact. Regression tests cover paid/internal bots, unpaid rejection before data work, cache-header overrides and streamed receipts. The full suite passed: 178 files / 889 tests; TypeScript passed.
+
+PR #462 targets main intentionally: this isolated production backport excludes staging's unreleased streaming migration. Test the PR's own preview, then release this branch to main after the remaining production gates above. Do not merge all of staging as part of this cost-control release. The preview before these review corrections built successfully and passed live unpaid/invalid-payment probes; the updated commit requires its own hosted build.

@@ -8,6 +8,8 @@ describe("frameworks assets (#406)", () => {
   beforeEach(() => {
     vi.stubEnv("VIDEO_PROVIDER", "frameworks");
     vi.stubEnv("FRAMEWORKS_API_TOKEN", "fw-token");
+    vi.stubEnv("FRAMEWORKS_SIGNING_KID", "kid");
+    vi.stubEnv("FRAMEWORKS_SIGNING_PRIVATE_KEY", "test-key");
     vi.stubEnv("FRAMEWORKS_GRAPHQL_URL", "https://bridge.example/graphql");
     resetVideoProviderForTests();
     vi.stubGlobal("fetch", fetchMock);
@@ -105,6 +107,7 @@ describe("frameworks assets (#406)", () => {
       }),
     });
 
+    fetchMock.mockResolvedValueOnce({ok:true,json:async()=>({data:{setPlaybackPolicy:{__typename:'VodAsset',artifactHash:'hash-canonical',playbackId:'pb-2',playbackPolicy:{type:'JWT',jwt:{allowedKids:['kid'],requiredAudience:['pb-2']}}}}})});
     const result = (await getVideoProvider().assets.create({
       name: "demo.mp4",
       sizeBytes: 4096,
@@ -252,15 +255,6 @@ describe("frameworks assets (#406)", () => {
           }),
         errors: ["AuthError", "NotFoundError", "ValidationError", "UnexpectedResult"] as const,
       },
-      importVodAsset: {
-        field: "importVodAsset",
-        invoke: () =>
-          getVideoProvider().assets.createViaUrl({
-            url: "https://cdn.example/v.mp4",
-            name: "Remote",
-          }),
-        errors: ["AuthError", "ValidationError", "UnexpectedResult"] as const,
-      },
       deleteVodAsset: {
         field: "deleteVodAsset",
         invoke: () => getVideoProvider().assets.delete("vod-del"),
@@ -322,26 +316,8 @@ describe("frameworks assets (#406)", () => {
     await expect(assets.abortUpload?.("up-net")).rejects.toThrow(/network down/i);
   });
 
-  it("createViaUrl uses importVodAsset", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        data: {
-          importVodAsset: {
-            __typename: "VodAsset",
-            id: "vod-import",
-            playbackId: "pb-import",
-            status: "processing",
-          },
-        },
-      }),
-    });
-
-    const result = (await getVideoProvider().assets.createViaUrl({
-      url: "https://cdn.example/video.mp4",
-      name: "Remote",
-    })) as { data?: { asset?: { id?: string } } };
-    expect(result.data?.asset?.id).toBe("vod-import");
+  it("refuses URL imports before a provider mutation can expose media", async () => {
+    await expect(getVideoProvider().assets.createViaUrl({url:'https://cdn.example/video.mp4'})).rejects.toThrow(/protected multipart/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

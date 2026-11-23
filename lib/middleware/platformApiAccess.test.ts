@@ -137,6 +137,16 @@ describe("requirePlatformApiAccess", () => {
     }
   });
 
+  it("does not grant free browser access for malformed SDK error verdicts", async () => {
+    mockCheckBotId.mockResolvedValue({ isHuman: true, isBot: undefined });
+    const request = new NextRequest("http://localhost/api/test", {
+      headers: { "Sec-Fetch-Site": "same-origin" },
+    });
+    const result = await requirePlatformApiAccess(request, { resource: "playback.info" });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.response.status).toBe(402);
+  });
+
   it("requires payment for same-site requests without credentials", async () => {
     const request = new NextRequest("http://localhost/api/livepeer/playback-info", {
       headers: { "Sec-Fetch-Site": "same-site" },

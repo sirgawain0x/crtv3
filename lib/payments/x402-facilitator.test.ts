@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { encodePaymentSignatureHeader, decodePaymentResponseHeader } from '@x402/core/http';
+import { VerifyError } from '@x402/core/types';
 import { CDP_FACILITATOR_URL, CREATIVE_TREASURY_ADDRESS, X402_NETWORK } from './x402-config';
 const mocks = vi.hoisted(() => ({ supported: vi.fn(), verify: vi.fn(), settle: vi.fn(), reserve: vi.fn(), jwt: vi.fn(), configurations: [] as Array<Record<string, any>> }));
 vi.mock('@coinbase/cdp-sdk/auth', () => ({ generateJwt: mocks.jwt }));
@@ -86,6 +87,18 @@ describe('Coinbase facilitator settlement boundary', () => {
     expect(mocks.reserve).not.toHaveBeenCalled();
     mocks.reserve.mockResolvedValue({ ok: false, error: 'Payment proof already used' });
     expect((await settleX402Payment(signature(), requirements)).ok).toBe(false);
+    expect(mocks.settle).not.toHaveBeenCalled();
+  });
+  it.each([400, 402])('treats HTTP %s rejected-payment errors as invalid proof, not an outage', async (status) => {
+    mocks.verify.mockRejectedValue(new VerifyError(status, { isValid: false, invalidReason: 'invalid_signature' }));
+    expect(await settleX402Payment(signature(), requirements)).toEqual({ ok: false, error: 'Payment authorization rejected' });
+    expect(mocks.reserve).not.toHaveBeenCalled();
+    expect(mocks.settle).not.toHaveBeenCalled();
+  });
+  it('keeps facilitator authentication failures unavailable without claiming settlement is pending', async () => {
+    mocks.verify.mockRejectedValue(new VerifyError(401, { isValid: false, invalidReason: 'unauthorized' }));
+    expect(await settleX402Payment(signature(), requirements)).toEqual({ ok: false, error: 'Payment service unavailable', unavailable: true });
+    expect(mocks.reserve).not.toHaveBeenCalled();
     expect(mocks.settle).not.toHaveBeenCalled();
   });
   it.each(['amount', 'asset', 'payTo', 'network', 'scheme'] as const)('rejects mismatched %s before calling the facilitator', async (field) => {

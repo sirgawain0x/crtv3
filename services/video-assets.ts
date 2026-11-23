@@ -10,6 +10,11 @@ import {
   requireVideoProviderForUploadsAndAssets,
 } from "@/lib/video-provider";
 import type { CollaboratorFormData } from "@/lib/types/splits";
+import type { WalletAuthArgs } from "@/lib/auth/require-wallet";
+import { resolveVideoProviderId } from "@/lib/video-provider/config";
+import { updateFrameworksVodAccess } from "@/lib/video-provider/frameworks/vod-access";
+import { filterVideoIdentity } from "@/lib/video-provider/identity-filter";
+import { isVideoAssetId } from "@/lib/video-provider/asset-id";
 
 export async function createVideoAsset(
   data: Omit<VideoAsset, "id" | "created_at" | "updated_at">,
@@ -425,11 +430,10 @@ export async function getVideoAssetByPlaybackId(playbackId: string): Promise<Vid
   // Cast supabase to any to resolve issue where missing Database types cause return to be inferred as 'never'
   const result = await executeWithTimeoutAndRetry<VideoAssetPlaybackData>(
     async () => {
-      return await (supabase as any)
+      return await filterVideoIdentity((supabase as any)
         .from('video_assets')
-        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title, story_ip_registered, story_ip_id')
-        .eq('playback_id', playbackId)
-        .maybeSingle();
+        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title, story_ip_registered, story_ip_id'),
+        'playback_id', playbackId).maybeSingle();
     },
     10000, // 10 second timeout
     2 // 2 retries
@@ -439,20 +443,16 @@ export async function getVideoAssetByPlaybackId(playbackId: string): Promise<Vid
 }
 
 export async function getVideoAssetByAssetId(assetId: string) {
-  // Validate UUID format
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-  if (!uuidRegex.test(assetId)) {
-    throw new Error(`Invalid asset ID: ${assetId}. Asset ID must be a valid UUID.`);
+  if (!isVideoAssetId(assetId)) {
+    throw new Error('Invalid video asset ID');
   }
 
   const supabase = await createClient();
 
-  const { data: result, error } = await supabase
+  const { data: result, error } = await filterVideoIdentity(supabase
     .from('video_assets')
-    .select('*')
-    .eq('asset_id', assetId)
-    .maybeSingle(); // Use maybeSingle() instead of single()
+    .select('*'), 'asset_id', assetId)
+    .maybeSingle(); // Ambiguous active/legacy aliases fail instead of choosing a different video.
 
   if (error) {
     throw new Error(`Failed to get video asset by asset ID: ${error.message}`);
@@ -559,11 +559,14 @@ export async function updateVideoAsset(
     splits_address?: string | null;
     creator_metoken_id?: string | null;
     livepeer_attestation_id?: string | null;
-  }
+  },
+  auth?: WalletAuthArgs
 ) {
   // Use service client to bypass RLS
   const supabase = createServiceClient();
 
+  const protectedVod = resolveVideoProviderId() === 'frameworks';
+  if (protectedVod) await updateFrameworksVodAccess(supabase, id, data, auth);
   const updateData: any = {
     updated_at: new Date().toISOString(),
   };
@@ -572,7 +575,7 @@ export async function updateVideoAsset(
   if (data.thumbnailUri !== undefined) {
     updateData.thumbnail_url = data.thumbnailUri;
   }
-  if (data.status !== undefined) {
+  if (!protectedVod && data.status !== undefined) {
     updateData.status = data.status;
   }
   if (data.title !== undefined) {
@@ -599,10 +602,10 @@ export async function updateVideoAsset(
   if (data.metadata_uri !== undefined) {
     updateData.metadata_uri = data.metadata_uri;
   }
-  if (data.requires_metoken !== undefined) {
+  if (!protectedVod && data.requires_metoken !== undefined) {
     updateData.requires_metoken = data.requires_metoken;
   }
-  if (data.metoken_price !== undefined) {
+  if (!protectedVod && data.metoken_price !== undefined) {
     updateData.metoken_price = data.metoken_price;
   }
   if (data.attributes !== undefined) {

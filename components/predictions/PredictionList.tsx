@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import type { UserClaimStatus } from "@/lib/predictions/claim-status";
+import { hasIndexedAnswer, isPredictionResolutionConfirmed } from '@/lib/predictions/resolution-state';
 import {
   formatEth,
   type ListStakeSummary,
@@ -217,7 +218,7 @@ export function PredictionList() {
               ? q.outcomes.split("\n").filter(Boolean)
               : display.outcomes;
           const enrichedDisplay = { ...display, outcomes };
-          const leadingLabel = q.best_answer
+          const leadingLabel = hasIndexedAnswer({ lastBond: q.last_bond, finalizeTs: q.finalize_ts }) && q.best_answer
             ? answerBytesToLabel(q.best_answer, enrichedDisplay)
             : null;
 
@@ -603,17 +604,18 @@ export function PredictionList() {
             Boolean(question.leadingLabel) &&
             Number.isFinite(effectiveFinalizeTs) &&
             effectiveFinalizeTs > now;
-          const claimImpliesResolved = Boolean(claimStatusMap[question.id]);
-          const isResolved =
-            claimImpliesResolved ||
-            (Boolean(question.leadingLabel) &&
-              Number.isFinite(effectiveFinalizeTs) &&
-              effectiveFinalizeTs > 0 &&
-              effectiveFinalizeTs <= now &&
-              !question.is_pending_arbitration);
+          const isResolved = isPredictionResolutionConfirmed({
+            finalizeTs, now,
+            isPendingArbitration: question.is_pending_arbitration,
+            hasAnswer: Boolean(question.leadingLabel),
+            claimStatus: claimStatusMap[question.id],
+          });
+          const needsResultCheck = Boolean(question.leadingLabel) && !isResolved && inferredFinalizeTs > 0 && inferredFinalizeTs <= now;
 
           const statusLabel = isResolved
             ? "Resolved"
+            : needsResultCheck
+              ? "Check result"
             : isFinalizing
               ? "Finalizing"
               : isActive
@@ -657,7 +659,7 @@ export function PredictionList() {
                               </Badge>
                             ) : (
                               <Badge variant="secondary" className="text-xs">
-                                Leading: {question.leadingLabel}
+                                {needsResultCheck ? "Indexed answer:" : "Leading:"} {question.leadingLabel}
                               </Badge>
                             ))}
                           {claimStatusMap[question.id] && (

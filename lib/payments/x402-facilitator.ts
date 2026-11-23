@@ -2,6 +2,7 @@ import { generateJwt } from '@coinbase/cdp-sdk/auth';
 import { HTTPFacilitatorClient } from '@x402/core/server';
 import { decodePaymentSignatureHeader, encodePaymentResponseHeader } from '@x402/core/http';
 import type { PaymentPayload, PaymentRequirements } from '@x402/core/types';
+import { VerifyError } from '@x402/core/types';
 import { keccak256, stringToHex } from 'viem';
 import { consumePaymentReceipt } from '@/lib/middleware/paymentReplayGuard';
 import { CDP_FACILITATOR_URL, X402_NETWORK } from './x402-config';
@@ -62,6 +63,7 @@ export async function settleX402Payment(
     return { ok: false, error: 'Invalid payment signature' };
   }
 
+  let settlementAttempted = false;
   try {
     const facilitator = createX402Facilitator();
     const supported = await facilitator.getSupported();
@@ -85,13 +87,21 @@ export async function settleX402Payment(
     const reserved = await consumePaymentReceipt(reservation, 'x402-authorization');
     if (!reserved.ok) return { ok: false, error: reserved.error, unavailable: reserved.error !== 'Payment proof already used' };
 
+    settlementAttempted = true;
     const settled = await facilitator.settle(payment, requirements);
     if (!settled.success || settled.network !== X402_NETWORK || !/^0x[0-9a-fA-F]{64}$/.test(settled.transaction)) {
       return { ok: false, error: 'Payment settlement not confirmed' };
     }
     return { ok: true, paymentResponse: encodePaymentResponseHeader(settled) };
-  } catch {
+  } catch (error) {
+    // CDP also reports rejected authorizations as HTTP 400/402. The SDK throws
+    // VerifyError for those responses rather than returning isValid: false.
+    if (error instanceof VerifyError && (error.statusCode === 400 || error.statusCode === 402)) {
+      return { ok: false, error: 'Payment authorization rejected' };
+    }
     // Do not expose facilitator credentials, raw signatures or provider errors.
-    return { ok: false, error: 'Payment service unavailable; settlement may be pending', unavailable: true };
+    return { ok: false, error: settlementAttempted
+      ? 'Payment service unavailable; settlement may be pending'
+      : 'Payment service unavailable', unavailable: true };
   }
 }
