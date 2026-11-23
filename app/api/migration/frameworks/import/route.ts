@@ -28,7 +28,7 @@ export async function POST(request:NextRequest){
   if(mode==='inspect-playback'){
    const record=await createImportLedger(createServiceClient()).find(source.assetId);
    if(!record||record.state!=='ready'||record.livepeer_playback_id!==source.playbackId||record.source_sha256!==source.sha256||record.source_bytes!==source.sizeBytes||!record.frameworks_playback_id)return respond({error:'Verified ready import required'},409);
-   return respond({diagnostic:await inspectMigrationPlayback(record.frameworks_playback_id)});
+   return respond({diagnostic:await inspectMigrationPlayback(record.frameworks_playback_id,fetch,record.frameworks_asset_id??undefined)});
   }
   const outcome=await runAssetImport({source,ledger:createImportLedger(createServiceClient()),provider:createFrameworksImportProvider(),
    file:mode==='import'?createStudioImportSource():undefined});
