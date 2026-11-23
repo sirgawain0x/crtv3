@@ -86,6 +86,8 @@ describe("frameworks assets (#406)", () => {
     const [, init] = fetchMock.mock.calls[0] ?? [];
     const body = JSON.parse(String((init as RequestInit).body));
     expect(body.variables.input.artifactHash).toBe("chapter-hash");
+    // StorageArtifact exposes `hash`; VodAsset exposes `artifactHash`.
+    expect(body.query).toContain('artifactHash: hash');
   });
 
   it("create maps createVodUpload for upload pipeline", async () => {

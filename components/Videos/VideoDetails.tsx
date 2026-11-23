@@ -38,6 +38,7 @@ import {
   useSubtitles,
 } from "@/components/Player/Subtitles";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
+import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import {
   livepeerViewMetricsQueryKey,
   type LivepeerViewMetrics,
@@ -212,6 +213,7 @@ export default function VideoDetails({
   tokenId,
 }: VideoDetailsProps) {
   const isVideoAdmin = useIsVideoAdmin();
+  const { getAuthHeaders, getCachedAuthHeaders, isReady: walletAuthReady } = useWalletAuth();
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [sourcesLoading, setSourcesLoading] = useState(true);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
@@ -378,7 +380,7 @@ export default function VideoDetails({
     };
   }, [isConnected, asset?.playbackId, playbackSources, queryClient]);
 
-  const loadPlaybackSources = useCallback(async () => {
+  const loadPlaybackSources = useCallback(async (verifyWallet = false) => {
     if (!asset?.playbackId) {
       setSourcesLoading(false);
       setSourcesError("No playback ID available.");
@@ -391,7 +393,8 @@ export default function VideoDetails({
     setPlaybackSources(null);
 
     try {
-      const sources = await getDetailPlaybackSource(asset.playbackId);
+      const authHeaders = verifyWallet ? await getAuthHeaders() : getCachedAuthHeaders();
+      const sources = await getDetailPlaybackSource(asset.playbackId, { authHeaders: authHeaders ?? undefined });
       if (!sources?.length) {
         setSourcesError("Unable to load playback sources.");
         setPlaybackSources(null);
@@ -404,7 +407,7 @@ export default function VideoDetails({
     } finally {
       setSourcesLoading(false);
     }
-  }, [asset?.playbackId]);
+  }, [asset?.playbackId, getAuthHeaders, getCachedAuthHeaders]);
 
   useEffect(() => {
     const fetchDbStatus = async () => {
@@ -795,6 +798,9 @@ export default function VideoDetails({
               <Button type="button" variant="outline" onClick={() => void loadPlaybackSources()}>
                 Retry
               </Button>
+              {walletAuthReady && <Button type="button" onClick={() => void loadPlaybackSources(true)}>
+                Verify wallet access
+              </Button>}
             </div>
           ) : playbackSources ? (
             <>

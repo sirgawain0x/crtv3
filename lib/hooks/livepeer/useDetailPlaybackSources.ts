@@ -11,6 +11,7 @@ async function sleep(ms: number) {
 async function fetchPlaybackInfo(
   id: string,
   signal?: AbortSignal,
+  authHeaders?: Record<string, string>,
 ): Promise<Response> {
   const internalUrl = `/api/internal/playback-info?playbackId=${id}`;
 
@@ -19,6 +20,7 @@ async function fetchPlaybackInfo(
       signal,
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders,
       },
     });
 
@@ -33,6 +35,7 @@ async function fetchPlaybackInfo(
         signal,
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders,
         },
       });
       if (publicResponse.status !== 429) {
@@ -63,12 +66,12 @@ async function fetchPlaybackInfo(
 
 export const getDetailPlaybackSource = async (
   id: string,
-  opts?: { signal?: AbortSignal }
+  opts?: { signal?: AbortSignal; authHeaders?: Record<string, string> }
 ): Promise<Src[] | null> => {
   try {
     logger.debug("[getDetailPlaybackSource] Fetching for ID:", id);
 
-    const response = await fetchPlaybackInfo(id, opts?.signal);
+    const response = await fetchPlaybackInfo(id, opts?.signal, opts?.authHeaders);
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -99,7 +102,7 @@ export const getDetailPlaybackSource = async (
     });
 
     const src = getSrc(res) as Src[];
-    logger.debug("[getDetailPlaybackSource] Generated sources:", src);
+    // Playback URLs can carry bearer tokens; never log the sources.
 
     // Livepeer may return sources for an idle stream (meta.live === 0). If we
     // hand those to the player, the CDN rejects the session and the UI spins
