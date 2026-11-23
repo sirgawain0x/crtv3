@@ -31,6 +31,10 @@ export function renderAssetCutoverSql(plan:AssetCutoverPlan,direction:'apply'|'r
  if(plan.blockers.length)throw new Error('Resolve creator/payment snapshot exceptions before generating cutover SQL');
  const base=renderAssetRemapSql(plan.identities,direction);
  if(direction==='rollback')return '-- Retain imported access records and reservations during identity rollback.\n'+base;
+ const publishedIds=plan.accessSeeds.filter(seed=>['published','minted'].includes(seed.status)).map(seed=>{
+  if(!Number.isSafeInteger(seed.videoId)||seed.videoId<=0)throw new Error('Invalid published video identity');
+  return seed.videoId;
+ });
  const statements=plan.accessSeeds.map(seed=>{
   if(!Number.isSafeInteger(seed.videoId)||seed.videoId<=0)throw new Error('Invalid video row identity');
   const price=priceSql(seed.price), required=seed.required?'true':'false';const map=seed.mapping;
@@ -40,10 +44,14 @@ export function renderAssetCutoverSql(plan:AssetCutoverPlan,direction:'apply'|'r
   const ready=`EXISTS(SELECT 1 FROM public.frameworks_asset_imports WHERE livepeer_asset_id=${sqlString(map.livepeer_asset_id)}::uuid AND state='ready' AND frameworks_asset_id=${sqlString(seed.assetId)} AND frameworks_playback_id=${sqlString(seed.playbackId)} AND source_sha256=${sqlString(map.source_sha256)} AND source_bytes=${map.source_bytes})`;
   return `WITH source AS (SELECT id FROM public.video_assets WHERE id=${seed.videoId} AND ${expected} AND ${ready} FOR UPDATE), seeded AS (\n INSERT INTO public.frameworks_vod_access(asset_id,playback_id,creator_id,status,requires_metoken,metoken_price)\n SELECT ${sqlString(seed.assetId)},${sqlString(seed.playbackId)},${sqlString(seed.creator)},${sqlString(seed.status)},${required},${price} FROM source\n ON CONFLICT(asset_id) DO NOTHING RETURNING asset_id)\nSELECT 1 / CASE WHEN EXISTS(SELECT 1 FROM source) AND ((SELECT count(*) FROM seeded)=1 OR EXISTS(SELECT 1 FROM public.frameworks_vod_access WHERE ${authority})) THEN 1 ELSE 0 END AS access_guard;`;
  });
+ // A new publication since the snapshot must not be silently left on the retired provider.
+ statements.push(`SELECT 1 / CASE WHEN NOT EXISTS(SELECT 1 FROM public.video_assets WHERE status IN ('published','minted')${publishedIds.length?` AND id NOT IN (${publishedIds.join(',')})`:''}) THEN 1 ELSE 0 END AS published_catalog_guard;`);
  const allowedFields:Record<string,string[]>={metoken_transactions:['playback_id'],hack_beta_submissions:['video_asset_id','playback_id'],shoppable_videos:['livepeer_asset_id','livepeer_playback_id']};
  for(const row of plan.preservedReferences){
   if(!allowedFields[row.table]?.includes(row.field))throw new Error('Invalid preserved reference column');
   statements.push(`SELECT 1 / CASE WHEN EXISTS(SELECT 1 FROM public.${row.table} WHERE id::text=${sqlString(String(row.id))} AND ${row.field} IS NOT DISTINCT FROM ${sqlString(row.value)}) THEN 1 ELSE 0 END AS preserved_reference_guard;`);
  }
- return base.replace(/COMMIT;\n$/,statements.join('\n\n')+'\n\nCOMMIT;\n');
+ return base.replace('SET LOCAL standard_conforming_strings = on;',
+  'SET LOCAL standard_conforming_strings = on;\nLOCK TABLE public.video_assets IN SHARE ROW EXCLUSIVE MODE;')
+  .replace(/COMMIT;\n$/,statements.join('\n\n')+'\n\nCOMMIT;\n');
 }

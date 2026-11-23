@@ -13,6 +13,16 @@ async function fixture(){
  INSERT INTO frameworks_asset_imports VALUES('${id}','ready','new-asset','new-play','${hash}',123);`);return db;
 }
 describe('creator/payment-preserving cutover plan',()=>{
+ it('blocks a publication added after the snapshot and rolls back every identity change',async()=>{
+  const db=await fixture();try{
+   const sql=renderAssetCutoverSql(buildAssetCutoverPlan(input),'apply');
+   expect(sql).toContain('LOCK TABLE public.video_assets IN SHARE ROW EXCLUSIVE MODE');
+   await db.exec("INSERT INTO video_assets(id,asset_id,playback_id,status) VALUES(2,'new-source','new-source-playback','published')");
+   await expect(db.exec(sql)).rejects.toThrow();await db.exec('ROLLBACK');
+   expect((await db.query('SELECT asset_id FROM video_assets WHERE id=1')).rows).toEqual([{asset_id:id}]);
+   expect((await db.query('SELECT count(*)::int AS count FROM frameworks_vod_access')).rows).toEqual([{count:0}]);
+  }finally{await db.close();}
+ },30000);
  it('blocks missing creator or ambiguous payment evidence',()=>{
   for(const change of [{creator_id:'unknown'},{requires_metoken:undefined},{metoken_price:undefined},{metoken_price:-1}]){
    const plan=buildAssetCutoverPlan({...input,videos:[{...video,...change} as AccessVideoSnapshot]});expect(()=>renderAssetCutoverSql(plan,'apply')).toThrow(/creator/);
