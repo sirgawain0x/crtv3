@@ -46,7 +46,7 @@ export async function inspectMigrationPlayback(playbackId:string,fetcher:typeof 
   if(contentType==='application/json'){try{const parsed=JSON.parse(body);if(typeof parsed.code==='string'&&/^[A-Z_]{1,80}$/.test(parsed.code))hop.code=parsed.code;}catch{}}
   // A bounded compatibility probe keeps the same scoped token and protected policy.
   // Some older edges read the viewer credential from jwt rather than fwjwt.
-  if(hop.code==='EDGE_ACCESS_DENIED'&&!alternateTransport&&target.hostname!==initial.hostname&&i<3){
+  if(['EDGE_ACCESS_DENIED','EDGE_SOURCE_ADMISSION_DENIED'].includes(hop.code??'')&&!alternateTransport&&target.hostname!==initial.hostname&&i<3){
    target.searchParams.set('fwjwt',viewerToken);target.searchParams.set('jwt',viewerToken);
    url=target.toString();alternateTransport=true;continue;
   }

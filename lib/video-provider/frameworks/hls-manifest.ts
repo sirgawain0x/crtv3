@@ -5,6 +5,7 @@ export function inspectHlsManifest(body: string) {
   let errorCode: string | undefined;
   if (failed) {
     errorCode = /No HLS compatible tracks found/i.test(body) ? 'NO_HLS_TRACKS'
+      : /CONN_PLAY/i.test(body) ? 'EDGE_SOURCE_ADMISSION_DENIED'
       : /not allowed|rejected|denied/i.test(body) ? 'EDGE_ACCESS_DENIED'
       : /Stream open failed|Could not connect to stream|Stream initialization failed/i.test(body) ? 'STREAM_OPEN_FAILED'
       : /not active|not available/i.test(body) ? 'STREAM_UNAVAILABLE'
