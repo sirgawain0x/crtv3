@@ -50,31 +50,9 @@ function buildStudioRequestUploadBody(
   };
 }
 
-export async function GET(request: NextRequest) {
-  const baseUrl = process.env.LIVEPEER_FULL_API_URL ?? "https://livepeer.studio";
-  const livepeerUrl = `${baseUrl}/api/stream`;
-
-  if (!process.env.LIVEPEER_FULL_API_KEY)
-    return NextResponse.json(
-      { error: "Missing Livepeer API key" },
-      { status: 500 }
-    );
-
-  const response = await fetch(livepeerUrl, {
-    headers: {
-      Authorization: `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok)
-    return NextResponse.json(
-      { error: "Failed to fetch streams", details: await response.text() },
-      { status: response.status }
-    );
-
-  const json = await response.json();
-  return NextResponse.json(json);
+/** Stream credentials are available only through the existing owner-authenticated routes. */
+export async function GET() {
+  return NextResponse.json({error:'Method not allowed'}, {status:405,headers:{Allow:'POST'}});
 }
 
 export async function POST(request: NextRequest) {

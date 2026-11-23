@@ -144,7 +144,7 @@ const LIST_ARTIFACTS = `
       totalCount
       nodes {
         id
-        artifactHash
+        artifactHash: hash
         playbackId
         title
         kind

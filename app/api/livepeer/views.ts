@@ -1,3 +1,4 @@
+import { resolveVideoProviderId } from '@/lib/video-provider/config';
 import { serverLogger } from '@/lib/utils/logger';
 import {
   hasLivepeerErrors,
@@ -316,6 +317,7 @@ async function fetchViewsViaSdk(
 export const fetchAllViews = async (
   playbackId: string,
 ): Promise<FetchAllViewsResult> => {
+  if (resolveVideoProviderId() === 'frameworks') return {ok:false,reason:'not_configured',status:503};
   const token = resolveLivepeerStudioAuthToken();
 
   const sdkResult = token && hasLivepeerPrivateApiKey()

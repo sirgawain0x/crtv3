@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {fetchStudioAssetDownloadTarget} from '@/lib/livepeer/vod-migration/studio-asset-download';
-import {resolveLivepeerStudioAuthToken} from '@/lib/sdk/livepeer/studioAuth';
+import {normalizeEnvSecret} from '@/lib/sdk/livepeer/studioAuth';
 import type {ArchivedSource} from './archive';
 import type {VerifiedImportSource} from './importer';
 const SOURCE_HOST='vod-cdn.lp-playback.studio';
@@ -23,7 +23,9 @@ export function createStudioImportSource(fetchImpl:typeof fetch=fetch,deadline=D
   etag=etag??response.headers.get('etag');return bytes;
  };
  return {read,async verify(source:ArchivedSource){
-  const token=resolveLivepeerStudioAuthToken();if(!token)throw new Error('Existing Studio server credential unavailable');
+  // The isolated, admin-only migration is a one-time source export, not a runtime provider fallback.
+  const token=normalizeEnvSecret(process.env.LIVEPEER_FULL_API_KEY)||normalizeEnvSecret(process.env.LIVEPEER_API_KEY);
+  if(!token)throw new Error('Existing Studio server credential unavailable');
   const target=await fetchStudioAssetDownloadTarget({baseUrl:'https://livepeer.studio',authToken:token,assetId:source.assetId,
    fetchImpl:async(input,init)=>{
     const response=await fetchImpl(input,{...init,cache:'no-store',redirect:'error',signal:signal()});
