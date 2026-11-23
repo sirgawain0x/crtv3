@@ -8,6 +8,7 @@ import {createFrameworksImportProvider} from '@/lib/video-provider/migration/fra
 import {createStudioImportSource} from '@/lib/video-provider/migration/studio-source';
 import {isFrameworksMigrationStaging} from '@/lib/video-provider/migration/staging-runtime';
 import {rateLimiters} from '@/lib/middleware/rateLimit';
+import {inspectMigrationPlayback} from '@/lib/video-provider/migration/inspect-playback';
 export const runtime='nodejs';
 export const maxDuration=300;
 const respond=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -19,11 +20,16 @@ export async function POST(request:NextRequest){
  try{
   const raw=await request.text();if(Buffer.byteLength(raw)>4096)return respond({error:'Source request too large'},413);
   const body=JSON.parse(raw);mode=body.mode;
-  if(!['import','poll'].includes(mode)||!body.source||typeof body.source!=='object')throw new Error();
+  if(!['import','poll','inspect-playback'].includes(mode)||!body.source||typeof body.source!=='object')throw new Error();
   [source]=archivedSourcesFromManifests([{assets:[{...body.source,status:'archived'}]}]);
   if(!source || source.sizeBytes>1024**3)throw new Error();
  }catch{return respond({error:'One verified source up to 1 GiB is required'},400);}
  try{
+  if(mode==='inspect-playback'){
+   const record=await createImportLedger(createServiceClient()).find(source.assetId);
+   if(!record||record.state!=='ready'||record.livepeer_playback_id!==source.playbackId||record.source_sha256!==source.sha256||record.source_bytes!==source.sizeBytes||!record.frameworks_playback_id)return respond({error:'Verified ready import required'},409);
+   return respond({diagnostic:await inspectMigrationPlayback(record.frameworks_playback_id)});
+  }
   const outcome=await runAssetImport({source,ledger:createImportLedger(createServiceClient()),provider:createFrameworksImportProvider(),
    file:mode==='import'?createStudioImportSource():undefined});
   return respond({outcome});

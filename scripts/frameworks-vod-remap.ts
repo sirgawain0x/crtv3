@@ -5,6 +5,7 @@ import {archivedSourcesFromManifests} from '../lib/video-provider/migration/arch
 import {buildAssetCutoverPlan,renderAssetCutoverSql,type AccessVideoSnapshot} from '../lib/video-provider/migration/cutover-plan';
 import type {PreservedReference} from '../lib/video-provider/migration/reference-exceptions';
 import type {ReadyAssetMapping,ReferenceRow} from '../lib/video-provider/migration/remap-plan';
+import {homepageHeroSource} from '../lib/video-provider/migration/system-assets';
 
 async function main(){
  const args=process.argv.slice(2),manifests:string[]=[];let snapshotPath:string|undefined,mappingsPath:string|undefined,output:string|undefined,exceptionsPath:string|undefined;
@@ -19,9 +20,9 @@ async function main(){
  const archive=archivedSourcesFromManifests(await Promise.all(manifests.map(async path=>JSON.parse(await readFile(path,'utf8')))));
  const preserveReferences:PreservedReference[]=exceptionsPath?JSON.parse(await readFile(exceptionsPath,'utf8')):[];
  if(!Array.isArray(preserveReferences))throw new Error('Invalid reference preservation exceptions');
- const plan=buildAssetCutoverPlan({...snapshot,mappings,archive,preserveReferences});
+ const plan=buildAssetCutoverPlan({...snapshot,mappings,archive,preserveReferences,systemAssets:[homepageHeroSource]});
  const summary={mode:'dry-run',videoRows:snapshot.videos.length,verifiedReadyMappings:mappings.length,identityUpdates:plan.identities.patches.length,
-  preservedHistoricalReferences:plan.preservedReferences.length,protectedAccessSeeds:plan.accessSeeds.length,preservedDrafts:plan.identities.preservedDraftIds.length,
+  preservedHistoricalReferences:plan.preservedReferences.length,protectedAccessSeeds:plan.accessSeeds.length,systemAccessSeeds:plan.systemSeeds.length,preservedDrafts:plan.identities.preservedDraftIds.length,
   blockers:plan.identities.blockers.length+plan.blockers.length,unresolvedReferences:plan.identities.unresolvedReferences.length,
   executable:!plan.identities.blockers.length&&!plan.blockers.length&&!plan.identities.unresolvedReferences.length,databaseWrites:0};
  if(output){
