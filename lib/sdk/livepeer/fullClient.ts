@@ -1,10 +1,12 @@
 import { Livepeer } from 'livepeer';
 import { resolveLivepeerStudioAuthToken } from './studioAuth';
+import { resolveVideoProviderId } from '@/lib/video-provider/config';
 
 let cachedClient: Livepeer | null | undefined;
 
 /** Lazily construct the Livepeer SDK client (full key, then LIVEPEER_API_KEY). */
 export function getFullLivepeer(): Livepeer | null {
+  if (resolveVideoProviderId() === 'frameworks') return null;
   if (cachedClient !== undefined) {
     return cachedClient;
   }

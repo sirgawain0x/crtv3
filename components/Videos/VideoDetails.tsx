@@ -394,7 +394,8 @@ export default function VideoDetails({
 
     try {
       const authHeaders = verifyWallet ? await getAuthHeaders() : getCachedAuthHeaders();
-      const sources = await getDetailPlaybackSource(asset.playbackId, { authHeaders: authHeaders ?? undefined });
+      const sources = await getDetailPlaybackSource(asset.playbackId, { authHeaders: authHeaders ?? undefined,
+        companionAddress: user?.address });
       if (!sources?.length) {
         setSourcesError("Unable to load playback sources.");
         setPlaybackSources(null);
@@ -407,7 +408,7 @@ export default function VideoDetails({
     } finally {
       setSourcesLoading(false);
     }
-  }, [asset?.playbackId, getAuthHeaders, getCachedAuthHeaders]);
+  }, [asset?.playbackId, getAuthHeaders, getCachedAuthHeaders, user?.address]);
 
   useEffect(() => {
     const fetchDbStatus = async () => {

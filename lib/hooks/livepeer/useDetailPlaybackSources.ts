@@ -12,8 +12,11 @@ async function fetchPlaybackInfo(
   id: string,
   signal?: AbortSignal,
   authHeaders?: Record<string, string>,
+  companionAddress?: string,
 ): Promise<Response> {
-  const internalUrl = `/api/internal/playback-info?playbackId=${id}`;
+  const query = new URLSearchParams({ playbackId: id });
+  if (companionAddress) query.set('companionAddress', companionAddress);
+  const internalUrl = `/api/internal/playback-info?${query}`;
 
   for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
     const response = await fetch(internalUrl, {
@@ -31,7 +34,7 @@ async function fetchPlaybackInfo(
       logger.warn(
         `[getDetailPlaybackSource] Internal playback-info not found for ${id}; falling back to public route`,
       );
-      const publicResponse = await fetch(`/api/livepeer/playback-info?playbackId=${id}`, {
+      const publicResponse = await fetch(`/api/livepeer/playback-info?${query}`, {
         signal,
         headers: {
           'Content-Type': 'application/json',
@@ -66,12 +69,12 @@ async function fetchPlaybackInfo(
 
 export const getDetailPlaybackSource = async (
   id: string,
-  opts?: { signal?: AbortSignal; authHeaders?: Record<string, string> }
+  opts?: { signal?: AbortSignal; authHeaders?: Record<string, string>; companionAddress?: string }
 ): Promise<Src[] | null> => {
   try {
     logger.debug("[getDetailPlaybackSource] Fetching for ID:", id);
 
-    const response = await fetchPlaybackInfo(id, opts?.signal, opts?.authHeaders);
+    const response = await fetchPlaybackInfo(id, opts?.signal, opts?.authHeaders, opts?.companionAddress);
 
     if (!response.ok) {
       if (response.status === 429) {

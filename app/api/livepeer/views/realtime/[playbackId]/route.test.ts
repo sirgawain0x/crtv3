@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 import { NextRequest } from 'next/server';
+import {getFrameworksViewerCount} from '@/lib/video-provider/frameworks/viewers';
+vi.mock('@/lib/video-provider/frameworks/viewers',()=>({getFrameworksViewerCount:vi.fn()}));
 import {
   livepeerStudioApiBaseUrl,
   resolveLivepeerStudioAuthToken,
@@ -16,6 +18,7 @@ describe('Real-time viewership API route', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it('returns 400 if playbackId is missing', async () => {
@@ -25,6 +28,12 @@ describe('Real-time viewership API route', () => {
     expect(response.status).toBe(400);
     const data = await response.json();
     expect(data.error).toBe('Playback ID is required');
+  });
+  it('uses FrameWorks viewership without a Livepeer network request after cutover',async()=>{
+    vi.stubEnv('VIDEO_PROVIDER','frameworks');vi.mocked(getFrameworksViewerCount).mockResolvedValue(7);
+    const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+    const response=await GET(new NextRequest('https://example.test/api/livepeer/views/realtime/new'),{params:Promise.resolve({playbackId:'new'})});
+    expect(response.status).toBe(200);expect((await response.json()).viewerCount).toBe(7);expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('returns 503 if Livepeer token is not configured', async () => {
