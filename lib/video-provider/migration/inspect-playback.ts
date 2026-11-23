@@ -1,7 +1,10 @@
 import {buildAuthorizedViewerPlayHlsUrl} from '../frameworks/playback';
 /** Bounded staging diagnostic. Never return bearer URLs, manifest contents or raw provider messages. */
 export async function inspectMigrationPlayback(playbackId:string,fetcher:typeof fetch=fetch){
- let url=buildAuthorizedViewerPlayHlsUrl({playbackId,subject:'migration-verification',expiresInSeconds:60});
+ // Match the normal player token lifetime and session query, not only a short server probe.
+ const initial=new URL(buildAuthorizedViewerPlayHlsUrl({playbackId,subject:'anonymous',expiresInSeconds:3600}));
+ initial.searchParams.set('tkn','migrationverification');
+ let url=initial.toString();
  const hops:Array<{status:number;host:string;contentType:string;manifest:boolean;code?:string}>=[];
  for(let i=0;i<4;i++){
   const target=new URL(url);
