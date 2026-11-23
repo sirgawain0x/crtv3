@@ -10,6 +10,9 @@ import {
   requireVideoProviderForUploadsAndAssets,
 } from "@/lib/video-provider";
 import type { CollaboratorFormData } from "@/lib/types/splits";
+import type { WalletAuthArgs } from "@/lib/auth/require-wallet";
+import { resolveVideoProviderId } from "@/lib/video-provider/config";
+import { updateFrameworksVodAccess } from "@/lib/video-provider/frameworks/vod-access";
 import { isVideoAssetId } from "@/lib/video-provider/asset-id";
 
 export async function createVideoAsset(
@@ -557,11 +560,14 @@ export async function updateVideoAsset(
     splits_address?: string | null;
     creator_metoken_id?: string | null;
     livepeer_attestation_id?: string | null;
-  }
+  },
+  auth?: WalletAuthArgs
 ) {
   // Use service client to bypass RLS
   const supabase = createServiceClient();
 
+  const protectedVod = resolveVideoProviderId() === 'frameworks';
+  if (protectedVod) await updateFrameworksVodAccess(supabase, id, data, auth);
   const updateData: any = {
     updated_at: new Date().toISOString(),
   };
@@ -570,7 +576,7 @@ export async function updateVideoAsset(
   if (data.thumbnailUri !== undefined) {
     updateData.thumbnail_url = data.thumbnailUri;
   }
-  if (data.status !== undefined) {
+  if (!protectedVod && data.status !== undefined) {
     updateData.status = data.status;
   }
   if (data.title !== undefined) {
@@ -597,10 +603,10 @@ export async function updateVideoAsset(
   if (data.metadata_uri !== undefined) {
     updateData.metadata_uri = data.metadata_uri;
   }
-  if (data.requires_metoken !== undefined) {
+  if (!protectedVod && data.requires_metoken !== undefined) {
     updateData.requires_metoken = data.requires_metoken;
   }
-  if (data.metoken_price !== undefined) {
+  if (!protectedVod && data.metoken_price !== undefined) {
     updateData.metoken_price = data.metoken_price;
   }
   if (data.attributes !== undefined) {

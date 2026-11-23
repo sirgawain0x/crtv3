@@ -47,10 +47,24 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
     const stream = await getStreamByPlaybackId(playbackId);
     let resource = stream;
     if (!stream && resolveVideoProviderId() === 'frameworks') {
-      const { data, error } = await createServiceClient().from('video_assets')
+      const { data, error } = await createServiceClient().from('frameworks_vod_access')
         .select('creator_id, requires_metoken, metoken_price, status')
         .eq('playback_id', playbackId).maybeSingle();
       if (error) return NextResponse.json({ message: 'Playback authorization unavailable' }, { status: 503 });
+      if (data?.status === 'draft') {
+        try {
+          const viewer = await requireWalletAuth(req);
+          if (viewer.address.toLowerCase() !== data.creator_id?.toLowerCase()) {
+            return NextResponse.json({ message: 'Playback not found' }, { status: 404 });
+          }
+          const token = await signViewerToken(playbackId, viewer.address);
+          return NextResponse.json({ token }, { headers: { 'Cache-Control': 'private, no-store' } });
+        } catch (error) {
+          if (!(error instanceof WalletAuthError)) throw error;
+          return NextResponse.json({ code: 'METOKEN_REQUIRED', connectWallet: true, signingRequired: true,
+            message: 'Verify the creator wallet to preview this upload' }, { status: 403 });
+        }
+      }
       if (!data || !['published', 'minted'].includes(data.status)) {
         return NextResponse.json({ message: 'Playback not found' }, { status: 404 });
       }

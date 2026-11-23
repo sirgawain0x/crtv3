@@ -13,6 +13,10 @@ ALTER TABLE public.streams
   ADD COLUMN IF NOT EXISTS frameworks_stream_id text,
   ADD COLUMN IF NOT EXISTS frameworks_playback_id text;
 
+-- streams has column-level grants so stream_key stays private. Expose only the new public identities.
+GRANT SELECT (provider, livepeer_stream_id, livepeer_playback_id, frameworks_stream_id, frameworks_playback_id)
+  ON public.streams TO anon, authenticated;
+
 CREATE INDEX IF NOT EXISTS video_assets_livepeer_asset_id_idx
   ON public.video_assets (livepeer_asset_id) WHERE livepeer_asset_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS video_assets_livepeer_playback_id_idx

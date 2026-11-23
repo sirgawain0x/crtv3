@@ -2,6 +2,7 @@ import type { AssetSummary } from "../types";
 import { FrameworksGraphqlUnionError } from "../errors";
 import { frameworksGraphqlRequest } from "../frameworks-graphql";
 import { frameworksPlayHlsUrl } from "./constants";
+import { requireVodSigningKeyId, secureFrameworksVod } from "./vod-policy";
 
 type GraphqlUnionMember = {
   __typename: string;
@@ -82,18 +83,6 @@ type CreateVodUploadMutation = {
 
 type CompleteVodUploadMutation = {
   completeVodUpload: {
-    __typename: string;
-    id?: string;
-    artifactHash?: string;
-    playbackId?: string;
-    status?: string;
-    message?: string;
-    field?: string;
-  };
-};
-
-type ImportVodAssetMutation = {
-  importVodAsset: {
     __typename: string;
     id?: string;
     artifactHash?: string;
@@ -211,28 +200,6 @@ const COMPLETE_VOD_UPLOAD = `
       }
       ... on NotFoundError {
         message
-      }
-      ... on AuthError {
-        message
-      }
-    }
-  }
-`;
-
-const IMPORT_VOD_ASSET = `
-  mutation ImportVodAsset($input: ImportVodAssetInput!) {
-    importVodAsset(input: $input) {
-      __typename
-      ... on VodAsset {
-        id
-        artifactHash
-        playbackId
-        status
-        title
-      }
-      ... on ValidationError {
-        message
-        field
       }
       ... on AuthError {
         message
@@ -411,6 +378,7 @@ export const frameworksAssets = {
     if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes <= 0) {
       throw new Error("sizeBytes is required and must be a positive number");
     }
+    requireVodSigningKeyId();
     const data = await frameworksGraphqlRequest<CreateVodUploadMutation>(CREATE_VOD_UPLOAD, {
       input: {
         filename,
@@ -422,11 +390,14 @@ export const frameworksAssets = {
     const uploadResult = data.createVodUpload;
     assertGraphqlUnionSuccess(uploadResult, "VodUploadSession", "createVodUpload");
     const upload = uploadResult;
+    const canonicalId = requireArtifactHash(upload);
+    if (!upload.playbackId) throw new Error("FrameWorks returned no VOD playback ID");
+    await secureFrameworksVod(canonicalId, upload.playbackId);
     const presignedParts = (upload.parts ?? []).map((part) => ({
       partNumber: part.partNumber,
       url: part.presignedUrl,
     }));
-    const assetLookupId = upload.artifactHash ?? upload.artifactId ?? upload.id;
+    const assetLookupId = canonicalId;
     return {
       data: {
         asset: {
@@ -491,32 +462,9 @@ export const frameworksAssets = {
   },
 
   createViaUrl: async (body: unknown): Promise<unknown> => {
-    const payload = body as {
-      url?: string;
-      name?: string;
-      filename?: string;
-      title?: string;
-    };
-    if (!payload.url) throw new Error("url is required");
-    const data = await frameworksGraphqlRequest<ImportVodAssetMutation>(IMPORT_VOD_ASSET, {
-      input: {
-        url: payload.url,
-        filename: payload.filename ?? payload.name,
-        title: payload.title ?? payload.name,
-      },
-    });
-    const result = data.importVodAsset;
-    assertGraphqlUnionSuccess(result, "VodAsset", "importVodAsset");
-    return {
-      data: {
-        asset: {
-          id: requireArtifactHash(result),
-          playbackId: result.playbackId,
-          status: { phase: result.status ?? "processing" },
-          name: payload.name,
-        },
-      },
-    };
+    // URL imports start fetching immediately; they cannot establish access policy before bytes arrive.
+    void body;
+    throw new Error("FrameWorks URL imports are disabled; use protected multipart upload");
   },
 
   delete: async (assetId: string): Promise<void> => {

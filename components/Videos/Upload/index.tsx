@@ -15,6 +15,8 @@ import CreateThumbnailWrapper from "@/components/Videos/Upload/CreateThumbnailWr
 import { CreateDetailsAndUploadSkeleton } from "@/components/Videos/Upload/CreateDetailsAndUploadSkeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { TVideoMetaForm } from "@/components/Videos/Upload/Create-info";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 import { updateVideoAsset } from "@/services/video-assets";
 import { createVideoAsset } from "@/services/video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
@@ -48,6 +50,7 @@ const HookMultiStepForm = () => {
   const { client: smartAccountClient } = useSmartAccountClient({ type: 'MultiOwnerModularAccount' });
 
   const router = useRouter();
+  const { getAuthHeaders } = useWalletAuth();
 
   const {
     formState: { errors },
@@ -301,7 +304,7 @@ const HookMultiStepForm = () => {
               requires_metoken: data.meTokenConfig?.requireMeToken || false,
               metoken_price: data.meTokenConfig?.priceInMeToken || null,
               splits_address: splitsAddress, // Include split address in atomic update
-            });
+            }, walletAuthHeadersToArgs(await getAuthHeaders()));
 
             toast.success("Video uploaded and published successfully!");
 

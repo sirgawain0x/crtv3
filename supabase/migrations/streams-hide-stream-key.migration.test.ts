@@ -88,7 +88,12 @@ describe("20261117234351_streams_hide_stream_key.sql", () => {
   const schemaFiles = listStreamsSchemaMigrationFiles();
   const derivedColumns = parseStreamsColumnsFromMigrations(schemaFiles);
   const grantColumns = parseGrantSelectColumns(migrationSql);
-  const grantSet = new Set(grantColumns);
+  // Later additive migrations must explicitly grant their new public columns; the historical grant stays verbatim.
+  const laterGrants = schemaFiles.filter(name => name > TARGET_MIGRATION).flatMap(name => {
+    const sql = readFileSync(path.join(MIGRATIONS_DIR, name), "utf8");
+    return /GRANT\s+SELECT\s*\([\s\S]*?\)\s+ON\s+public\.streams/i.test(sql) ? parseGrantSelectColumns(sql) : [];
+  });
+  const grantSet = new Set([...grantColumns, ...laterGrants]);
 
   it("documents column-level grant requirement and production apply record", () => {
     expect(migrationSql).toMatch(/new column on public\.streams/i);

@@ -12,7 +12,14 @@ vi.mock('@/lib/auth/require-wallet', () => ({ requireWalletAuth: vi.fn(), Wallet
 vi.mock('@/lib/utils/metoken-access', () => ({ checkMeTokenAccess: vi.fn(), isMeTokenGateActive: (required: boolean, price: number) => required || Number(price) > 0 }));
 vi.mock('@/lib/utils/linked-identity', () => ({ resolveVerifiedViewerAddresses: vi.fn(async address => [address]) }));
 vi.mock('@livepeer/core/crypto', () => ({ signAccessJwt: vi.fn(async () => 'legacy-token') }));
-vi.mock('@/lib/sdk/supabase/service', () => ({ createServiceClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: videoLookup }) }) }) }) }));
+vi.mock('@/lib/sdk/supabase/service', () => ({
+  createServiceClient: () => ({
+    from: (table: string) => {
+      expect(table).toBe('frameworks_vod_access');
+      return { select: () => ({ eq: () => ({ maybeSingle: videoLookup }) }) };
+    },
+  }),
+}));
 import { handleSignJwt } from './sign-jwt-handler';
 const request = () => new NextRequest('https://example.test/api/internal/sign-jwt', { method: 'POST', body: JSON.stringify({ playbackId: 'pb-1' }) });
 const pair = generateKeyPairSync('ec', { namedCurve: 'prime256v1', privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
@@ -60,6 +67,15 @@ describe('provider-aware viewer signing', () => {
     expect((await handleSignJwt(request())).status).toBe(404);
     videoLookup.mockResolvedValue({ data: { ...stream(), status: 'draft' }, error: null });
     expect((await handleSignJwt(request())).status).toBe(404);
+  });
+  it('allows only the registered creator to preview a draft', async () => {
+    vi.mocked(getStreamByPlaybackId).mockResolvedValue(null);
+    videoLookup.mockResolvedValue({ data: { creator_id:'0xviewer', status:'draft', requires_metoken:false }, error:null });
+    const response=await handleSignJwt(request());
+    expect(response.status).toBe(200);
+    expect(jwt.verify((await response.json()).token,pair.publicKey,{audience:'pb-1'})).toMatchObject({sub:'0xviewer'});
+    vi.mocked(requireWalletAuth).mockRejectedValue(new WalletAuthError(401,'Missing wallet auth headers'));
+    expect((await handleSignJwt(request())).status).toBe(403);
   });
   it('checks the published VOD gate before issuing a token', async () => {
     vi.mocked(getStreamByPlaybackId).mockResolvedValue(null);
