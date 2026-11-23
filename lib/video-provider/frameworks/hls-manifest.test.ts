@@ -10,7 +10,8 @@ it.each([
 });
 it.each([
  ['No HLS compatible tracks found','NO_HLS_TRACKS'],
- ['Not allowed to play (CONN_PLAY)','EDGE_ACCESS_DENIED'],
+ ['Not allowed to play (CONN_PLAY)','EDGE_SOURCE_ADMISSION_DENIED'],
+ ['Not allowed to view','EDGE_ACCESS_DENIED'],
  ['Stream open failed','STREAM_OPEN_FAILED'],
  ['Stream not active already, aborting','STREAM_UNAVAILABLE'],
  ['Playback start past end of non-live source','PLAYBACK_RANGE_UNAVAILABLE'],
