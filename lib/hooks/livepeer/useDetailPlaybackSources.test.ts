@@ -1,7 +1,7 @@
 import {afterEach,describe,it,expect,vi} from 'vitest';
 vi.mock('@livepeer/react/external',()=>({getSrc:(info:unknown)=>info}));
 vi.mock('@/lib/utils/logger',()=>({logger:{debug:vi.fn(),info:vi.fn(),warn:vi.fn(),error:vi.fn()}}));
-import {getDetailPlaybackSource} from './useDetailPlaybackSources';
+import {getDetailPlaybackSource,PlaybackAuthorizationError} from './useDetailPlaybackSources';
 afterEach(()=>vi.unstubAllGlobals());
 describe('protected playback source requests',()=>{
  it('forwards proof and the linked-wallet candidate to source authorization',async()=>{
@@ -16,6 +16,6 @@ describe('protected playback source requests',()=>{
  });
  it('does not retry a protected denial through an alternate endpoint',async()=>{
   const fetcher=vi.fn(async()=>new Response(JSON.stringify({code:'METOKEN_REQUIRED'}),{status:403}));vi.stubGlobal('fetch',fetcher);
-  expect(await getDetailPlaybackSource('protected-video')).toBeNull();expect(fetcher).toHaveBeenCalledTimes(1);
+  await expect(getDetailPlaybackSource('protected-video')).rejects.toBeInstanceOf(PlaybackAuthorizationError);expect(fetcher).toHaveBeenCalledTimes(1);
  });
 });

@@ -446,7 +446,11 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
 
         // If Livepeer no longer reports sources, the stream has ended.
         if (status.kind === "live") {
-          const sources = await getDetailPlaybackSource(playbackId, {authHeaders:getCachedAuthHeaders()??undefined,companionAddress:buildCompanionAddress()});
+          const authHeaders=getCachedAuthHeaders();
+          // A short-lived wallet proof is not the lifetime of the issued playback JWT.
+          // Retain authorized playback rather than prompting or declaring the stream offline.
+          if (isGateLikelyActive() && !authHeaders) return;
+          const sources = await getDetailPlaybackSource(playbackId, {authHeaders:authHeaders??undefined,companionAddress:buildCompanionAddress()});
           if (!sources || sources.length === 0) {
             setStatus({ kind: "offline-temporary", attempts: 0 });
           }
@@ -454,7 +458,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
       } catch (err) {
         logger.warn("Stream metadata refresh failed:", err);
       }
-    }, [playbackId, status.kind, getCachedAuthHeaders, buildCompanionAddress]),
+    }, [playbackId, status.kind, getCachedAuthHeaders, buildCompanionAddress, isGateLikelyActive]),
     (status.kind === "live" || status.kind === "metoken-gated") &&
       !streamData?.lens_live_post_id
       ? 15000
@@ -467,14 +471,16 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     useCallback(async () => {
       if (!playbackId) return;
       try {
-        const sources = await getDetailPlaybackSource(playbackId, {authHeaders:getCachedAuthHeaders()??undefined,companionAddress:buildCompanionAddress()});
+        const authHeaders=getCachedAuthHeaders();
+        if (isGateLikelyActive() && !authHeaders) return;
+        const sources = await getDetailPlaybackSource(playbackId, {authHeaders:authHeaders??undefined,companionAddress:buildCompanionAddress()});
         if (!sources || sources.length === 0) {
           setStatus({ kind: "offline-temporary", attempts: 0 });
         }
       } catch (err) {
         logger.warn("Live source health check failed:", err);
       }
-    }, [playbackId, getCachedAuthHeaders, buildCompanionAddress]),
+    }, [playbackId, getCachedAuthHeaders, buildCompanionAddress, isGateLikelyActive]),
     status.kind === "live" ? 15000 : null
   );
 

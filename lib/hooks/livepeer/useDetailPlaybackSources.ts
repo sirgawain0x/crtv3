@@ -3,6 +3,9 @@ import { Src } from "@livepeer/react";
 import { logger } from '@/lib/utils/logger';
 
 const MAX_429_RETRIES = 3;
+export class PlaybackAuthorizationError extends Error {
+  constructor(public status: number) { super('Playback wallet verification required'); this.name='PlaybackAuthorizationError'; }
+}
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -77,6 +80,7 @@ export const getDetailPlaybackSource = async (
     const response = await fetchPlaybackInfo(id, opts?.signal, opts?.authHeaders, opts?.companionAddress);
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) throw new PlaybackAuthorizationError(response.status);
       if (response.status === 429) {
         logger.warn(
           "[getDetailPlaybackSource] Rate limit persisted for ID:",
@@ -129,6 +133,7 @@ export const getDetailPlaybackSource = async (
     }
     return src;
   } catch (error) {
+    if (error instanceof PlaybackAuthorizationError) throw error;
     const isAbortError =
       error instanceof DOMException && error.name === 'AbortError' ||
       (error instanceof Error && (
