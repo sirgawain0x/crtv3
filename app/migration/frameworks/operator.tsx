@@ -1,11 +1,12 @@
 'use client';
 import {useState} from 'react';
-import {useWalletAuth} from '@/lib/auth/useWalletAuth';
-import {isPlatformAdmin} from '@/lib/access/platform-admin';
+import {usePlatformAdmin} from '@/lib/hooks/admin/usePlatformAdmin';
+import {usePlatformAdminWalletAuth} from '@/lib/hooks/admin/usePlatformAdminWalletAuth';
 import {archivedSourcesFromManifests} from '@/lib/video-provider/migration/archive';
 import type {ImportOutcome} from '@/lib/video-provider/migration/importer';
 export default function MigrationOperator(){
- const {address,getAuthHeaders,isReady}=useWalletAuth();const [metadata,setMetadata]=useState('');
+ const {adminAuthAddress,isAdmin}=usePlatformAdmin();
+ const {getAuthHeaders,isReady}=usePlatformAdminWalletAuth(adminAuthAddress);const [metadata,setMetadata]=useState('');
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[outcome,setOutcome]=useState<ImportOutcome|null>(null);
  async function run(mode:'import'|'poll'){
   setBusy(true);setMessage('');
@@ -17,7 +18,7 @@ export default function MigrationOperator(){
    setOutcome(result.outcome);setMessage(result.outcome.state==='ready'?'Verified import ready.':'Request finished. Poll an existing processing import; do not recreate uncertain imports.');
   }catch(error){setMessage(error instanceof Error?error.message:'Migration request failed');}finally{setBusy(false);}
  }
- if(!isPlatformAdmin(address))return <main className="mx-auto max-w-2xl p-8"><h1>Staging video migration</h1><p>Sign in with the platform admin wallet to continue.</p></main>;
+ if(!isAdmin)return <main className="mx-auto max-w-2xl p-8"><h1>Staging video migration</h1><p>Sign in with the platform admin wallet to continue.</p></main>;
  return <main className="mx-auto max-w-2xl space-y-4 p-8"><h1 className="text-2xl font-bold">Staging video migration</h1>
   <p>Import one archived source into isolated QA. Existing server credentials stay on the server. This action cannot change production.</p>
   <label htmlFor="archive-source" className="block">Verified archive source metadata</label>
