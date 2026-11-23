@@ -55,3 +55,12 @@ The durable migration and a hosted-schema thumbnail fix are applied to isolated 
 Discover and prediction resolution accepts canonical opaque IDs and preserved legacy IDs while retaining the stable video row PK. UUIDs normalize to lowercase; opaque IDs retain case; filter-injection characters are rejected. Old VOD playback links resolve only through ready import mappings, then use the canonical playback URL and JWT audience. Storage failures/ambiguous aliases fail closed. Production Livepeer paths do not reference the additive alias columns.
 
 The expanded full suite passes 1,258 tests across 231 files, and TypeScript passes. The earlier access/import checkpoint passed hosted checks. The latest webhook/alias checkpoint needs fresh hosted checks after push. Remaining release gates include protected playback authority for imported assets, clips and recordings; real staging sign-in/wallet/stream/upload/playback verification; the actual source imports and reviewed remap/backup; and the final production cutover.
+
+
+## Reviewed access seeding in the cutover plan
+
+A separate cutover planner now combines the identity remap and authoritative VOD access seeding in one transaction. It preserves the source snapshot's creator, publication status, MeToken requirement and exact numeric price. Missing/invalid ownership or payment evidence blocks SQL generation. An owner/gate change after the snapshot or a conflicting existing access record rolls back the entire remap rather than relaxing playback. Apply/reapply/rollback execution tests pass, and rollback retains new access records and import reservations while preserving newer metadata.
+
+`npm run frameworks:vod-remap -- --snapshot /private/path/snapshot.json --mappings /private/path/ready-mappings.json --manifest /private/path/manifest.json --manifest /private/path/delta.json` produces a count-only dry-run summary. It makes no database requests or writes. `--output NEW_PRIVATE_DIRECTORY` writes a private review plan and emits apply/rollback SQL only when every coverage/reference/creator/payment gate passes. The source production snapshot export is pending explicit permission after automatic approval review rejected exporting creator wallet/payment metadata under general migration authorization. No workaround or alternative export was used.
+
+The complete access-seeding checkpoint passes 1,262 tests across 232 files and TypeScript. No source import, production schema apply or production ID remap has occurred.

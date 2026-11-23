@@ -122,6 +122,7 @@ export function renderAssetRemapSql(plan: RemapPlan, direction: 'apply' | 'rollb
     const id=`id=${literal(patch.id)}`;
     const expectedTime=direction==='apply' && patch.expectedUpdatedAt ? ` AND updated_at=${literal(patch.expectedUpdatedAt)}::timestamptz` : '';
     const map = patch.mapping;
+    if (map && (!Number.isSafeInteger(map.source_bytes) || map.source_bytes <= 0)) throw new Error("Invalid mapping source size");
     const mappingGuard=map && direction==='apply' ? ` AND EXISTS (SELECT 1 FROM public.frameworks_asset_imports WHERE livepeer_asset_id=${literal(map.livepeer_asset_id)}::uuid AND state='ready' AND frameworks_asset_id=${literal(map.frameworks_asset_id)} AND frameworks_playback_id=${literal(map.frameworks_playback_id)} AND source_sha256=${literal(map.source_sha256)} AND source_bytes=${map.source_bytes})` : '';
     statements.push(`WITH changed AS (UPDATE public.${patch.table} SET ${assignments} WHERE ${id} AND ${condition(patch.table,before)}${expectedTime}${mappingGuard} RETURNING id)\nSELECT 1 / CASE WHEN (SELECT count(*) FROM changed)=1 OR EXISTS (SELECT 1 FROM public.${patch.table} WHERE ${id} AND ${condition(patch.table,after)}${mappingGuard}) THEN 1 ELSE 0 END AS identity_guard;`);
   }
