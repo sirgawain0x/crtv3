@@ -3,22 +3,25 @@ import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {archivedSourcesFromManifests} from '../lib/video-provider/migration/archive';
 import {buildAssetCutoverPlan,renderAssetCutoverSql,type AccessVideoSnapshot} from '../lib/video-provider/migration/cutover-plan';
+import type {PreservedReference} from '../lib/video-provider/migration/reference-exceptions';
 import type {ReadyAssetMapping,ReferenceRow} from '../lib/video-provider/migration/remap-plan';
 
 async function main(){
- const args=process.argv.slice(2),manifests:string[]=[];let snapshotPath:string|undefined,mappingsPath:string|undefined,output:string|undefined;
+ const args=process.argv.slice(2),manifests:string[]=[];let snapshotPath:string|undefined,mappingsPath:string|undefined,output:string|undefined,exceptionsPath:string|undefined;
  for(let i=0;i<args.length;i++){
   const value=()=>{const v=args[++i];if(!v||v.startsWith('--'))throw new Error('Missing command option value');return v;};
-  switch(args[i]){case '--manifest':manifests.push(value());break;case '--snapshot':snapshotPath=value();break;case '--mappings':mappingsPath=value();break;case '--output':output=value();break;default:throw new Error('Use --snapshot PATH --mappings PATH --manifest PATH [--manifest PATH] [--output NEW_PRIVATE_DIRECTORY]');}
+  switch(args[i]){case '--manifest':manifests.push(value());break;case '--snapshot':snapshotPath=value();break;case '--mappings':mappingsPath=value();break;case '--output':output=value();break;case '--preserve-references':exceptionsPath=value();break;default:throw new Error('Use --snapshot PATH --mappings PATH --manifest PATH [--manifest PATH] [--output NEW_PRIVATE_DIRECTORY]');}
  }
  if(!snapshotPath||!mappingsPath||!manifests.length)throw new Error('Snapshot, ready mappings and archive manifests are required');
  const snapshot=JSON.parse(await readFile(snapshotPath,'utf8')) as {videos:AccessVideoSnapshot[];references:ReferenceRow[]};
  const mappings=JSON.parse(await readFile(mappingsPath,'utf8')) as ReadyAssetMapping[];
  if(!Array.isArray(snapshot.videos)||!Array.isArray(snapshot.references)||!Array.isArray(mappings))throw new Error('Invalid migration snapshot or mapping collection');
  const archive=archivedSourcesFromManifests(await Promise.all(manifests.map(async path=>JSON.parse(await readFile(path,'utf8')))));
- const plan=buildAssetCutoverPlan({...snapshot,mappings,archive});
+ const preserveReferences:PreservedReference[]=exceptionsPath?JSON.parse(await readFile(exceptionsPath,'utf8')):[];
+ if(!Array.isArray(preserveReferences))throw new Error('Invalid reference preservation exceptions');
+ const plan=buildAssetCutoverPlan({...snapshot,mappings,archive,preserveReferences});
  const summary={mode:'dry-run',videoRows:snapshot.videos.length,verifiedReadyMappings:mappings.length,identityUpdates:plan.identities.patches.length,
-  protectedAccessSeeds:plan.accessSeeds.length,preservedDrafts:plan.identities.preservedDraftIds.length,
+  preservedHistoricalReferences:plan.preservedReferences.length,protectedAccessSeeds:plan.accessSeeds.length,preservedDrafts:plan.identities.preservedDraftIds.length,
   blockers:plan.identities.blockers.length+plan.blockers.length,unresolvedReferences:plan.identities.unresolvedReferences.length,
   executable:!plan.identities.blockers.length&&!plan.blockers.length&&!plan.identities.unresolvedReferences.length,databaseWrites:0};
  if(output){
