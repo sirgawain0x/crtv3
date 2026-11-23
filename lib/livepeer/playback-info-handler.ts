@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveFrameworksPlaybackAlias } from '@/lib/video-provider/frameworks/playback-alias';
 import { getVideoProvider } from '@/lib/video-provider';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
@@ -42,7 +43,12 @@ export async function handlePlaybackInfo(request: NextRequest): Promise<NextResp
       );
     }
 
-    const response = await provider.playback.get(playbackId);
+    let canonicalPlaybackId = playbackId;
+    if (provider.id === 'frameworks') {
+      try { canonicalPlaybackId = await resolveFrameworksPlaybackAlias(playbackId); }
+      catch { return NextResponse.json({ error: 'Playback lookup unavailable' }, { status: 503 }); }
+    }
+    const response = await provider.playback.get(canonicalPlaybackId);
 
     if (response.error) {
       return NextResponse.json(

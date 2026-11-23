@@ -13,6 +13,7 @@ import { resolveVerifiedViewerAddresses } from "@/lib/utils/linked-identity";
 import { serverLogger } from '@/lib/utils/logger';
 import { resolveVideoProviderId } from '@/lib/video-provider/config';
 import { signAuthorizedFrameworksPlaybackToken } from '@/lib/video-provider/frameworks/playback';
+import { resolveFrameworksPlaybackAlias } from '@/lib/video-provider/frameworks/playback-alias';
 import { createServiceClient } from '@/lib/sdk/supabase/service';
 
 async function signViewerToken(playbackId: string, subject: string): Promise<string> {
@@ -44,12 +45,17 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
     if (typeof playbackId !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(playbackId)) {
       return NextResponse.json({ message: 'Invalid playbackId' }, { status: 400 });
     }
-    const stream = await getStreamByPlaybackId(playbackId);
+    let authorizedPlaybackId = playbackId;
+    if (resolveVideoProviderId() === 'frameworks') {
+      try { authorizedPlaybackId = await resolveFrameworksPlaybackAlias(playbackId); }
+      catch { return NextResponse.json({ message: 'Playback authorization unavailable' }, { status: 503 }); }
+    }
+    const stream = await getStreamByPlaybackId(authorizedPlaybackId);
     let resource = stream;
     if (!stream && resolveVideoProviderId() === 'frameworks') {
       const { data, error } = await createServiceClient().from('frameworks_vod_access')
         .select('creator_id, requires_metoken, metoken_price, status')
-        .eq('playback_id', playbackId).maybeSingle();
+        .eq('playback_id', authorizedPlaybackId).maybeSingle();
       if (error) return NextResponse.json({ message: 'Playback authorization unavailable' }, { status: 503 });
       if (data?.status === 'draft') {
         try {
@@ -57,7 +63,7 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
           if (viewer.address.toLowerCase() !== data.creator_id?.toLowerCase()) {
             return NextResponse.json({ message: 'Playback not found' }, { status: 404 });
           }
-          const token = await signViewerToken(playbackId, viewer.address);
+          const token = await signViewerToken(authorizedPlaybackId, viewer.address);
           return NextResponse.json({ token }, { headers: { 'Cache-Control': 'private, no-store' } });
         } catch (error) {
           if (!(error instanceof WalletAuthError)) throw error;
@@ -75,7 +81,7 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
       !resource ||
       !isMeTokenGateActive(resource.requires_metoken, resource.metoken_price)
     ) {
-      const token = await signViewerToken(playbackId, "anonymous");
+      const token = await signViewerToken(authorizedPlaybackId, "anonymous");
 
       return NextResponse.json({ token }, { headers: { 'Cache-Control': 'private, no-store' } });
     }
@@ -150,7 +156,7 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const token = await signViewerToken(playbackId, verifiedViewerAddress);
+    const token = await signViewerToken(authorizedPlaybackId, verifiedViewerAddress);
 
     return NextResponse.json({ token }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {

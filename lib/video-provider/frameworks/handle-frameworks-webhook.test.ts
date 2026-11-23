@@ -1,189 +1,42 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { handleFrameworksWebhookEvent } from "./handle-frameworks-webhook";
-import { FrameworksWebhookRetryableError } from "./webhook-errors";
-import { resetFrameworksWebhookDedupeForTests } from "./webhook-dedupe";
-
-vi.mock("@/services/streams", () => ({
-  markStreamLiveByStreamId: vi.fn(),
-  markStreamOfflineByStreamId: vi.fn(),
-}));
-
-vi.mock("@/services/livestream-recordings", () => ({
-  persistRecordingAsset: vi.fn(),
-  finalizeStreamRecordings: vi.fn(),
-}));
-
-vi.mock("../index", () => ({
-  getVideoProvider: vi.fn(),
-}));
-
-import { getVideoProvider } from "../index";
-import { persistRecordingAsset } from "@/services/livestream-recordings";
-import {
-  markStreamLiveByStreamId,
-  markStreamOfflineByStreamId,
-} from "@/services/streams";
-
-describe("handleFrameworksWebhookEvent", () => {
-  const getSessions = vi.fn();
-
-  beforeEach(() => {
-    resetFrameworksWebhookDedupeForTests();
-    vi.clearAllMocks();
-    vi.mocked(getVideoProvider).mockReturnValue({
-      streams: { getSessions },
-      assets: { get: vi.fn() },
-    } as never);
-  });
-
-  afterEach(() => {
-    resetFrameworksWebhookDedupeForTests();
-  });
-
-  it("maps stream.live to markStreamLiveByStreamId", async () => {
-    const result = await handleFrameworksWebhookEvent({
-      id: "evt-live",
-      type: "stream.live",
-      data: { streamId: "stream-1" },
-    });
-
-    expect(result).toBe("processed");
-    expect(markStreamLiveByStreamId).toHaveBeenCalledWith("stream-1");
-  });
-
-  it("stream.idle marks offline only and does not scan sessions", async () => {
-    const result = await handleFrameworksWebhookEvent({
-      id: "evt-idle",
-      type: "stream.idle",
-      data: { streamId: "stream-2" },
-    });
-
-    expect(result).toBe("processed");
-    expect(markStreamOfflineByStreamId).toHaveBeenCalledWith("stream-2");
-    expect(getSessions).not.toHaveBeenCalled();
-  });
-
-  it.each([true, false])("normalizes a recording's raw parent stream UUID (explicit=%s)", async (explicit) => {
-    const uuid = "12345678-abcd-4abc-8def-123456789abc";
-    const asset = {
-      id: "artifact-hash",
-      playbackId: "playback-local",
-      status: { phase: "ready" },
-      source: { type: "recording", streamId: uuid },
-    };
-    vi.mocked(getVideoProvider).mockReturnValue({
-      assets: { get: vi.fn().mockResolvedValue(asset) },
-    } as never);
-    await handleFrameworksWebhookEvent({
-      id: "evt-recording-uuid",
-      type: "recording.ready",
-      data: { artifact: { artifactId: "artifact-hash" }, ...(explicit ? { streamId: uuid } : {}) },
-    });
-    expect(persistRecordingAsset).toHaveBeenCalledWith(asset, {
-      streamId: Buffer.from(`Stream:${uuid}`).toString("base64"),
-    });
-  });
-
-  it("deduplicates on event id after successful handling", async () => {
-    const event = { id: "evt-dup", type: "webhook.test", data: {} };
-    expect(await handleFrameworksWebhookEvent(event)).toBe("ignored");
-    expect(await handleFrameworksWebhookEvent(event)).toBe("duplicate");
-  });
-
-  it("does not dedupe when the handler throws so a retry can run", async () => {
-    vi.mocked(markStreamLiveByStreamId).mockRejectedValueOnce(new Error("db down"));
-
-    await expect(
-      handleFrameworksWebhookEvent({
-        id: "evt-retry",
-        type: "stream.live",
-        data: { streamId: "stream-9" },
-      }),
-    ).rejects.toThrow("db down");
-
-    vi.mocked(markStreamLiveByStreamId).mockResolvedValueOnce(undefined);
-
-    const retry = await handleFrameworksWebhookEvent({
-      id: "evt-retry",
-      type: "stream.live",
-      data: { streamId: "stream-9" },
-    });
-    expect(retry).toBe("processed");
-  });
-
-  it("resolves recording.ready via artifactHash lookup and persists hash as asset id", async () => {
-    const artifactHash = "0xrecordinghash9999";
-    const assetsGet = vi.fn().mockResolvedValue({
-      id: artifactHash,
-      playbackId: "pb-1",
-      status: { phase: "ready" },
-      source: { type: "recording", streamId: "stream-3" },
-    });
-    vi.mocked(getVideoProvider).mockReturnValue({
-      streams: { getSessions },
-      assets: { get: assetsGet },
-    } as never);
-
-    await handleFrameworksWebhookEvent({
-      id: "evt-rec",
-      type: "recording.ready",
-      data: {
-        artifact: {
-          artifactHash,
-          artifactId: "chapter-internal-id",
-          playbackId: "",
-        },
-        streamId: "stream-3",
-      },
-    });
-
-    expect(assetsGet).toHaveBeenCalledWith(artifactHash);
-    expect(persistRecordingAsset).toHaveBeenCalledWith(
-      expect.objectContaining({ id: artifactHash, playbackId: "pb-1" }),
-      { streamId: "stream-3" },
-    );
-  });
-
-  it("recording.ready throws retryable error when lookup misses and is not marked processed", async () => {
-    vi.mocked(getVideoProvider).mockReturnValue({
-      streams: { getSessions },
-      assets: {
-        get: vi.fn().mockResolvedValue(null),
-      },
-    } as never);
-
-    await expect(
-      handleFrameworksWebhookEvent({
-        id: "evt-miss",
-        type: "recording.ready",
-        data: {
-          artifact: { artifactId: "missing-art", playbackId: "" },
-          streamId: "stream-5",
-        },
-      }),
-    ).rejects.toBeInstanceOf(FrameworksWebhookRetryableError);
-
-    vi.mocked(getVideoProvider).mockReturnValue({
-      streams: { getSessions },
-      assets: {
-        get: vi.fn().mockResolvedValue({
-          id: "chapter-2",
-          playbackId: "pb-2",
-          status: { phase: "ready" },
-          source: { type: "recording", streamId: "stream-5" },
-        }),
-      },
-    } as never);
-
-    const retry = await handleFrameworksWebhookEvent({
-      id: "evt-miss",
-      type: "recording.ready",
-      data: {
-        artifact: { artifactId: "missing-art", playbackId: "" },
-        streamId: "stream-5",
-      },
-    });
-    expect(retry).toBe("processed");
-    expect(persistRecordingAsset).toHaveBeenCalled();
-  });
+import {beforeEach,describe,expect,it,vi} from 'vitest';
+const {get,commit}=vi.hoisted(()=>({get:vi.fn(),commit:vi.fn()}));
+vi.mock('../index',()=>({getVideoProvider:()=>({assets:{get}})}));
+vi.mock('./webhook-store',()=>({commitFrameworksWebhook:commit}));
+import {handleFrameworksWebhookEvent,type FrameworksWebhookEvent} from './handle-frameworks-webhook';
+const event=(type:string,data:Record<string,unknown>={}):FrameworksWebhookEvent=>({id:'evt',type,created_at:'2026-11-23T10:00:00Z',data});
+const asset={id:'hash',playbackId:'play',status:{phase:'ready'},source:{type:'recording',streamId:'parent'},videoSpec:{duration:12}};
+beforeEach(()=>{vi.clearAllMocks();commit.mockResolvedValue('processed');get.mockResolvedValue(asset);});
+describe('durable FrameWorks event dispatch',()=>{
+ it.each(['stream.live','stream.idle'])('normalizes %s parent IDs and delegates atomic persistence',async(type)=>{
+  const uuid='12345678-abcd-4abc-8def-123456789abc';
+  expect(await handleFrameworksWebhookEvent(event(type,{streamId:uuid}))).toBe('processed');
+  expect(commit).toHaveBeenCalledWith(expect.objectContaining({streamId:Buffer.from(`Stream:${uuid}`).toString('base64'),payloadSha256:expect.stringMatching(/^[a-f0-9]{64}$/)}));expect(get).not.toHaveBeenCalled();
+ });
+ it('lets the durable store decide duplicates across instances',async()=>{
+  commit.mockResolvedValueOnce('processed').mockResolvedValueOnce('duplicate');const input=event('stream.live',{streamId:'parent'});
+  expect(await handleFrameworksWebhookEvent(input)).toBe('processed');expect(await handleFrameworksWebhookEvent(input)).toBe('duplicate');expect(commit).toHaveBeenCalledTimes(2);
+ });
+ it('records verified canonical recording data, excluding event-supplied owner and URLs',async()=>{
+  await handleFrameworksWebhookEvent(event('recording.ready',{artifact:{artifactId:'hash'},creator:'attacker',url:'https://private.example'}));
+  expect(commit).toHaveBeenCalledWith(expect.objectContaining({streamId:'parent',artifact:{assetId:'hash',playbackId:'play',durationSeconds:12}}));
+  expect(JSON.stringify(commit.mock.calls[0])).not.toContain('attacker');
+ });
+ it.each(['upload.ready','clip.ready'])('stores %s readiness without inventing ownership or publishing',async(type)=>{
+  get.mockResolvedValue({...asset,source:{type:'vod'}});await handleFrameworksWebhookEvent(event(type,{artifact:{artifactHash:'hash'}}));expect(commit).toHaveBeenCalled();
+ });
+ it('does not consume a receipt when provider lookup fails, so a retry can run',async()=>{
+  get.mockResolvedValueOnce(null);const input=event('recording.ready',{artifact:{artifactId:'hash'}});
+  await expect(handleFrameworksWebhookEvent(input)).rejects.toThrow(/not available/);expect(commit).not.toHaveBeenCalled();
+  await handleFrameworksWebhookEvent(input);expect(commit).toHaveBeenCalledTimes(1);
+ });
+ it.each([undefined,{...asset,status:{phase:'processing'}},{...asset,id:'other'},{...asset,source:{type:'vod'}},{...asset,source:{type:'recording',streamId:'other'}}])('rejects unverified recording data',async(value)=>{
+  get.mockResolvedValue(value);await expect(handleFrameworksWebhookEvent(event('recording.ready',{artifact:{artifactHash:'hash'},streamId:'parent'}))).rejects.toThrow();expect(commit).not.toHaveBeenCalled();
+ });
+ it('rejects business events without source time or required IDs',async()=>{
+  await expect(handleFrameworksWebhookEvent({...event('stream.live',{streamId:'parent'}),created_at:undefined})).rejects.toThrow(/timestamp/);
+  await expect(handleFrameworksWebhookEvent(event('stream.live'))).rejects.toThrow(/stream ID/);expect(commit).not.toHaveBeenCalled();
+ });
+ it('accepts signed test probes without provider or database work',async()=>{
+  expect(await handleFrameworksWebhookEvent(event('webhook.test'))).toBe('ignored');expect(get).not.toHaveBeenCalled();expect(commit).not.toHaveBeenCalled();
+ });
 });

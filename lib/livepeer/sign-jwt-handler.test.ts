@@ -7,6 +7,8 @@ import { requireWalletAuth, WalletAuthError } from '@/lib/auth/require-wallet';
 import { checkMeTokenAccess } from '@/lib/utils/metoken-access';
 import { signAccessJwt } from '@livepeer/core/crypto';
 const { videoLookup } = vi.hoisted(() => ({ videoLookup: vi.fn() }));
+vi.mock('@/lib/video-provider/frameworks/playback-alias', () => ({ resolveFrameworksPlaybackAlias: vi.fn(async id => id) }));
+import { resolveFrameworksPlaybackAlias } from '@/lib/video-provider/frameworks/playback-alias';
 vi.mock('@/services/streams', () => ({ getStreamByPlaybackId: vi.fn() }));
 vi.mock('@/lib/auth/require-wallet', () => ({ requireWalletAuth: vi.fn(), WalletAuthError: class extends Error { constructor(public status: number, message: string) { super(message); } } }));
 vi.mock('@/lib/utils/metoken-access', () => ({ checkMeTokenAccess: vi.fn(), isMeTokenGateActive: (required: boolean, price: number) => required || Number(price) > 0 }));
@@ -27,6 +29,7 @@ const stream = (required = false) => ({ creator_id: '0xcreator', requires_metoke
 describe('provider-aware viewer signing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resolveFrameworksPlaybackAlias).mockImplementation(async id => id);
     vi.stubEnv('VIDEO_PROVIDER', 'frameworks');
     vi.stubEnv('FRAMEWORKS_SIGNING_PRIVATE_KEY', pair.privateKey);
     vi.stubEnv('FRAMEWORKS_SIGNING_KID', 'test-key');
@@ -87,6 +90,13 @@ describe('provider-aware viewer signing', () => {
     vi.mocked(getStreamByPlaybackId).mockResolvedValue(null);
     videoLookup.mockResolvedValue({ data: null, error: { message: 'offline' } });
     expect((await handleSignJwt(request())).status).toBe(503);
+  });
+  it('authorizes and signs the canonical audience when an old embed playback ID is used', async () => {
+    vi.mocked(resolveFrameworksPlaybackAlias).mockResolvedValue('new-playback');
+    const response=await handleSignJwt(request());
+    expect(response.status).toBe(200);
+    expect(jwt.verify((await response.json()).token,pair.publicKey,{audience:'new-playback'})).toMatchObject({aud:'new-playback'});
+    expect(getStreamByPlaybackId).toHaveBeenCalledWith('new-playback');
   });
   it('keeps the selected Livepeer signing path', async () => {
     vi.stubEnv('VIDEO_PROVIDER', 'livepeer');

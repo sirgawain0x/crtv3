@@ -3,6 +3,7 @@ import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
+import { normalizeVideoIdentity } from "@/lib/video-provider/identity-filter";
 import { getVideoPredictionLinks } from "@/lib/predictions/video-prediction-links";
 
 /**
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
   }
 
   return withPlatformApiPaymentHeaders(NextResponse.json({
-    videoAssetId: videoAssetId.trim().toLowerCase(),
+    videoAssetId: normalizeVideoIdentity(videoAssetId),
     predictions: result.predictions,
   }), access);
 }

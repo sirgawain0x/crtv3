@@ -13,6 +13,7 @@ import type { CollaboratorFormData } from "@/lib/types/splits";
 import type { WalletAuthArgs } from "@/lib/auth/require-wallet";
 import { resolveVideoProviderId } from "@/lib/video-provider/config";
 import { updateFrameworksVodAccess } from "@/lib/video-provider/frameworks/vod-access";
+import { filterVideoIdentity } from "@/lib/video-provider/identity-filter";
 import { isVideoAssetId } from "@/lib/video-provider/asset-id";
 
 export async function createVideoAsset(
@@ -429,11 +430,10 @@ export async function getVideoAssetByPlaybackId(playbackId: string): Promise<Vid
   // Cast supabase to any to resolve issue where missing Database types cause return to be inferred as 'never'
   const result = await executeWithTimeoutAndRetry<VideoAssetPlaybackData>(
     async () => {
-      return await (supabase as any)
+      return await filterVideoIdentity((supabase as any)
         .from('video_assets')
-        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title, story_ip_registered, story_ip_id')
-        .eq('playback_id', playbackId)
-        .maybeSingle();
+        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title, story_ip_registered, story_ip_id'),
+        'playback_id', playbackId).maybeSingle();
     },
     10000, // 10 second timeout
     2 // 2 retries
@@ -449,11 +449,10 @@ export async function getVideoAssetByAssetId(assetId: string) {
 
   const supabase = await createClient();
 
-  const { data: result, error } = await supabase
+  const { data: result, error } = await filterVideoIdentity(supabase
     .from('video_assets')
-    .select('*')
-    .eq('asset_id', assetId)
-    .maybeSingle(); // Use maybeSingle() instead of single()
+    .select('*'), 'asset_id', assetId)
+    .maybeSingle(); // Ambiguous active/legacy aliases fail instead of choosing a different video.
 
   if (error) {
     throw new Error(`Failed to get video asset by asset ID: ${error.message}`);

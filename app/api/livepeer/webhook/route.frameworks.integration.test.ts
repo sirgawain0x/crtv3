@@ -2,7 +2,8 @@ import { createHmac, randomBytes } from "node:crypto";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
-import { resetFrameworksWebhookDedupeForTests } from "@/lib/video-provider/frameworks/webhook-dedupe";
+import { commitFrameworksWebhook } from "@/lib/video-provider/frameworks/webhook-store";
+vi.mock("@/lib/video-provider/frameworks/webhook-store", () => ({commitFrameworksWebhook: vi.fn()}));
 import { getVideoProvider } from "@/lib/video-provider";
 import {
   markStreamLiveByStreamId,
@@ -10,7 +11,7 @@ import {
 } from "@/services/streams";
 import { persistRecordingAsset } from "@/services/livestream-recordings";
 
-// Keep the real route, provider selector, HMAC verifier, event handler and dedupe.
+// Keep the real route, selector, HMAC verifier and handler; replace the durable database boundary.
 // Only the external provider and persistence boundaries are replaced.
 vi.mock("@/lib/video-provider", () => ({ getVideoProvider: vi.fn() }));
 vi.mock("@/services/streams", () => ({
@@ -36,14 +37,14 @@ describe("FrameWorks signed webhook route (#409)", () => {
     vi.resetAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(now);
-    resetFrameworksWebhookDedupeForTests();
+
     signingKey = randomBytes(32);
     vi.stubEnv("VIDEO_PROVIDER", "frameworks");
     vi.stubEnv("FRAMEWORKS_WEBHOOK_SECRET", `whsec_${signingKey.toString("base64")}`);
   });
 
   afterEach(() => {
-    resetFrameworksWebhookDedupeForTests();
+
     vi.unstubAllEnvs();
     vi.useRealTimers();
   });
@@ -81,6 +82,7 @@ describe("FrameWorks signed webhook route (#409)", () => {
   }
 
   function expectNoExternalWork() {
+    expect(commitFrameworksWebhook).not.toHaveBeenCalled();
     expect(getVideoProvider).not.toHaveBeenCalled();
     expect(markStreamLiveByStreamId).not.toHaveBeenCalled();
     expect(markStreamOfflineByStreamId).not.toHaveBeenCalled();
@@ -120,52 +122,19 @@ describe("FrameWorks signed webhook route (#409)", () => {
     expectNoExternalWork();
   });
 
-  it.each([
-    ["stream.live", markStreamLiveByStreamId],
-    ["stream.idle", markStreamOfflineByStreamId],
-  ] as const)("verifies %s before dispatching to persistence and dedupes in the same instance", async (type, persist) => {
-    const body = eventBody(type, { streamId: "stream-local" });
+  it.each(['stream.live','stream.idle'])("verifies %s before durable persistence", async (type) => {
+    vi.mocked(commitFrameworksWebhook).mockResolvedValueOnce('processed').mockResolvedValueOnce('duplicate');
+    const body=eventBody(type,{streamId:'stream-local'});
     expect((await POST(signedRequest(body))).status).toBe(200);
     expect((await POST(signedRequest(body))).status).toBe(204);
-    expect(persist).toHaveBeenCalledTimes(1);
-    expect(persist).toHaveBeenCalledWith("stream-local");
+    expect(commitFrameworksWebhook).toHaveBeenCalledTimes(2);
+    expect(commitFrameworksWebhook).toHaveBeenCalledWith(expect.objectContaining({streamId:'stream-local',type}));
     expect(getVideoProvider).not.toHaveBeenCalled();
   });
-
-  it.each([
-    ["stream.live", markStreamLiveByStreamId],
-    ["stream.idle", markStreamOfflineByStreamId],
-  ] as const)("maps signed raw UUID %s events to the stored GraphQL stream ID", async (type, persist) => {
-    const uuid = "12345678-abcd-4abc-8def-123456789abc";
-    const body = eventBody(type, { streamId: uuid });
-    expect((await POST(signedRequest(body))).status).toBe(200);
-    expect(persist).toHaveBeenCalledWith(Buffer.from(`Stream:${uuid}`).toString("base64"));
-    expect(getVideoProvider).not.toHaveBeenCalled();
-  });
-
-  it("resolves a signed v1 artifactId to the provider hash and permits retry after lookup failure", async () => {
-    const artifactHash = "recording-hash-local";
-    const asset = {
-      id: artifactHash,
-      playbackId: "playback-local",
-      status: { phase: "ready" },
-      source: { type: "recording", streamId: "stream-local" },
-    };
-    const getAsset = vi.fn().mockResolvedValueOnce(null).mockResolvedValue(asset);
-    vi.mocked(getVideoProvider).mockReturnValue({ assets: { get: getAsset } } as never);
-    const body = eventBody("recording.ready", {
-      // Public v1 payloads use artifactId, not the GraphQL artifactHash field.
-      artifact: { artifactId: artifactHash },
-    });
-
+  it('does not acknowledge failed storage and retries the durable transaction',async()=>{
+    vi.mocked(commitFrameworksWebhook).mockRejectedValueOnce(new Error('Storage unavailable')).mockResolvedValueOnce('processed');
+    const body=eventBody('stream.live',{streamId:'stream-local'});
     expect((await POST(signedRequest(body))).status).toBe(500);
-    expect(persistRecordingAsset).not.toHaveBeenCalled();
     expect((await POST(signedRequest(body))).status).toBe(200);
-    expect((await POST(signedRequest(body))).status).toBe(204);
-    expect(getAsset).toHaveBeenCalledTimes(2);
-    expect(getAsset).toHaveBeenNthCalledWith(1, artifactHash);
-    expect(getAsset).toHaveBeenNthCalledWith(2, artifactHash);
-    expect(persistRecordingAsset).toHaveBeenCalledTimes(1);
-    expect(persistRecordingAsset).toHaveBeenCalledWith(asset, { streamId: "stream-local" });
   });
 });
