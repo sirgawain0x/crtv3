@@ -1,4 +1,5 @@
 "use client";
+import type { Subtitles } from "@/lib/types/video-asset";
 
 import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -182,6 +183,7 @@ function StoryIPBlock({
 
 type VideoDetailsProps = {
   asset: Asset;
+  storedSubtitles?: Subtitles | null;
   videoTitle?: string;
   /** Creator wallet — shown below the title. */
   creatorAddress?: string | null;
@@ -199,6 +201,7 @@ type VideoDetailsProps = {
 
 export default function VideoDetails({
   asset,
+  storedSubtitles,
   videoTitle,
   creatorAddress,
   livepeerAttestationId,
@@ -416,7 +419,9 @@ export default function VideoDetails({
             }
           }
         }
-      } catch { }
+      } catch {
+        // Keep the existing status when the optional lookup is unavailable.
+      }
     };
     const fetchThumbnail = async () => {
       if (!asset?.playbackId) return;
@@ -712,8 +717,7 @@ export default function VideoDetails({
   }
 
   return (
-    <SubtitlesProvider>
-      <SubtitlesInitializer assetMetadata={null} />
+    <SubtitlesProvider key={asset.id} initialSubtitles={storedSubtitles ?? undefined}>
       <div className="w-full">
         <div className="w-full space-y-6">
           <h1 className="text-2xl font-bold">{videoTitle || asset?.name}</h1>
@@ -1039,19 +1043,3 @@ export const PlayerLoading = ({
     )}
   </div>
 );
-
-function SubtitlesInitializer({
-  assetMetadata,
-}: {
-  assetMetadata: any;
-}) {
-  const { setSubtitles } = useSubtitles();
-
-  useEffect(() => {
-    if (assetMetadata?.subtitles) {
-      setSubtitles(assetMetadata.subtitles);
-    }
-  }, [assetMetadata, setSubtitles]);
-
-  return null;
-}

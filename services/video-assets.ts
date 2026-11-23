@@ -4,8 +4,13 @@
 import { createClient } from "@/lib/sdk/supabase/server";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { VideoAsset } from "@/lib/types/video-asset";
-import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import {
+  FrameWorksUploadsAssetsUnavailableError,
+  getVideoProvider,
+  requireVideoProviderForUploadsAndAssets,
+} from "@/lib/video-provider";
 import type { CollaboratorFormData } from "@/lib/types/splits";
+import { isVideoAssetId } from "@/lib/video-provider/asset-id";
 
 export async function createVideoAsset(
   data: Omit<VideoAsset, "id" | "created_at" | "updated_at">,
@@ -435,11 +440,8 @@ export async function getVideoAssetByPlaybackId(playbackId: string): Promise<Vid
 }
 
 export async function getVideoAssetByAssetId(assetId: string) {
-  // Validate UUID format
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-  if (!uuidRegex.test(assetId)) {
-    throw new Error(`Invalid asset ID: ${assetId}. Asset ID must be a valid UUID.`);
+  if (!isVideoAssetId(assetId)) {
+    throw new Error('Invalid video asset ID');
   }
 
   const supabase = await createClient();
@@ -797,13 +799,13 @@ export async function createMultistreamTarget({
   const targetName = name || `Target ${Date.now()}`;
 
   try {
-    const target = await fullLivepeer.stream.addMultistreamTarget(
+    const target = await getVideoProvider().streams.addMultistreamTarget(
       {
         profile,
         videoOnly,
         spec: { name: targetName, url },
       },
-      streamId
+      streamId,
     );
 
     if (!target) {
@@ -844,7 +846,9 @@ export async function listMultistreamTargets(
 
   try {
     // Fetch the stream to get its multistream targets
-    const stream = await fullLivepeer.stream.get(streamId);
+    const stream = (await getVideoProvider().streams.getWithMultistream(
+      streamId,
+    )) as { stream?: { multistream?: { targets?: unknown } } } | null;
 
     if (!stream || !stream.stream) {
       return { error: "Stream not found" };
@@ -881,7 +885,7 @@ export async function deleteMultistreamTarget({
 }: DeleteMultistreamTargetParams): Promise<DeleteMultistreamTargetResult> {
   if (!id) return { success: false, error: "Missing target ID" };
   try {
-    await fullLivepeer.multistream.delete(id);
+    await getVideoProvider().multistream.delete(id);
     return { success: true };
   } catch (e) {
     return { success: false, error: "Failed to delete multistream target" };
@@ -914,8 +918,13 @@ export async function deleteVideoAsset(assetId: string, creatorId: string) {
 
   // 2. Delete from Livepeer
   try {
-    await fullLivepeer.asset.delete(assetId);
-  } catch (error: any) {
+    await requireVideoProviderForUploadsAndAssets(
+      "video-assets.deleteVideoAsset",
+    ).assets.delete(assetId);
+  } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
+      throw error;
+    }
     console.error('Error deleting from Livepeer:', error);
     // Proceed to delete from DB even if Livepeer fails (e.g. if already deleted)
   }

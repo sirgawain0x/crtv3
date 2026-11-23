@@ -122,11 +122,14 @@ export default function LivePage() {
   const [streamCreateError, setStreamCreateError] = useState<string | null>(
     null
   );
+  const [streamMetadataReady, setStreamMetadataReady] = useState(false);
   const [allowClipping, setAllowClipping] = useState(true);
   const [isUpdatingClipPref, setIsUpdatingClipPref] = useState(false);
   const [streamName, setStreamName] = useState<string | null>(null);
   const [saveRecording, setSaveRecording] = useState(true);
   const [isUpdatingSaveRecording, setIsUpdatingSaveRecording] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const recordingRequestRef = useRef<AbortController | null>(null);
   const [requiresMetoken, setRequiresMetoken] = useState(false);
   const [metokenPrice, setMetokenPrice] = useState<number | null>(null);
   const [storyIpId, setStoryIpId] = useState<string | null>(null);
@@ -141,7 +144,6 @@ export default function LivePage() {
   const { stream: liveStream, isLive: isStreamLive } = useCreatorLiveStream(15_000);
   const songchainFeedId =
     process.env.NEXT_PUBLIC_SONGCHAIN_FEED_ID?.trim() || null;
-  const recordingEnableRequestedRef = useRef<Set<string>>(new Set());
 
   // Match the viewer-side derivation in WatchClient so host + viewers share the
   // same XMTP group ID.
@@ -165,10 +167,15 @@ export default function LivePage() {
     setStreamKey(null);
     setStreamId(null);
     setPlaybackId(null);
+    setStreamMetadataReady(false);
+    setStreamCreateError(null);
     setThumbnailUrl(null);
     setAllowClipping(true);
     setStreamName(null);
     setSaveRecording(true);
+    setRecordingError(null);
+    setIsUpdatingSaveRecording(false);
+    recordingRequestRef.current?.abort();
     setRequiresMetoken(false);
     setMetokenPrice(null);
     setStoryIpId(null);
@@ -185,6 +192,45 @@ export default function LivePage() {
         if (!active) return;
         const legacy = signerAddress ?? undefined;
 
+        // Load the saved preference before mounting Broadcast with credentials.
+        // Opening the studio must not change the provider's recording setting.
+        const params = new URLSearchParams();
+        if (legacy) params.set("legacyCreatorAddress", legacy);
+        const query = params.toString();
+        const res = await fetch(
+          `/api/streams/creator/${encodeURIComponent(creatorAddress)}${query ? `?${query}` : ""}`,
+          { cache: "no-store" },
+        );
+        if (!active) return;
+        if (!res.ok) {
+          logger.error("Error fetching stream metadata", { status: res.status });
+          setStreamCreateError("Could not load stream settings. Refresh and try again.");
+          return;
+        }
+        const stream = await res.json();
+        if (!active) return;
+        if (
+          !stream || typeof stream !== "object" ||
+          !(stream.playback_id === null || (typeof stream.playback_id === "string" && stream.playback_id.trim())) ||
+          (stream.playback_id !== null && typeof stream.save_recording !== "boolean")
+        ) {
+          throw new Error("Invalid stream settings response");
+        }
+        setStreamMetadataReady(true);
+        if (!stream?.playback_id) return;
+        if (stream.stream_id) setStreamId(stream.stream_id);
+        setPlaybackId(stream.playback_id);
+        setThumbnailUrl(stream.thumbnail_url || null);
+        setAllowClipping(stream.allow_clipping ?? true);
+        setStreamName(stream.name ?? null);
+        setSaveRecording(stream.save_recording);
+        setRequiresMetoken(stream.requires_metoken ?? false);
+        setMetokenPrice(stream.metoken_price ?? null);
+        setStoryIpId(stream.story_ip_id ?? null);
+        setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
+        setStoryRevShare(stream.story_commercial_rev_share ?? null);
+        setLensLivePostId(stream.lens_live_post_id ?? null);
+
         try {
           const keyData = await fetchStreamKeyWithRetry(
             creatorAddress,
@@ -195,15 +241,6 @@ export default function LivePage() {
           setStreamKey(keyData.streamKey);
           setStreamId(keyData.streamId);
           setPlaybackId(keyData.playbackId);
-
-          if (!recordingEnableRequestedRef.current.has(keyData.streamId)) {
-            recordingEnableRequestedRef.current.add(keyData.streamId);
-            fetch(`/api/livepeer/stream/${encodeURIComponent(keyData.streamId)}/recording`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ record: saveRecording }),
-            }).catch((err) => logger.error("Failed to set stream recording state:", err));
-          }
 
           setIsLoadingTargets(true);
           const result = await listMultistreamTargets({ streamId: keyData.streamId });
@@ -220,36 +257,9 @@ export default function LivePage() {
             setMultistreamTargets([]);
           }
         }
-
-        const params = new URLSearchParams();
-        if (legacy) params.set("legacyCreatorAddress", legacy);
-        const query = params.toString();
-        const res = await fetch(
-          `/api/streams/creator/${encodeURIComponent(creatorAddress)}${query ? `?${query}` : ""}`,
-          { cache: "no-store" },
-        );
-
-        if (res.ok) {
-          const stream = await res.json();
-          if (!active) return;
-          if (!stream?.playback_id) return;
-          if (stream.stream_id) setStreamId(stream.stream_id);
-          setPlaybackId(stream.playback_id);
-          setThumbnailUrl(stream.thumbnail_url || null);
-          setAllowClipping(stream.allow_clipping ?? true);
-          setStreamName(stream.name ?? null);
-          setSaveRecording(stream.save_recording ?? true);
-          setRequiresMetoken(stream.requires_metoken ?? false);
-          setMetokenPrice(stream.metoken_price ?? null);
-          setStoryIpId(stream.story_ip_id ?? null);
-          setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
-          setStoryRevShare(stream.story_commercial_rev_share ?? null);
-          setLensLivePostId(stream.lens_live_post_id ?? null);
-        } else {
-          logger.error("Error fetching stream metadata:", await res.text());
-        }
       } catch (err) {
         logger.error("Error fetching stream data:", err);
+        if (active) setStreamCreateError("Could not load stream settings. Refresh and try again.");
       }
     }
 
@@ -257,6 +267,7 @@ export default function LivePage() {
 
     return () => {
       active = false;
+      recordingRequestRef.current?.abort();
     };
   }, [creatorAddress, signerAddress, getAuthHeaders, identityReady]);
 
@@ -331,31 +342,41 @@ export default function LivePage() {
   }
 
   async function handleToggleSaveRecording(next: boolean) {
-    if (!creatorAddress || !streamId) return;
-    const previous = saveRecording;
-    setSaveRecording(next);
+    if (!creatorAddress || !streamMetadataReady || isUpdatingSaveRecording) return;
+    setRecordingError(null);
+    if (!streamId) {
+      setSaveRecording(next);
+      return;
+    }
+    const controller = new AbortController();
+    recordingRequestRef.current = controller;
     setIsUpdatingSaveRecording(true);
     try {
-      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
-      await updateStream(creatorAddress, { save_recording: next }, auth);
-      // Sync the recording flag on the Livepeer stream object as well.
-      await fetch(`/api/livepeer/stream/${encodeURIComponent(streamId)}/recording`, {
+      const authHeaders = await getAuthHeaders();
+      if (controller.signal.aborted) return;
+      const response = await fetch(`/api/livepeer/stream/${encodeURIComponent(streamId)}/recording`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ record: next }),
+        signal: controller.signal,
       });
+      if (!response.ok) throw new Error("Recording update failed");
+      if (!controller.signal.aborted) setSaveRecording(next);
     } catch (err) {
+      if (controller.signal.aborted) return;
       logger.error("Failed to update save-recording preference:", err);
-      setSaveRecording(previous);
+      setRecordingError("Recording settings could not be confirmed. Refresh before starting another broadcast.");
     } finally {
-      setIsUpdatingSaveRecording(false);
+      if (!controller.signal.aborted) setIsUpdatingSaveRecording(false);
     }
   }
 
   async function handleCreateStream() {
     if (!creatorAddress) return;
-    if (!identityReady || !isWalletAuthReady) {
-      setStreamCreateError("Wallet is still initializing. Wait a moment and try again.");
+    if (!identityReady || !isWalletAuthReady || !streamMetadataReady) {
+      setStreamCreateError(!streamMetadataReady
+        ? "Stream settings are still loading. Wait a moment and try again."
+        : "Wallet is still initializing. Wait a moment and try again.");
       return;
     }
     setIsCreatingStream(true);
@@ -560,14 +581,32 @@ export default function LivePage() {
                 <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
                   Create your channel first — camera preview and live chat appear on the next step.
                 </p>
+                {!streamId && (
+                  <div className="mb-4 flex items-center gap-3">
+                    <label htmlFor="new-stream-recording" className="text-sm">
+                      Save live stream replay
+                    </label>
+                    <Switch
+                      id="new-stream-recording"
+                      checked={saveRecording}
+                      onCheckedChange={handleToggleSaveRecording}
+                      disabled={isCreatingStream || !streamMetadataReady}
+                      aria-label="Save live stream replay"
+                    />
+                  </div>
+                )}
                 {!identityReady || !isWalletAuthReady ? (
                   <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
                     Preparing wallet…
                   </p>
+                ) : !streamMetadataReady && !streamCreateError ? (
+                  <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
+                    Loading stream settings…
+                  </p>
                 ) : null}
                 <button
                   onClick={handleCreateStream}
-                  disabled={isCreatingStream || !identityReady || !isWalletAuthReady}
+                  disabled={isCreatingStream || !identityReady || !isWalletAuthReady || !streamMetadataReady}
                   className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 >
                   {isCreatingStream ? "Creating Stream..." : "Create Stream"}
@@ -580,11 +619,13 @@ export default function LivePage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                 <div className="lg:col-span-2 relative">
                   <Broadcast
+                    key={creatorAddress}
                     streamKey={streamKey}
                     streamId={streamId}
                     playbackId={playbackId}
                     creatorAddress={creatorAddress!}
                     saveRecording={saveRecording}
+                    recordingSettingsReady={!isUpdatingSaveRecording && !recordingError}
                     onCredentialsChange={({ streamKey: key, streamId: id, playbackId: pb }) => {
                       setStreamKey(key);
                       setStreamId(id);
@@ -726,10 +767,11 @@ export default function LivePage() {
                   <Switch
                     checked={saveRecording}
                     onCheckedChange={handleToggleSaveRecording}
-                    disabled={isUpdatingSaveRecording}
+                    disabled={isUpdatingSaveRecording || !streamMetadataReady}
                     aria-label="Save live stream replay"
                   />
                 </div>
+                {recordingError && <p role="alert" className="mt-2 text-sm text-red-500">{recordingError}</p>}
               </div>
             )}
             {streamId && creatorAddress && (

@@ -1,5 +1,8 @@
 # Alchemy cost controls
 
+**Payment replay migration: COMPLETE.** Both production migrations (`20261122173608`, `20261122173706`) are applied and verified: a global duplicate key, RLS, no anonymous/user read grants, and server SELECT/INSERT only. PR #462 is merged at `d25573da50baa82af6cf166c9ce661edfe8b30d4` and deployed to production as `dpl_6muM1Gv2U3HDfygVpc4MUTSfuLof`. The existing Hermes key is configured server-only in Production, the tested gateway revision is serving normal traffic, and live unpaid/invalid-signature checks passed. A funded wallet smoke and distributed spending caps remain separate follow-ups; they do not represent pending replay schema work. Older staging/promotion notes below are historical checkpoints.
+
+
 TL;DR: Keep free gas sponsorship paused at Alchemy. Application guards are a second layer; browser-visible API keys and policy IDs can be used directly against the provider.
 
 ## Runtime policy
