@@ -8,13 +8,14 @@ export default function MigrationOperator(){
  const {adminAuthAddress,isAdmin}=usePlatformAdmin();
  const {getAuthHeaders,isReady}=usePlatformAdminWalletAuth(adminAuthAddress);const [metadata,setMetadata]=useState('');
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[outcome,setOutcome]=useState<ImportOutcome|null>(null);
- async function run(mode:'import'|'poll'){
+ async function run(mode:'import'|'poll'|'inspect-playback'){
   setBusy(true);setMessage('');
   try{
    const parsed=JSON.parse(metadata);const sources=archivedSourcesFromManifests([{assets:[{...parsed,status:'archived'}]}]);
    if(sources.length!==1)throw new Error('Paste one source from the verified archive manifest.');
    const response=await fetch('/api/migration/frameworks/import',{method:'POST',headers:{'Content-Type':'application/json',...await getAuthHeaders()},body:JSON.stringify({mode,source:sources[0]})});
    const result=await response.json();if(!response.ok)throw new Error(result.error||'Migration request failed');
+   if(mode==='inspect-playback'){setMessage(JSON.stringify(result.diagnostic));return;}
    setOutcome(result.outcome);setMessage(result.outcome.state==='ready'?'Verified import ready.':'Request finished. Poll an existing processing import; do not recreate uncertain imports.');
   }catch(error){setMessage(error instanceof Error?error.message:'Migration request failed');}finally{setBusy(false);}
  }
@@ -25,6 +26,7 @@ export default function MigrationOperator(){
   <textarea id="archive-source" value={metadata} onChange={event=>{setMetadata(event.target.value);setOutcome(null);}} rows={9} className="w-full rounded border bg-background p-3 font-mono text-sm" disabled={busy}/>
   <div className="flex gap-4"><button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('import')}>Import verified source</button>
   <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('poll')}>Poll existing import</button></div>
+  <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('inspect-playback')}>Check playback manifest</button>
   {busy&&<p role="status">Verifying and transferring one source. Keep this page open.</p>}
   {message&&<p role="status">{message}</p>}{outcome&&<p>State: <strong>{outcome.state}</strong></p>}
  </main>;
