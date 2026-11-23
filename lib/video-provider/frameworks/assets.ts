@@ -39,6 +39,7 @@ type VodAssetQuery = { vodAsset: VodAssetNode | null };
 type ClipQuery = {
   clip: {
     id: string;
+    clipHash?: string;
     playbackId?: string;
     title?: string;
     status?: string;
@@ -138,6 +139,7 @@ const GET_CLIP = `
   query GetClip($id: ID!) {
     clip(id: $id) {
       id
+      clipHash
       playbackId
       title
       status
@@ -345,6 +347,7 @@ async function fetchAssetSummary(assetId: string): Promise<AssetSummary | null> 
     return mapVodToSummary(
       {
         id: clip.clip.id,
+        artifactHash: clip.clip.clipHash,
         playbackId: clip.clip.playbackId,
         title: clip.clip.title,
         status: clip.clip.status,

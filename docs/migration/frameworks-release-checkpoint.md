@@ -18,3 +18,9 @@ The release integration combines main d25573da5 with staging 9a67c151b. Producti
 - Reuse existing FrameWorks credentials; production credential provisioning and provider switch follow reviewed readiness. Do not rotate endpoint secrets or recreate creator streams implicitly.
 
 Production rollback target before this migration: dpl_6muM1Gv2U3HDfygVpc4MUTSfuLof. The existing Livepeer provider stays selected during preparation. Preserve the completed x402 receipt ledger and gas-off settings during any rollback.
+
+## Archive and clip identity follow-up
+
+MEGA access is configured. The archive contains 44 video files totaling 5,660,021,068 bytes, with a manifest containing 44 archived and six skipped entries. All 44 archived entries have recorded SHA-256 values and match cloud filenames/sizes; this is not a fresh full-content rehash. A refreshed Studio inventory has 45 ready assets. One published source (database row 183, 63,405,447 bytes) is missing and is being prepared locally for an additive archive update. No source import or production remap has occurred.
+
+Clip creation and lookup now use the canonical clipHash instead of GraphQL node IDs. Missing clipHash fails closed before a result can be persisted. The expanded application suite passes 1,193 tests across 220 files; provider identity tests and TypeScript pass. The previously pushed integration head passed hosted Vercel/GitHub checks; the clip follow-up requires fresh hosted checks after push.
