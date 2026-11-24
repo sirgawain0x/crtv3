@@ -16,6 +16,7 @@ import {
   markStreamOfflineByStreamId,
 } from "@/services/streams";
 import { serverLogger } from "@/lib/utils/logger";
+import { relayFrameworksWebhookToStaging } from "@/lib/webhooks/frameworks-staging-relay";
 import { resolveVideoProviderId } from "@/lib/video-provider/config";
 import { verifyFrameworksWebhookSignature } from "@/lib/video-provider/frameworks/webhooks";
 import {
@@ -105,6 +106,8 @@ async function handleFrameworksWebhook(
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
+  const relayed = await relayFrameworksWebhookToStaging(rawBody, request.headers);
+  if (relayed) return relayed;
   const providerId = resolveVideoProviderId();
 
   if (providerId === "frameworks") {

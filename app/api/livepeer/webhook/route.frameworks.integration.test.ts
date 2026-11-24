@@ -46,6 +46,7 @@ describe("FrameWorks signed webhook route (#409)", () => {
   afterEach(() => {
 
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -136,5 +137,14 @@ describe("FrameWorks signed webhook route (#409)", () => {
     const body=eventBody('stream.live',{streamId:'stream-local'});
     expect((await POST(signedRequest(body))).status).toBe(500);
     expect((await POST(signedRequest(body))).status).toBe(200);
+  });
+  it('processes production FrameWorks events locally after cutover without forwarding them to staging',async()=>{
+    vi.stubEnv('VERCEL_ENV','production');
+    const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+    vi.mocked(commitFrameworksWebhook).mockResolvedValueOnce('processed');
+    const response=await POST(signedRequest(eventBody('stream.live',{streamId:'production-stream'})));
+    expect(response.status).toBe(200);
+    expect(commitFrameworksWebhook).toHaveBeenCalledWith(expect.objectContaining({streamId:'production-stream',type:'stream.live'}));
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
