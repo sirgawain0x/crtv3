@@ -23,13 +23,13 @@ export async function inspectMigrationReservation(source: ArchivedSource) {
     const artifacts = result.storageArtifactsConnection.nodes.filter(node => node.title === source.assetId).map(node => {
       const status = ['processing', 'ready', 'failed', 'expired'].includes(node.status.toLowerCase()) ? node.status.toLowerCase() : 'unknown';
       const sizeMatches = node.sizeBytes === source.sizeBytes;
-      if (!isVideoAssetId(node.hash)) {
-        return { incomplete: true as const, unusableReason: 'missing_hash' as const, hash: node.hash, playbackId: node.playbackId, sizeMatches, status };
+      const assetId = isVideoAssetId(node.hash) ? node.hash : null;
+      const playbackId = node.playbackId && isVideoAssetId(node.playbackId) ? node.playbackId : null;
+      if (assetId && playbackId) {
+        return { assetId, playbackId, identityUsable: true as const, sizeMatches, status };
       }
-      if (!node.playbackId || !isVideoAssetId(node.playbackId)) {
-        return { incomplete: true as const, unusableReason: 'missing_playback_id' as const, assetId: node.hash, playbackId: node.playbackId, sizeMatches, status };
-      }
-      return { assetId: node.hash, playbackId: node.playbackId, sizeMatches, status };
+      const unusableReason = !assetId ? 'missing_hash' as const : 'missing_playback_id' as const;
+      return { assetId, playbackId, identityUsable: false as const, incomplete: true as const, unusableReason, sizeMatches, status };
     });
     return { configuration, providerAvailable: true, completeSearch: !result.storageArtifactsConnection.hasNextPage, matchingArtifacts: artifacts };
   } catch {
