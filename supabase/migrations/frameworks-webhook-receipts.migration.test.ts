@@ -14,6 +14,7 @@ beforeAll(async()=>{
  await db.exec(readFileSync(new URL('./20261123051536_frameworks_asset_identity.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('./20261123053537_frameworks_vod_access.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('./20261124170039_frameworks_recording_authority.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./20261124182327_frameworks_recording_gate_preservation.sql',import.meta.url),'utf8'));
 },30000);
 afterAll(()=>db.close());
 const process=(id:string,type:string,time='2026-11-23T10:00:00Z',stream:string|null='parent',artifact:Record<string,unknown>|null=null,hash=sha)=>db.query<{process_frameworks_webhook:string}>('SELECT process_frameworks_webhook($1,$2,$3,$4,$5,$6)',[id,type,hash,time,stream,artifact]);
