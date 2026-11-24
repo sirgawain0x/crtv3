@@ -11,22 +11,40 @@ import {rateLimiters} from '@/lib/middleware/rateLimit';
 import {inspectMigrationPlayback} from '@/lib/video-provider/migration/inspect-playback';
 import {inspectMigrationReservation} from '@/lib/video-provider/migration/inspect-reservation';
 import {ImportStoppedError} from '@/lib/video-provider/migration/import-failure';
+import {prepareReviewedRecovery,adoptVerifiedRecovery,requireReviewedRecoverySource} from '@/lib/video-provider/migration/reviewed-recovery';
 export const runtime='nodejs';
 export const maxDuration=300;
 const respond=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
 export async function POST(request:NextRequest){
  if(!isFrameworksMigrationStaging())return respond({error:'Not found'},404);
- try{await requirePlatformAdmin(request);}catch(error){if(error instanceof PlatformAdminAuthError)return respond({error:error.message},error.status);return respond({error:'Admin authorization unavailable'},503);}
+ let reviewer:string;
+ try{reviewer=(await requirePlatformAdmin(request)).address;}catch(error){if(error instanceof PlatformAdminAuthError)return respond({error:error.message},error.status);return respond({error:'Admin authorization unavailable'},503);}
  const limited=await rateLimiters.standard(request);if(limited)return limited;
  let source,mode;
  try{
   const raw=await request.text();if(Buffer.byteLength(raw)>4096)return respond({error:'Source request too large'},413);
   const body=JSON.parse(raw);mode=body.mode;
-  if(!['import','poll','inspect-playback','inspect-reservation'].includes(mode)||!body.source||typeof body.source!=='object')throw new Error();
+  if(!['import','poll','inspect-playback','inspect-reservation','prepare-recovery','import-recovery','poll-recovery','adopt-recovery'].includes(mode)||!body.source||typeof body.source!=='object')throw new Error();
   [source]=archivedSourcesFromManifests([{assets:[{...body.source,status:'archived'}]}]);
   if(!source || source.sizeBytes>1024**3)throw new Error();
  }catch{return respond({error:'One verified source up to 1 GiB is required'},400);}
  try{
+  if(mode.endsWith('-recovery')){
+   requireReviewedRecoverySource(source);
+   const db=createServiceClient();
+   if(mode==='prepare-recovery'){
+    await prepareReviewedRecovery(db,source,reviewer);
+    return respond({message:'Original attempt retained under JWT quarantine. A separate reviewed replacement is reserved; no media was uploaded.'});
+   }
+   if(mode==='adopt-recovery'){
+    await adoptVerifiedRecovery(db,source);
+    return respond({message:'Verified replacement adopted. Original attempt and recovery audit are retained.'});
+   }
+   const ledger=createImportLedger(db,'frameworks_import_recoveries');
+   if(!await ledger.find(source.assetId))return respond({error:'Prepare the reviewed recovery reservation first'},409);
+   const outcome=await runAssetImport({source,ledger,provider:createFrameworksImportProvider(),file:mode==='import-recovery'?createStudioImportSource():undefined});
+   return respond({outcome,recovery:true});
+  }
   if(mode==='inspect-reservation'){
    const record=await createImportLedger(createServiceClient()).find(source.assetId);
    if(!record||record.livepeer_playback_id!==source.playbackId||record.source_sha256!==source.sha256||record.source_bytes!==source.sizeBytes)return respond({error:'Matching verified reservation required'},409);
