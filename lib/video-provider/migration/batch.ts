@@ -1,5 +1,6 @@
 import type {ArchivedSource} from './archive';
 import type {ImportOutcome} from './importer';
+import {ImportStoppedError} from './import-failure';
 
 export type MigrationMode='import'|'poll'|'inspect-playback'|'inspect-reservation';
 export type BatchProgress={completed:number;total:number;sourceId:string;phase:'importing'|'processing'|'checking'|'ready'};
@@ -25,7 +26,14 @@ export async function runVerifiedImportBatch(input:{
     if(requested)await input.wait();
     requested=true;
     try{return await input.request(mode,source);}
-    catch{throw new Error(`Batch stopped at source ${source.assetId}; inspect its reservation before resuming`);}
+    catch(error){
+      if(error instanceof ImportStoppedError){
+        const stopped=new ImportStoppedError(error.failureCode);
+        stopped.message=`Batch stopped at source ${source.assetId}; ${error.message}`;
+        throw stopped;
+      }
+      throw new Error(`Batch stopped at source ${source.assetId}; inspect its reservation before resuming`,error instanceof Error?{cause:error}:undefined);
+    }
   };
   const finish=async(source:ArchivedSource)=>{
     report(source,'checking');

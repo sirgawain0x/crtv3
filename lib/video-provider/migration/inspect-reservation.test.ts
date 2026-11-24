@@ -17,3 +17,24 @@ it('does not imply absence when a search is truncated or unavailable',async()=>{
  query.mockResolvedValueOnce({storageArtifactsConnection:{totalCount:20,hasNextPage:true,nodes:[]}});expect((await inspectMigrationReservation(source)).completeSearch).toBe(false);
  query.mockRejectedValueOnce(new Error('PRIVATE_URL?token=PRIVATE'));const result=await inspectMigrationReservation(source);expect(result.providerAvailable).toBe(false);expect(result.completeSearch).toBe(false);expect(JSON.stringify(result)).not.toContain('PRIVATE');
 });
+it('flags title matches with missing playback id without implying provider outage',async()=>{
+ query.mockResolvedValue({storageArtifactsConnection:{totalCount:1,hasNextPage:false,nodes:[{hash:'Canonical_Hash',playbackId:null,title:source.assetId,status:'ready',sizeBytes:100}]}});
+ const result=await inspectMigrationReservation(source);
+ expect(result.providerAvailable).toBe(true);expect(result.matchingArtifacts).toEqual([{incomplete:true,unusableReason:'missing_playback_id',assetId:'Canonical_Hash',playbackId:null,sizeMatches:true,status:'ready'}]);
+});
+it('flags title matches with missing hash without implying provider outage',async()=>{
+ query.mockResolvedValue({storageArtifactsConnection:{totalCount:1,hasNextPage:false,nodes:[{hash:'!!!',playbackId:'New_Play',title:source.assetId,status:'processing',sizeBytes:50}]}});
+ const result=await inspectMigrationReservation(source);
+ expect(result.providerAvailable).toBe(true);expect(result.matchingArtifacts).toEqual([{incomplete:true,unusableReason:'missing_hash',hash:'!!!',playbackId:'New_Play',sizeMatches:false,status:'processing'}]);
+});
+it('returns complete and incomplete title matches together',async()=>{
+ query.mockResolvedValue({storageArtifactsConnection:{totalCount:2,hasNextPage:false,nodes:[
+  {hash:'Canonical_Hash',playbackId:'New_Play',title:source.assetId,status:'ready',sizeBytes:100},
+  {hash:'Canonical_Hash',playbackId:null,title:source.assetId,status:'processing',sizeBytes:100},
+ ]}});
+ const result=await inspectMigrationReservation(source);
+ expect(result.providerAvailable).toBe(true);expect(result.matchingArtifacts).toEqual([
+  {assetId:'Canonical_Hash',playbackId:'New_Play',sizeMatches:true,status:'ready'},
+  {incomplete:true,unusableReason:'missing_playback_id',assetId:'Canonical_Hash',playbackId:null,sizeMatches:true,status:'processing'},
+ ]);
+});

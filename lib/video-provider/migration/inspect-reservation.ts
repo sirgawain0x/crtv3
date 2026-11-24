@@ -21,9 +21,15 @@ export async function inspectMigrationReservation(source: ArchivedSource) {
       nodes: Array<{ hash: string; playbackId: string | null; title: string; status: string; sizeBytes: number | null }>;
     } }>('query InspectMigrationReservation($input:StorageArtifactsInput!){storageArtifactsConnection(input:$input){totalCount hasNextPage nodes{hash playbackId title status sizeBytes}}}', { input: { kinds: ['VOD'], search: source.assetId, first: 10 } });
     const artifacts = result.storageArtifactsConnection.nodes.filter(node => node.title === source.assetId).map(node => {
-      if (!isVideoAssetId(node.hash) || !node.playbackId || !isVideoAssetId(node.playbackId)) throw new Error('Unusable identity');
-      return { assetId: node.hash, playbackId: node.playbackId, sizeMatches: node.sizeBytes === source.sizeBytes,
-        status: ['processing', 'ready', 'failed', 'expired'].includes(node.status.toLowerCase()) ? node.status.toLowerCase() : 'unknown' };
+      const status = ['processing', 'ready', 'failed', 'expired'].includes(node.status.toLowerCase()) ? node.status.toLowerCase() : 'unknown';
+      const sizeMatches = node.sizeBytes === source.sizeBytes;
+      if (!isVideoAssetId(node.hash)) {
+        return { incomplete: true as const, unusableReason: 'missing_hash' as const, hash: node.hash, playbackId: node.playbackId, sizeMatches, status };
+      }
+      if (!node.playbackId || !isVideoAssetId(node.playbackId)) {
+        return { incomplete: true as const, unusableReason: 'missing_playback_id' as const, assetId: node.hash, playbackId: node.playbackId, sizeMatches, status };
+      }
+      return { assetId: node.hash, playbackId: node.playbackId, sizeMatches, status };
     });
     return { configuration, providerAvailable: true, completeSearch: !result.storageArtifactsConnection.hasNextPage, matchingArtifacts: artifacts };
   } catch {
