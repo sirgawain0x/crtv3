@@ -61,6 +61,33 @@ describe("POST /api/livepeer/webhook", () => {
     expect(verifyLivepeerWebhookSignature).not.toHaveBeenCalled();
   });
 
+  it("routes production-relayed FrameWorks events on staging through handleFrameworksWebhookEvent without Livepeer verification", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.mocked(resolveVideoProviderId).mockReturnValue("frameworks");
+    vi.mocked(verifyFrameworksWebhookSignature).mockReturnValue(true);
+    vi.mocked(handleFrameworksWebhookEvent).mockResolvedValue("processed");
+
+    const body = JSON.stringify({
+      id: "evt-relayed",
+      type: "stream.live",
+      data: { streamId: "relay-target" },
+    });
+    const response = await POST(
+      makeRequest(body, {
+        "webhook-id": "evt-relayed",
+        "webhook-timestamp": "1700000000",
+        "webhook-signature": "v1,relay-signature",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handleFrameworksWebhookEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "evt-relayed", type: "stream.live" }),
+    );
+    expect(verifyFrameworksWebhookSignature).toHaveBeenCalled();
+    expect(verifyLivepeerWebhookSignature).not.toHaveBeenCalled();
+  });
+
   it("returns 401 when FrameWorks signature is invalid", async () => {
     vi.mocked(resolveVideoProviderId).mockReturnValue("frameworks");
     vi.mocked(verifyFrameworksWebhookSignature).mockReturnValue(false);
