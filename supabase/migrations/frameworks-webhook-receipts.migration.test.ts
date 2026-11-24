@@ -39,6 +39,15 @@ describe.sequential('atomic FrameWorks webhook receipts',()=>{
   expect((await db.query('SELECT asset_id,creator_id,requires_metoken,metoken_price::text,thumbnail_url FROM video_assets')).rows).toEqual([{asset_id:'recording',creator_id:owner,requires_metoken:true,metoken_price:'2',thumbnail_url:''}]);
   expect((await db.query('SELECT asset_id,playback_id,creator_id,status,requires_metoken,metoken_price::text FROM frameworks_vod_access')).rows).toEqual([{asset_id:'recording',playback_id:'recording-play',creator_id:owner,status:'published',requires_metoken:true,metoken_price:'2'}]);
  });
+ it('preserves catalog gate on first authority insert when parent later ungates',async()=>{
+  await db.exec(`INSERT INTO video_assets(title,asset_id,playback_id,category,location,creator_id,status,duration,views_count,likes_count,is_minted,current_supply,thumbnail_url,source_type,parent_playback_id,requires_metoken,metoken_price)
+    VALUES('Catalog recording','catalog-record','catalog-play','livestream','','${owner}','published',10,0,0,false,0,'','Livestream','parent-play',true,2)`);
+  await db.exec('UPDATE streams SET requires_metoken=false,metoken_price=NULL');
+  await process('catalog-ready','recording.ready',undefined,undefined,{assetId:'catalog-record',playbackId:'catalog-play',policyConfirmed:true});
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM frameworks_vod_access WHERE asset_id='catalog-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'2'}]);
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM video_assets WHERE asset_id='catalog-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'2'}]);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=2');
+ });
  it('does not relax an existing recording gate when the parent changes or republish an archived recording',async()=>{
   await db.exec("UPDATE streams SET requires_metoken=false,metoken_price=NULL;UPDATE frameworks_vod_access SET status='archived' WHERE asset_id='recording'");
   await process('record3','recording.ready',undefined,undefined,{assetId:'recording',playbackId:'recording-play',policyConfirmed:true});

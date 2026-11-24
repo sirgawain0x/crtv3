@@ -14,6 +14,9 @@ DECLARE
   v_asset_id text;
   v_playback_id text;
   v_duration numeric;
+  v_has_video boolean;
+  v_gate_requires boolean;
+  v_gate_price numeric;
 BEGIN
   IF p_type NOT IN ('stream.live','stream.idle','recording.ready','upload.ready','clip.ready')
       OR p_occurred_at IS NULL THEN RAISE EXCEPTION 'Invalid business event'; END IF;
@@ -59,19 +62,24 @@ BEGIN
   IF v_inserted=0 THEN RAISE EXCEPTION 'Conflicting artifact playback identity'; END IF;
   IF p_type='recording.ready' THEN
     SELECT * INTO v_existing FROM public.video_assets WHERE asset_id=v_asset_id LIMIT 1;
-    IF FOUND THEN
+    v_has_video := FOUND;
+    IF v_has_video THEN
       IF v_existing.playback_id IS DISTINCT FROM v_playback_id OR lower(v_existing.creator_id) IS DISTINCT FROM lower(v_stream.creator_id) THEN
         RAISE EXCEPTION 'Recording ownership or identity conflict';
       END IF;
+      v_gate_requires := coalesce(v_existing.requires_metoken,false);
+      v_gate_price := v_existing.metoken_price;
     ELSE
       INSERT INTO public.video_assets(title,asset_id,playback_id,category,location,description,creator_id,status,
         duration,views_count,likes_count,is_minted,current_supply,thumbnail_url,source_type,parent_playback_id,requires_metoken,metoken_price)
       VALUES(coalesce(nullif(p_artifact->>'name',''),v_stream.name,'Livestream recording'),v_asset_id,v_playback_id,
         'livestream','',NULL,lower(v_stream.creator_id),'published',v_duration,0,0,false,0,coalesce(v_stream.thumbnail_url,''),
         'Livestream',v_stream.playback_id,v_stream.requires_metoken,v_stream.metoken_price);
+      v_gate_requires := coalesce(v_stream.requires_metoken,false);
+      v_gate_price := v_stream.metoken_price;
     END IF;
     INSERT INTO public.frameworks_vod_access(asset_id,playback_id,creator_id,status,requires_metoken,metoken_price)
-      VALUES(v_asset_id,v_playback_id,lower(v_stream.creator_id),coalesce(v_existing.status,'published'),coalesce(v_stream.requires_metoken,false),v_stream.metoken_price)
+      VALUES(v_asset_id,v_playback_id,lower(v_stream.creator_id),coalesce(v_existing.status,'published'),v_gate_requires,v_gate_price)
       ON CONFLICT(asset_id) DO NOTHING;
     SELECT * INTO STRICT v_access FROM public.frameworks_vod_access WHERE asset_id=v_asset_id FOR UPDATE;
     IF v_access.playback_id IS DISTINCT FROM v_playback_id OR v_access.creator_id IS DISTINCT FROM lower(v_stream.creator_id) THEN
@@ -79,7 +87,13 @@ BEGIN
     END IF;
     -- Repeated events never relax the gate or republish an archived recording.
     UPDATE public.video_assets SET provider='frameworks',frameworks_asset_id=v_asset_id,frameworks_playback_id=v_playback_id,
-      status=v_access.status,requires_metoken=v_access.requires_metoken,metoken_price=v_access.metoken_price
+      status=v_access.status,
+      requires_metoken=(requires_metoken OR v_access.requires_metoken),
+      metoken_price=CASE
+        WHEN requires_metoken AND (v_access.metoken_price IS NULL OR v_access.metoken_price=0) THEN metoken_price
+        WHEN metoken_price IS NOT NULL AND v_access.metoken_price IS NOT NULL AND v_access.metoken_price < metoken_price THEN metoken_price
+        ELSE coalesce(v_access.metoken_price,metoken_price)
+      END
       WHERE asset_id=v_asset_id AND playback_id=v_playback_id AND lower(creator_id)=v_access.creator_id;
   ELSE
     -- Ready observations are durable even if the browser has not saved its draft yet. Never publish or assign an owner from webhook metadata.
