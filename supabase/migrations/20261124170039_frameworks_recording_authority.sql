@@ -67,8 +67,12 @@ BEGIN
       IF v_existing.playback_id IS DISTINCT FROM v_playback_id OR lower(v_existing.creator_id) IS DISTINCT FROM lower(v_stream.creator_id) THEN
         RAISE EXCEPTION 'Recording ownership or identity conflict';
       END IF;
-      v_gate_requires := coalesce(v_existing.requires_metoken,false);
-      v_gate_price := v_existing.metoken_price;
+      v_gate_requires := coalesce(v_existing.requires_metoken,false) OR coalesce(v_stream.requires_metoken,false);
+      IF v_gate_requires THEN
+        v_gate_price := greatest(v_existing.metoken_price,v_stream.metoken_price);
+      ELSE
+        v_gate_price := NULL;
+      END IF;
     ELSE
       INSERT INTO public.video_assets(title,asset_id,playback_id,category,location,description,creator_id,status,
         duration,views_count,likes_count,is_minted,current_supply,thumbnail_url,source_type,parent_playback_id,requires_metoken,metoken_price)
@@ -88,7 +92,7 @@ BEGIN
     -- Repeated events never relax the gate or republish an archived recording.
     UPDATE public.video_assets SET provider='frameworks',frameworks_asset_id=v_asset_id,frameworks_playback_id=v_playback_id,
       status=v_access.status,
-      requires_metoken=(requires_metoken OR v_access.requires_metoken),
+      requires_metoken=(coalesce(requires_metoken,false) OR coalesce(v_access.requires_metoken,false)),
       metoken_price=CASE
         WHEN requires_metoken AND (v_access.metoken_price IS NULL OR v_access.metoken_price=0) THEN metoken_price
         WHEN metoken_price IS NOT NULL AND v_access.metoken_price IS NOT NULL AND v_access.metoken_price < metoken_price THEN metoken_price

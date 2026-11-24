@@ -48,6 +48,24 @@ describe.sequential('atomic FrameWorks webhook receipts',()=>{
   expect((await db.query("SELECT requires_metoken,metoken_price::text FROM video_assets WHERE asset_id='catalog-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'2'}]);
   await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=2');
  });
+ it('raises gate from parent when catalog row is ungated on first authority insert',async()=>{
+  await db.exec(`INSERT INTO video_assets(title,asset_id,playback_id,category,location,creator_id,status,duration,views_count,likes_count,is_minted,current_supply,thumbnail_url,source_type,parent_playback_id,requires_metoken,metoken_price)
+    VALUES('Ungated catalog','ungated-record','ungated-play','livestream','','${owner}','published',10,0,0,false,0,'','Livestream','parent-play',false,NULL)`);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=5');
+  await process('ungated-ready','recording.ready',undefined,undefined,{assetId:'ungated-record',playbackId:'ungated-play',policyConfirmed:true});
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM frameworks_vod_access WHERE asset_id='ungated-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'5'}]);
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM video_assets WHERE asset_id='ungated-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'5'}]);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=2');
+ });
+ it('keeps the higher gated price when catalog and parent differ',async()=>{
+  await db.exec(`INSERT INTO video_assets(title,asset_id,playback_id,category,location,creator_id,status,duration,views_count,likes_count,is_minted,current_supply,thumbnail_url,source_type,parent_playback_id,requires_metoken,metoken_price)
+    VALUES('Lower catalog gate','higher-price-record','higher-price-play','livestream','','${owner}','published',10,0,0,false,0,'','Livestream','parent-play',true,2)`);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=5');
+  await process('higher-price-ready','recording.ready',undefined,undefined,{assetId:'higher-price-record',playbackId:'higher-price-play',policyConfirmed:true});
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM frameworks_vod_access WHERE asset_id='higher-price-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'5'}]);
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM video_assets WHERE asset_id='higher-price-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'5'}]);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=2');
+ });
  it('does not relax an existing recording gate when the parent changes or republish an archived recording',async()=>{
   await db.exec("UPDATE streams SET requires_metoken=false,metoken_price=NULL;UPDATE frameworks_vod_access SET status='archived' WHERE asset_id='recording'");
   await process('record3','recording.ready',undefined,undefined,{assetId:'recording',playbackId:'recording-play',policyConfirmed:true});
