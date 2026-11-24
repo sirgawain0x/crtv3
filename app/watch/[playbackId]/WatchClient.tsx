@@ -421,10 +421,13 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     void retryAfterGate();
   }, [user?.address, smartAccountAddress, status.kind, retryAfterGate]);
 
-  // Initial fetch
+  // Proof refreshes change the auth callbacks without changing the viewer.
+  // Only a stream/account change should restart playback and unmount its tools.
+  const fetchPlaybackSourcesRef = useRef(fetchPlaybackSources);
+  fetchPlaybackSourcesRef.current = fetchPlaybackSources;
   useEffect(() => {
-    fetchPlaybackSources(true);
-  }, [fetchPlaybackSources]);
+    void fetchPlaybackSourcesRef.current(true);
+  }, [playbackId, user?.address, smartAccountAddress, authAddress]);
 
   // Auto-poll every 15 seconds only while the stream is temporarily offline.
   useInterval(
