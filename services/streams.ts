@@ -12,6 +12,9 @@ import { isPermittedSigner } from "@/lib/utils/linked-identity";
 import { serverLogger } from "@/lib/utils/logger";
 
 export interface Stream {
+    provider?: 'livepeer' | 'frameworks' | null;
+    frameworks_stream_id?: string | null;
+    frameworks_playback_id?: string | null;
     id: string;
     creator_id: string;
     stream_key: string;
@@ -36,7 +39,7 @@ export interface Stream {
     updated_at: string;
 }
 
-export type CreateStreamParams = Omit<Stream, "id" | "created_at" | "updated_at">;
+export type CreateStreamParams = Omit<Stream, "id" | "created_at" | "updated_at" | "provider" | "frameworks_stream_id" | "frameworks_playback_id">;
 export type UpdateStreamParams = Partial<
   Pick<
     Stream,
@@ -261,11 +264,15 @@ export async function getStreamByStreamId(streamId: string) {
 export async function getStreamByPlaybackId(playbackId: string) {
     const supabase = await createClient(); // Use regular client for public read
 
-    const { data, error } = await supabase
+    const lookup = (field: 'playback_id' | 'livepeer_playback_id') => supabase
         .from("streams")
         .select("id, creator_id, stream_id, playback_id, thumbnail_url, name, is_live, last_live_at, allow_clipping, save_recording, requires_metoken, metoken_price, story_ip_id, story_license_terms_id, story_commercial_rev_share, story_ip_registered_at, lens_live_post_id")
-        .eq("playback_id", playbackId)
+        .eq(field, playbackId)
         .maybeSingle();
+    let { data, error } = await lookup('playback_id');
+    if (!error && !data && getVideoProviderId() === 'frameworks') {
+        ({ data, error } = await lookup('livepeer_playback_id'));
+    }
 
     if (error) {
         console.error("Error fetching stream by playback ID:", error);
@@ -285,6 +292,10 @@ export async function createStreamRecord(params: CreateStreamParams) {
         .from("streams")
         .insert({
             ...params,
+            ...(getVideoProviderId() === 'frameworks' ? {
+                provider: 'frameworks', frameworks_stream_id: params.stream_id,
+                frameworks_playback_id: params.playback_id,
+            } : {}),
             creator_id: params.creator_id.toLowerCase(), // Ensure lowercase storage
         })
         .select()
@@ -319,6 +330,10 @@ export async function replaceStreamLivepeerCredentials(
             stream_id: credentials.stream_id,
             stream_key: credentials.stream_key,
             playback_id: credentials.playback_id,
+            ...(getVideoProviderId() === 'frameworks' ? {
+                provider: 'frameworks', frameworks_stream_id: credentials.stream_id,
+                frameworks_playback_id: credentials.playback_id,
+            } : {}),
             is_live: false,
             updated_at: new Date().toISOString(),
         })
