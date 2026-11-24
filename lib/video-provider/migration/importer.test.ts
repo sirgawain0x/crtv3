@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe,expect,it,vi } from 'vitest';
 import { runAssetImport,type ImportLedger,type ImportProvider,type ImportRecord,type ImportState } from './importer';
+import {ImportStoppedError,MigrationProviderFailure} from './import-failure';
 const bytes=new Uint8Array([1,2,3,4,5]);
 const source={assetId:'2499b6b6-314f-4251-b119-fbb6445a48a5',playbackId:'old-play',sizeBytes:5,sha256:createHash('sha256').update(bytes).digest('hex')};
 function fixture(initial?:ImportState) {
@@ -16,6 +17,12 @@ function fixture(initial?:ImportState) {
   return {ledger,provider,file,getRecord:()=>record};
 }
 describe('resumable protected imports',()=>{
+  it('retains an ambiguous reservation while returning only the fixed preparation failure classification',async()=>{
+    const f=fixture();vi.mocked(f.provider.createProtectedUpload).mockRejectedValue(new MigrationProviderFailure('policy-unconfirmed'));
+    await expect(runAssetImport({source,...f})).rejects.toBeInstanceOf(ImportStoppedError);
+    expect(f.getRecord()?.state).toBe('ambiguous');expect(f.provider.uploadPart).not.toHaveBeenCalled();
+    await runAssetImport({source,...f});expect(f.provider.createProtectedUpload).toHaveBeenCalledTimes(1);
+  });
   it('reserves before mutation, persists target before bytes and marks ready only after a separate protection check',async()=>{
     const f=fixture();
     vi.mocked(f.provider.createProtectedUpload).mockImplementationOnce(async()=>{
