@@ -16,9 +16,12 @@ import {
   markStreamOfflineByStreamId,
 } from "@/services/streams";
 import { serverLogger } from "@/lib/utils/logger";
+import { relayFrameworksWebhookToStaging } from '@/lib/webhooks/frameworks-staging-relay';
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
+  const relayed = await relayFrameworksWebhookToStaging(rawBody, request.headers);
+  if (relayed) return relayed;
   const signature = request.headers.get("Livepeer-Signature");
 
   if (!verifyLivepeerWebhookSignature(rawBody, signature)) {
