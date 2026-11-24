@@ -17,7 +17,21 @@ import {POST} from './route';
 const owner='0x'+'a'.repeat(40),broadcaster='0x'+'b'.repeat(40);
 const request=()=>new NextRequest('https://example.test/api/livepeer/clips',{method:'POST',body:JSON.stringify({playbackId:'parent-play',sessionId:'session',startTime:1000,endTime:11000,clipperAddress:owner})});
 beforeEach(()=>{vi.clearAllMocks();m.auth.mockResolvedValue({address:owner});m.stream.mockResolvedValue({id:'parent-id',playback_id:'parent-play',creator_id:broadcaster,requires_metoken:true,metoken_price:2});m.access.mockResolvedValue({allowed:true});m.create.mockResolvedValue({assetId:'clip',newPlaybackId:'clip-play',playbackUrl:'https://foghorn.frameworks.network/play/clip-play/hls/index.m3u8'});m.secure.mockResolvedValue(undefined);m.rpc.mockResolvedValue({error:null});});
+const baseBody={playbackId:'parent-play',sessionId:'session',startTime:1000,endTime:11000,clipperAddress:owner};
+const postWith=(overrides:Partial<typeof baseBody>)=>new NextRequest('https://example.test/api/livepeer/clips',{method:'POST',body:JSON.stringify({...baseBody,...overrides})});
 describe('protected clip creation',()=>{
+ it('rejects an invalid clipperAddress before creating an upstream clip',async()=>{
+  const response=await POST(postWith({clipperAddress:'not-an-address'}));
+  expect(response.status).toBe(400);expect(await response.json()).toEqual({error:'Invalid clipperAddress format'});expect(m.create).not.toHaveBeenCalled();
+ });
+ it('rejects an invalid playbackId before creating an upstream clip',async()=>{
+  const response=await POST(postWith({playbackId:'bad id!'}));
+  expect(response.status).toBe(400);expect(await response.json()).toEqual({error:'Invalid playbackId'});expect(m.create).not.toHaveBeenCalled();
+ });
+ it('rejects an invalid sessionId before creating an upstream clip',async()=>{
+  const response=await POST(postWith({sessionId:'x'.repeat(201)}));
+  expect(response.status).toBe(400);expect(await response.json()).toEqual({error:'Invalid sessionId'});expect(m.create).not.toHaveBeenCalled();
+ });
  it('rejects forged wallet proof before creating an upstream clip',async()=>{
   m.auth.mockRejectedValue(new WalletAuthError(403,'Invalid wallet signature'));
   expect((await POST(request())).status).toBe(403);expect(m.create).not.toHaveBeenCalled();
