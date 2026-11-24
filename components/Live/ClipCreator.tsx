@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useState } from "react";
-import { useUser } from "@/lib/wallet/react";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Scissors, Settings2, Share2 } from "lucide-react";
 import { SongchainShareClipDialog } from "@/components/songchain/SongchainShareClipDialog";
 import type { ClipLensShareInput } from "@/lib/songchain/clip-to-video-asset";
+import type { Src } from '@livepeer/react';
+import { PreviewPlayer } from '@/components/Player/PreviewPlayer';
+import { getDetailPlaybackSource } from '@/lib/hooks/livepeer/useDetailPlaybackSources';
 
 interface ClipCreatorProps {
   playbackId: string;
@@ -35,9 +37,9 @@ export function ClipCreator({
   parentStoryIpId,
   parentCommercialRevShare,
 }: ClipCreatorProps) {
-  const user = useUser();
-  const { getAuthHeaders } = useWalletAuth();
-  const clipperAddress = user?.address;
+  const { getAuthHeaders, address: clipperAddress } = useWalletAuth();
+  const [previewSources,setPreviewSources]=useState<Src[]|null>(null);
+  const [previewLoading,setPreviewLoading]=useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clip, setClip] = useState<ClipState | null>(null);
@@ -60,11 +62,13 @@ export function ClipCreator({
       setIsLoading(true);
       setError(null);
       setClip(null);
+      setPreviewSources(null);
       setMintResult(null);
       try {
+        const authHeaders=await getAuthHeaders();
         const res = await fetch("/api/livepeer/clips", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({
             playbackId,
             sessionId,
@@ -82,7 +86,7 @@ export function ClipCreator({
 
         const persistRes = await fetch("/api/video-assets/clips", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({
             assetId: data.assetId,
             playbackId: data.newPlaybackId,
@@ -96,6 +100,7 @@ export function ClipCreator({
           }),
         });
         const persist = await persistRes.json().catch(() => ({}));
+        if(!persistRes.ok) throw new Error(persist?.error || 'Clip could not be saved');
 
         const clipTitle =
           name.trim() ||
@@ -120,7 +125,7 @@ export function ClipCreator({
         setIsLoading(false);
       }
     },
-    [clipperAddress, name, parentCommercialRevShare, parentStoryIpId, playbackId, sessionId]
+    [clipperAddress, getAuthHeaders, name, parentCommercialRevShare, parentStoryIpId, playbackId, sessionId]
   );
 
   const handleQuickClip = (durationSec: number) => {
@@ -278,12 +283,17 @@ export function ClipCreator({
         <Alert>
           <AlertTitle>Clip Created!</AlertTitle>
           <AlertDescription className="space-y-3">
-            <video
-              src={clip.playbackUrl}
-              controls
-              className="w-full max-w-sm rounded shadow"
-              style={{ aspectRatio: "16/9" }}
-            />
+            {previewSources ? <PreviewPlayer src={previewSources} title={clip.title} playbackId={clip.newPlaybackId}/> : (
+              <Button disabled={previewLoading} onClick={async()=>{
+                setPreviewLoading(true);setError(null);
+                try {
+                  const sources=await getDetailPlaybackSource(clip.newPlaybackId,{authHeaders:await getAuthHeaders()});
+                  if(sources?.length)setPreviewSources(sources);
+                  else setError('Your clip is still processing. Try the preview again shortly.');
+                } catch {setError('Could not load the protected clip preview. Please try again.');}
+                finally {setPreviewLoading(false);}
+              }}>{previewLoading?'Loading preview…':'Preview clip'}</Button>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
