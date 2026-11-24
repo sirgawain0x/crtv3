@@ -88,9 +88,16 @@ export async function handlePlaybackInfo(request: NextRequest): Promise<NextResp
 
     if (viewerToken) {
       const sources = response.playbackInfo.meta?.source ?? [];
-      const authorizedUrl = sources.length
-        ? await resolveAuthorizedFrameworksHlsUrl(canonicalPlaybackId, viewerToken)
-        : undefined;
+      let authorizedUrl: string | undefined;
+      try {
+        authorizedUrl = sources.length
+          ? await resolveAuthorizedFrameworksHlsUrl(canonicalPlaybackId, viewerToken)
+          : undefined;
+      } catch {
+        return NextResponse.json({ error: 'Playback routing unavailable' }, {
+          status: 503, headers: { 'Cache-Control': 'private, no-store' },
+        });
+      }
       response.playbackInfo = { ...response.playbackInfo, meta: {
         ...response.playbackInfo.meta,
         source: sources.map(source => {

@@ -52,6 +52,14 @@ describe('provider playback HTTP boundary', () => {
     const response = await handlePlaybackInfo(new NextRequest('https://example.test/api/internal/playback-info?playbackId=pb-1'));
     expect(response.status).toBe(status);
     expect(playback).not.toHaveBeenCalled();
+    expect(resolveAuthorizedFrameworksHlsUrl).not.toHaveBeenCalled();
+  });
+  it('fails closed with a private response when protected media routing fails',async()=>{
+    playback.mockResolvedValue({playbackInfo:{meta:{source:[{url:'https://media.example/hls.m3u8'}]}}});
+    vi.mocked(resolveAuthorizedFrameworksHlsUrl).mockRejectedValueOnce(new Error('PRIVATE_PROVIDER_URL'));
+    const response=await handlePlaybackInfo(new NextRequest('https://example.test/api/internal/playback-info?playbackId=pb-1'));
+    expect(response.status).toBe(503);expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(JSON.stringify(await response.json())).not.toContain('PRIVATE');
   });
   it('forwards wallet proof and canonical identity to the existing authorization checks', async () => {
     vi.mocked(resolveFrameworksPlaybackAlias).mockResolvedValue('canonical');
