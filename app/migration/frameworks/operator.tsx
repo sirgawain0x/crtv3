@@ -21,11 +21,12 @@ export default function MigrationOperator(){
    const parsed=JSON.parse(metadata);const sources=archivedSourcesFromManifests([{assets:[{...parsed,status:'archived'}]}]);
    if(sources.length!==1)throw new Error('Paste one source from the verified archive manifest.');
    const result=await request(mode,sources[0]);
+   if('message' in result){setMessage(result.message);return;}
    if(mode==='inspect-playback'||mode==='inspect-reservation'){if('diagnostic' in result)setMessage(JSON.stringify(result.diagnostic));return;}
    if('outcome' in result){
-    setOutcome(result.outcome);
-    setMessage(result.outcome.state==='ready'?'Verified import ready.':'Request finished. Poll an existing processing import; do not recreate uncertain imports.');
+    setOutcome(result.outcome);setMessage(result.recovery?(result.outcome.state==='ready'?'Replacement is ready. Adopt verified recovery to reconcile the original mapping.':'Replacement request finished. Poll replacement; never recreate an uncertain attempt.'):(result.outcome.state==='ready'?'Verified import ready.':'Request finished. Poll an existing processing import; do not recreate uncertain imports.'));
    }
+
   }catch(error){setMessage(error instanceof Error?error.message:'Migration request failed');}finally{setBusy(false);}
  }
  async function runBatch(){
@@ -37,7 +38,7 @@ export default function MigrationOperator(){
     const response=await request(mode,source);
     if('outcome' in response)return {outcome:response.outcome};
     if('diagnostic' in response)return {diagnostic:{playableManifest:response.diagnostic.playableManifest===true}};
-    throw new Error(response.error);
+    throw new Error('error' in response?response.error:'Unexpected migration batch response');
    },shouldStop:()=>stopRequested.current,
     wait:()=>new Promise(resolve=>setTimeout(resolve,10000)),
     report:progress=>setMessage(`${progress.completed}/${progress.total} verified. ${progress.phase}: ${progress.sourceId}`)});
@@ -54,6 +55,13 @@ export default function MigrationOperator(){
   <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('inspect-playback')}>Check playback manifest</button>
   <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('inspect-reservation')}>Inspect import reservation</button>
   <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={runBatch}>Import verified batch</button>
+  <details className="space-y-3 rounded border p-4"><summary>Reviewed unfinished-upload recovery</summary>
+   <p>Only the specifically reviewed pre-transfer failure is eligible. Preserve its protected original artifact and audit; upload a separate replacement, verify it, then adopt its mapping. No original upload is retried or deleted.</p>
+   <button disabled={busy||!isReady||!metadata} onClick={()=>run('prepare-recovery')}>Prepare reviewed recovery</button>{' '}
+   <button disabled={busy||!isReady||!metadata} onClick={()=>run('import-recovery')}>Import reserved replacement</button>{' '}
+   <button disabled={busy||!isReady||!metadata} onClick={()=>run('poll-recovery')}>Poll replacement</button>{' '}
+   <button disabled={busy||!isReady||!metadata} onClick={()=>run('adopt-recovery')}>Adopt verified recovery</button>
+  </details>
   {busy&&<><button className="rounded border px-4 py-2" onClick={()=>{stopRequested.current=true;}}>Stop after current source</button><p role="status">Verifying sources. Keep this page open; completed reservations are reused when resuming.</p></>}
   {message&&<p role="status">{message}</p>}{outcome&&<p>State: <strong>{outcome.state}</strong></p>}
  </main>;
