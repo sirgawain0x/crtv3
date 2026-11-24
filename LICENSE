@@ -1,21 +1,36 @@
-MIT License
+Functional Source License, Version 1.1, MIT Future License (FSL-1.1-MIT)
 
-Copyright (c) 2025 Creative
+Copyright (c) 2026 Creative Platform, Inc.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## Acronyms
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+"Licensor" means Creative Platform, Inc.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+"Software" means the software and associated documentation files provided
+under this License.
+
+"Competing Use" means making the Software available to others in a
+commercial product or service that:
+1. substitutes for the Software;
+2. substitutes for any other product or service we offer using the Software
+   that exists as of the date we make the Software available; or
+3. offers the same or substantially similar functionality as the Software.
+
+## Terms
+
+1. License Grant. Subject to the terms of this License, Licensor grants
+   you a non-exclusive, worldwide, non-transferable, non-sublicensable
+   license to use, copy, modify, and distribute the Software for any
+   purpose other than a Competing Use.
+
+2. Future Open Source License. On the second anniversary of the date we
+   make a version of the Software available under this License, that
+   version automatically becomes licensed under the MIT License.
+
+3. Conditions. You must retain all copyright notices and this License in
+   all copies or substantial portions of the Software.
+
+4. Disclaimer. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+   KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+   OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT.
