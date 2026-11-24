@@ -1,9 +1,13 @@
 import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { requirePlatformApiAccess } from "@/lib/middleware/platformApiAccess";
 import { NextRequest, NextResponse } from 'next/server';
-import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
+import {
+  FrameWorksUploadsAssetsUnavailableError,
+  requireVideoProviderForUploadsAndAssets,
+} from '@/lib/video-provider';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
+import { isVideoAssetId } from '@/lib/video-provider/asset-id';
 
 export async function GET(
   request: NextRequest,
@@ -22,20 +26,20 @@ export async function GET(
       ), access);
     }
 
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(assetId)) {
+    if (!isVideoAssetId(assetId)) {
       return withPlatformApiPaymentHeaders(NextResponse.json(
         {
-          error: 'Invalid asset ID format. Expected UUID format.',
+          error: 'Invalid asset ID format.',
           code: 'INVALID_ASSET_ID',
         },
         { status: 400 },
       ), access);
     }
 
-    const client = getFullLivepeer();
-    if (!client) {
+    const provider = requireVideoProviderForUploadsAndAssets(
+      "asset.[assetId].GET",
+    );
+    if (!provider.isConfigured()) {
       return withPlatformApiPaymentHeaders(NextResponse.json(
         {
           error: 'Livepeer is not configured',
@@ -45,10 +49,14 @@ export async function GET(
       ), access);
     }
 
-    const assetResponse = await client.asset.get(assetId);
+    const assetResponse = (await provider.assets.getById(assetId)) as {
+      errors?: string[];
+      asset?: unknown;
+    } | null;
 
     if (
       assetResponse &&
+      typeof assetResponse === "object" &&
       'errors' in assetResponse &&
       Array.isArray(assetResponse.errors) &&
       assetResponse.errors.length > 0
@@ -72,6 +80,10 @@ export async function GET(
 
     return withPlatformApiPaymentHeaders(NextResponse.json(assetResponse), access);
   } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
+      return withPlatformApiPaymentHeaders(NextResponse.json({ error: error.message }, { status: 503 }), access);
+    }
+
     serverLogger.error('Error fetching asset:', error);
 
     const err = error as { errors?: string[]; message?: string };

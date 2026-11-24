@@ -1,3 +1,4 @@
+import { resolveVideoProviderId } from '@/lib/video-provider/config';
 import { NextRequest, NextResponse } from "next/server";
 import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 
@@ -8,6 +9,7 @@ const LIVEPEER_ATTESTATION_BASE = "https://livepeer.studio/api/experiment/-/atte
  * Body: { primaryType, domain, message, signature } (message.timestamp as number for JSON).
  */
 export async function POST(request: NextRequest) {
+  if (resolveVideoProviderId() === 'frameworks') return NextResponse.json({error:'Legacy attestation service unavailable'},{status:410});
   const verification = await checkBotIdDeep();
   if (verification.isBot) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
@@ -54,6 +56,7 @@ export async function POST(request: NextRequest) {
  * Query: id=<attestationId> OR creator=<0x address>
  */
 export async function GET(request: NextRequest) {
+  if (resolveVideoProviderId() === 'frameworks') return NextResponse.json({error:'Legacy attestation service unavailable'},{status:410});
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

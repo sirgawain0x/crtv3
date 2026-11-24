@@ -1,0 +1,57 @@
+import {PGlite} from '@electric-sql/pglite';
+import {readFileSync} from 'node:fs';
+import {afterAll,beforeAll,describe,expect,it} from 'vitest';
+const db=new PGlite();const owner='0x'+'a'.repeat(40);const sha='a'.repeat(64);
+beforeAll(async()=>{
+ await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;
+ CREATE TABLE streams(id integer PRIMARY KEY,stream_id text,playback_id text,creator_id text,is_live boolean,last_live_at timestamptz,updated_at timestamptz,save_recording boolean,name text,thumbnail_url text,requires_metoken boolean,metoken_price numeric);
+ CREATE TABLE video_assets(id serial PRIMARY KEY,title text,asset_id text,playback_id text,category text,location text,description text,creator_id text,status text,duration numeric,views_count integer,likes_count integer,is_minted boolean,current_supply integer,thumbnail_url text NOT NULL DEFAULT '',source_type text,parent_playback_id text,requires_metoken boolean,metoken_price numeric,updated_at timestamptz DEFAULT now());
+ GRANT ALL ON streams,video_assets TO service_role;GRANT USAGE ON SEQUENCE video_assets_id_seq TO service_role;
+ ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon,authenticated,service_role;
+ INSERT INTO streams VALUES(1,'parent','parent-play','${owner}',false,NULL,now(),true,'Creator stream',NULL,true,2);`);
+ await db.exec(readFileSync(new URL('./20261123143443_frameworks_webhook_receipts.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./20261123144030_frameworks_recording_thumbnail_fallback.sql',import.meta.url),'utf8'));
+},30000);
+afterAll(()=>db.close());
+const process=(id:string,type:string,time='2026-11-23T10:00:00Z',stream:string|null='parent',artifact:Record<string,unknown>|null=null,hash=sha)=>db.query<{process_frameworks_webhook:string}>('SELECT process_frameworks_webhook($1,$2,$3,$4,$5,$6)',[id,type,hash,time,stream,artifact]);
+describe.sequential('atomic FrameWorks webhook receipts',()=>{
+ it('processes once and rejects a conflicting payload under the same event ID',async()=>{
+  expect((await process('live','stream.live')).rows[0].process_frameworks_webhook).toBe('processed');
+  expect((await process('live','stream.live')).rows[0].process_frameworks_webhook).toBe('duplicate');
+  await expect(process('live','stream.live',undefined,undefined,undefined,'b'.repeat(64))).rejects.toThrow(/conflict/);
+ });
+ it('keeps newer stream state when an older event arrives',async()=>{
+  await process('idle','stream.idle','2026-11-23T10:01:00Z');
+  expect((await process('old-live','stream.live','2026-11-23T09:59:00Z')).rows[0].process_frameworks_webhook).toBe('ignored');
+  expect((await db.query('SELECT is_live FROM streams')).rows).toEqual([{is_live:false}]);
+ });
+ it('rolls back its receipt on missing stream and permits the same event to retry',async()=>{
+  await expect(process('retry','stream.live',undefined,'missing')).rejects.toThrow(/not available/);
+  expect((await db.query("SELECT count(*)::int AS count FROM frameworks_webhook_receipts WHERE event_id='retry'")).rows).toEqual([{count:0}]);
+  expect((await process('retry','stream.live','2026-11-23T10:02:00Z')).rows[0].process_frameworks_webhook).toBe('processed');
+ });
+ it('stores a recording once across different event IDs, deriving its owner and gate from the stream',async()=>{
+  const artifact={assetId:'recording',playbackId:'recording-play',durationSeconds:12,creator_id:'attacker'};
+  await process('record1','recording.ready',undefined,undefined,artifact);await process('record2','recording.ready',undefined,undefined,artifact);
+  expect((await db.query('SELECT asset_id,creator_id,requires_metoken,metoken_price::text,thumbnail_url FROM video_assets')).rows).toEqual([{asset_id:'recording',creator_id:owner,requires_metoken:true,metoken_price:'2',thumbnail_url:''}]);
+ });
+ it('preserves an upload observation before browser persistence without publishing or inventing ownership',async()=>{
+  await process('upload','upload.ready',undefined,null,{assetId:'upload',playbackId:'upload-play',durationSeconds:7});
+  expect((await db.query("SELECT count(*)::int AS count FROM video_assets WHERE asset_id='upload'")).rows).toEqual([{count:0}]);
+  expect((await db.query("SELECT playback_id FROM frameworks_ready_artifacts WHERE asset_id='upload'")).rows).toEqual([{playback_id:'upload-play'}]);
+ });
+ it('does not acknowledge a conflicting artifact identity or failed database effect',async()=>{
+  await expect(process('conflict','upload.ready',undefined,null,{assetId:'upload',playbackId:'different'})).rejects.toThrow(/Conflicting/);
+  expect((await db.query("SELECT count(*)::int AS count FROM frameworks_webhook_receipts WHERE event_id='conflict'")).rows).toEqual([{count:0}]);
+ });
+ it('honors a creator decision not to save recordings',async()=>{
+  await db.exec('UPDATE streams SET save_recording=false');
+  expect((await process('no-record','recording.ready',undefined,undefined,{assetId:'no-record',playbackId:'no-record-play'})).rows[0].process_frameworks_webhook).toBe('ignored');
+  expect((await db.query("SELECT count(*)::int AS count FROM video_assets WHERE asset_id='no-record'")).rows).toEqual([{count:0}]);
+ });
+ it('keeps receipts and RPC inaccessible to public roles',async()=>{
+  for(const role of ['anon','authenticated']){
+   await db.exec(`SET ROLE ${role}`);try{await expect(process('forged','stream.live')).rejects.toThrow();await expect(db.query('SELECT * FROM frameworks_webhook_receipts')).rejects.toThrow();}finally{await db.exec('RESET ROLE');}
+  }
+ });
+});

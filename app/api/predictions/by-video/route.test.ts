@@ -25,6 +25,7 @@ vi.mock("@/lib/middleware/rateLimit", () => ({
 type SupaChain = {
   select: (...args: unknown[]) => SupaChain;
   eq: (...args: unknown[]) => SupaChain;
+  or: (...args: unknown[]) => SupaChain;
   in: (...args: unknown[]) => SupaChain;
   order: (...args: unknown[]) => SupaChain;
   limit: (...args: unknown[]) => SupaChain;
@@ -40,6 +41,7 @@ vi.mock("@/lib/sdk/supabase/service", () => ({
       const chain = {} as SupaChain;
       chain.select = () => chain;
       chain.eq = () => chain;
+      chain.or = () => chain;
       chain.in = () => chain;
       chain.order = () => chain;
       chain.limit = () => chain;
@@ -112,11 +114,16 @@ describe("predictions/by-video GET", () => {
     expect(mockVideoLookup).not.toHaveBeenCalled();
   });
 
+  it("preserves opaque provider ID case", async () => {
+    const response=await GET(byVideoRequest('?videoAssetId=Hash_Case-1'));
+    expect(response.status).toBe(200);expect((await response.json()).videoAssetId).toBe('Hash_Case-1');
+  });
+
   it("returns 400 for a missing or malformed videoAssetId", async () => {
     const missing = await GET(byVideoRequest(""));
     expect(missing.status).toBe(400);
 
-    const malformed = await GET(byVideoRequest("?videoAssetId=not-a-uuid"));
+    const malformed = await GET(byVideoRequest("?videoAssetId=bad%2Fid"));
     expect(malformed.status).toBe(400);
 
     const json = await malformed.json();

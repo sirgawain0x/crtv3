@@ -36,7 +36,6 @@ export function useAutoDeployContentCoin() {
                     // Use server action to update the asset
                     await updateVideoAsset(videoAsset.id, {
                         thumbnailUri: videoAsset.thumbnail_url || '',
-                        status: videoAsset.status || 'draft',
                         attributes: {
                             content_coin_id: deployTx
                         }

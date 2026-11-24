@@ -19,6 +19,7 @@ vi.mock("@/lib/middleware/rateLimit", () => ({
 
 vi.mock("@/lib/auth/require-wallet", () => ({
   requireWalletAuthFor: (...args: unknown[]) => mockRequireWalletAuthFor(...args),
+  walletAuthHeadersToArgs: () => ({address: "0xcccccccccccccccccccccccccccccccccccccccc",timestamp:1700000000,signature:"0xproof"}),
   WalletAuthError: class WalletAuthError extends Error {
     constructor(
       public status: number,

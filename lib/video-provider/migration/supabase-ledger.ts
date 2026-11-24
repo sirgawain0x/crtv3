@@ -1,0 +1,28 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ArchivedSource } from './archive';
+import type { ImportLedger, ImportRecord, ImportState } from './importer';
+const columns='livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id';
+/** Supply the explicitly selected migration database, never the application's implicit production client. */
+export function createImportLedger(db: SupabaseClient): ImportLedger {
+  const find=async(sourceId:string):Promise<ImportRecord|null>=>{
+    const {data,error}=await db.from('frameworks_asset_imports').select(columns).eq('livepeer_asset_id',sourceId).maybeSingle();
+    if(error) throw new Error('Cannot read migration import ledger');
+    return data as ImportRecord|null;
+  };
+  return {find,
+    async reserve(source:ArchivedSource) {
+      const {data,error}=await db.from('frameworks_asset_imports').insert({livepeer_asset_id:source.assetId,
+        livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes,state:'prepared'}).select(columns).single();
+      if(!error && data) return data as ImportRecord;
+      if(error?.code==='23505') { const existing=await find(source.assetId); if(existing) return existing; }
+      throw new Error('Cannot reserve migration import');
+    },
+    async transition(sourceId:string,expected:ImportState,next:ImportState,target?:{assetId:string;playbackId:string}) {
+      const {data,error}=await db.from('frameworks_asset_imports').update({state:next,updated_at:new Date().toISOString(),
+        ...(target?{frameworks_asset_id:target.assetId,frameworks_playback_id:target.playbackId}:{})})
+        .eq('livepeer_asset_id',sourceId).eq('state',expected).select('livepeer_asset_id');
+      if(error) throw new Error('Cannot persist migration import state');
+      return data?.length===1;
+    },
+  };
+}

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getIngest } from '@livepeer/react/external';
 import { toast } from 'sonner';
+import type { StreamIngestDestination } from '@/lib/video-provider/ingest-types';
 import { logger } from '@/lib/utils/logger';
 
 export type BroadcastStatus = 'idle' | 'loading' | 'live' | 'error';
@@ -27,6 +28,7 @@ function preferCodec(sdp: string, codec: string): string {
 
 interface UseBroadcastProps {
     ingestUrl?: string | null;
+    resolveIngest?: () => Promise<StreamIngestDestination>;
     streamKey?: string | null;
     /**
      * Called once on WHIP 404 so the host can refresh stale Livepeer credentials
@@ -58,6 +60,7 @@ export function useBroadcast({
     ingestUrl,
     streamKey,
     refreshStreamKey,
+    resolveIngest,
 }: UseBroadcastProps): UseBroadcastReturn {
     const [status, setStatus] = useState<BroadcastStatus>('idle');
     const [error, setError] = useState<string | null>(null);
@@ -70,14 +73,24 @@ export function useBroadcast({
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+    const whipResourceRef = useRef<string | null>(null);
+    const connectionGenerationRef = useRef(0);
+    const mountedRef = useRef(true);
+    const mediaRequestRef = useRef(0);
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const activeStreamKeyRef = useRef<string | null>(streamKey ?? null);
+    const ingestProviderRef = useRef<"livepeer" | "frameworks">("livepeer");
 
     useEffect(() => {
         activeStreamKeyRef.current = streamKey ?? null;
     }, [streamKey]);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
 
     // Enumerate devices
     useEffect(() => {
@@ -108,6 +121,7 @@ export function useBroadcast({
 
     // Initialize Media Stream
     const initStream = useCallback(async () => {
+        const mediaRequest = ++mediaRequestRef.current;
         try {
             if (mediaStreamRef.current) {
                 mediaStreamRef.current.getTracks().forEach(track => track.stop());
@@ -123,6 +137,10 @@ export function useBroadcast({
             };
 
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (!mountedRef.current || mediaRequest !== mediaRequestRef.current) {
+                stream.getTracks().forEach(track => track.stop());
+                return;
+            }
             mediaStreamRef.current = stream;
             setLocalStream(stream);
 
@@ -136,6 +154,7 @@ export function useBroadcast({
             stream.getVideoTracks().forEach(track => track.enabled = isVideoEnabled);
 
         } catch (err) {
+            if (!mountedRef.current || mediaRequest !== mediaRequestRef.current) return;
             logger.error('Error accessing media devices:', err);
             setError('Failed to access camera/microphone');
             toast.error('Failed to access camera/microphone');
@@ -146,6 +165,7 @@ export function useBroadcast({
     useEffect(() => {
         initStream();
         return () => {
+            mediaRequestRef.current += 1;
             if (mediaStreamRef.current) {
                 mediaStreamRef.current.getTracks().forEach(track => track.stop());
             }
@@ -157,11 +177,16 @@ export function useBroadcast({
 
 
     const teardownPeerConnection = useCallback(() => {
-        if (peerConnectionRef.current) {
-            peerConnectionRef.current.close();
-            peerConnectionRef.current = null;
-        }
+        connectionGenerationRef.current += 1;
+        const resource = whipResourceRef.current;
+        whipResourceRef.current = null;
+        if (resource) void fetch(resource, { method: 'DELETE' }).catch(() => {});
+        const peer = peerConnectionRef.current;
+        peerConnectionRef.current = null;
+        if (peer) peer.close();
     }, []);
+
+    useEffect(() => () => teardownPeerConnection(), [teardownPeerConnection]);
 
     const analyzeOfferSdp = (sdp: string) => ({
         mediaLineCount: (sdp.match(/^m=/gm) || []).length,
@@ -187,22 +212,29 @@ export function useBroadcast({
     };
 
     const connectWhip = async (keyForIngest: string | null | undefined) => {
-        // Official @livepeer/react getIngest default:
-        // https://playback.livepeer.studio/webrtc/{streamKey}
-        // (HEAD-redirects to regional catalyst). /whip hosts 404.
-        const webrtcDiscoveryUrl =
-            (keyForIngest ? getIngest(keyForIngest) : null) ||
-            (keyForIngest
-                ? `https://playback.livepeer.studio/webrtc/${keyForIngest}`
-                : null);
-        let endpointUrl = webrtcDiscoveryUrl || ingestUrl || null;
+        teardownPeerConnection();
+        const generation = connectionGenerationRef.current;
+        const assertCurrent = () => {
+            if (!mountedRef.current || generation !== connectionGenerationRef.current) throw new DOMException('Broadcast stopped', 'AbortError');
+        };
+        assertCurrent();
+        // Resolve at Go Live, not on mount: FrameWorks placement is dynamic.
+        const destination = resolveIngest ? await resolveIngest() : null;
+        assertCurrent();
+        ingestProviderRef.current = destination?.provider ?? "livepeer";
+        const selectedUrl = destination
+            ? destination.whipUrl
+            : ingestUrl || (keyForIngest ? getIngest(keyForIngest) : null);
+        if (!selectedUrl) throw new Error('No WHIP destination is available');
+        const webrtcDiscoveryUrl = ingestProviderRef.current === "livepeer" ? selectedUrl : null;
+        let endpointUrl = selectedUrl;
         let iceServers: RTCIceServer[] = [
             { urls: 'stun:stun.l.google.com:19302' },
         ];
 
         // Livepeer docs: HEAD the webrtc redirect endpoint, use Location host for ICE.
         if (webrtcDiscoveryUrl) {
-            logger.debug('Discovering WHIP endpoint from:', webrtcDiscoveryUrl);
+
 
             try {
                 const headRes = await fetch(webrtcDiscoveryUrl, {
@@ -226,7 +258,7 @@ export function useBroadcast({
                     endpointUrl = webrtcDiscoveryUrl;
                 } else {
                     endpointUrl = headRes.url || webrtcDiscoveryUrl;
-                    logger.debug('Resolved WHIP endpoint:', endpointUrl);
+
 
                     const host = new URL(endpointUrl).host;
                     iceServers = [
@@ -246,7 +278,7 @@ export function useBroadcast({
                 ) {
                     throw e;
                 }
-                logger.error('Failed to discover optimized WHIP endpoint:', e);
+                logger.error('Failed to discover optimized WHIP endpoint');
                 endpointUrl = webrtcDiscoveryUrl;
             }
         }
@@ -255,8 +287,7 @@ export function useBroadcast({
             throw new Error('Could not resolve valid WHIP endpoint.');
         }
 
-        teardownPeerConnection();
-
+        assertCurrent();
         const pc = new RTCPeerConnection({ iceServers });
         peerConnectionRef.current = pc;
 
@@ -299,6 +330,7 @@ export function useBroadcast({
         // addTrack binds an RTP sender per track (required for media to flow).
         // Livepeer returns 404 "Stream open failed" when the offer has no m= lines.
         const activeStream = await ensureLiveMediaStream();
+        assertCurrent();
         const liveTracks = activeStream
             .getTracks()
             .filter((t) => t.readyState === 'live');
@@ -333,6 +365,7 @@ export function useBroadcast({
             }, 5000);
         });
 
+        assertCurrent();
         const offerSdp = pc.localDescription?.sdp;
         if (!offerSdp) throw new Error('Failed to generate SDP offer');
 
@@ -346,7 +379,7 @@ export function useBroadcast({
             throw err;
         }
 
-        logger.debug(`Posting SDP offer to: ${endpointUrl}`);
+
 
         const response = await fetch(endpointUrl, {
             method: 'POST',
@@ -358,19 +391,32 @@ export function useBroadcast({
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
+            if (response.body) await response.body.cancel().catch(() => {});
             const err = new Error(
-                `WHIP Request failed: ${response.status} ${response.statusText} - ${errorText}`,
+                `WHIP Request failed: ${response.status} ${response.statusText}`,
             ) as Error & { status?: number; offerHadMedia?: boolean };
             err.status = response.status;
             err.offerHadMedia = sdpInfo.mediaLineCount > 0;
             throw err;
         }
 
+        const location = response.headers.get('Location');
+        let resource: string | null = null;
+        if (location) {
+            const candidate = new URL(location, endpointUrl);
+            if (candidate.origin === new URL(endpointUrl).origin) resource = candidate.toString();
+        }
+        if (generation !== connectionGenerationRef.current) {
+            if (resource) void fetch(resource, { method: 'DELETE' }).catch(() => {});
+            assertCurrent();
+        }
+        whipResourceRef.current = resource;
         const answerSdp = await response.text();
+        assertCurrent();
         await pc.setRemoteDescription(
             new RTCSessionDescription({ type: 'answer', sdp: answerSdp }),
         );
+        assertCurrent();
     };
 
     const startBroadcast = async () => {
@@ -392,6 +438,7 @@ export function useBroadcast({
             setStatus('live');
             toast.success('Broadcast started successfully!');
         } catch (err: unknown) {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
             const message =
                 err instanceof Error ? err.message : 'Failed to start broadcast';
             const statusCode =
@@ -408,6 +455,7 @@ export function useBroadcast({
             // Livepeer returns the same 404 body for media-less offers; only refresh
             // credentials when discovery misses the stream or a media-bearing offer fails.
             const shouldRefreshKey =
+                ingestProviderRef.current === "livepeer" &&
                 Boolean(refreshStreamKey) &&
                 (isDiscovery404 || (isWhipPost404 && offerHadMedia === true));
 
@@ -434,6 +482,7 @@ export function useBroadcast({
                     toast.success('Broadcast started successfully!');
                     return;
                 } catch (retryErr) {
+                    if (retryErr instanceof DOMException && retryErr.name === 'AbortError') return;
                     logger.error('WHIP retry after credential refresh failed:', retryErr);
                     const retryMessage =
                         retryErr instanceof Error
@@ -462,6 +511,7 @@ export function useBroadcast({
     };
 
     const stopBroadcast = () => {
+        mediaRequestRef.current += 1;
         // Stop screen sharing if active
         if (screenStreamRef.current) {
             screenStreamRef.current.getTracks().forEach((track) => track.stop());

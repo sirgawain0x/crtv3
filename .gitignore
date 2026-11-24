@@ -82,3 +82,9 @@ public/workbox-*.js.map
 /contracts/interface
 /eip
 /fix-baseY-facet/
+
+# Private migration inventories and source archives
+livepeer-studio-inventory*.json
+livepeer-studio-inventory*.csv
+livepeer-archive*/
+frameworks-id-map*.json

@@ -23,7 +23,7 @@ export interface ModeratorRecord {
 /**
  * Look up the streams row for the moderation key. The chat keys moderation by
  * playback_id (matches the URL/session id), so we check that first and fall
- * back to stream_id for the rare creator-side flow that hands us the Livepeer
+ * back to stream_id for the rare creator-side flow that hands us the upstream
  * stream id directly.
  */
 async function lookupStream(streamId: string) {

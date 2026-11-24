@@ -89,7 +89,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
 
   const user = useUser();
   const { address: smartAccountAddress } = useModularAccount();
-  const { getAuthHeaders, address: authAddress } = useWalletAuth();
+  const { getAuthHeaders, getCachedAuthHeaders, address: authAddress } = useWalletAuth();
   const [status, setStatus] = useState<StreamStatus>({ kind: "loading" });
   const [streamData, setStreamData] = useState<import("@/services/streams").Stream | null>(null);
   const [jwt, setJwt] = useState<string | undefined>(undefined);
@@ -265,11 +265,11 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
       // Parallel fetch: Livepeer sources + our persistent stream metadata.
       // Using allSettled so a DB blip doesn't tank the whole classification.
       const [sourcesResult, streamRecordResult] = await Promise.allSettled([
-        getDetailPlaybackSource(playbackId),
+        getDetailPlaybackSource(playbackId, {authHeaders:getCachedAuthHeaders()??undefined,companionAddress:buildCompanionAddress()}),
         getStreamByPlaybackId(playbackId),
       ]);
 
-      const sources = sourcesResult.status === "fulfilled" ? sourcesResult.value : null;
+      let sources = sourcesResult.status === "fulfilled" ? sourcesResult.value : null;
       const streamRecord = streamRecordResult.status === "fulfilled"
         ? streamRecordResult.value
         : null;
@@ -282,7 +282,22 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
       }
 
       if (streamRecord) {
+        streamDataRef.current = streamRecord as import("@/services/streams").Stream;
         setStreamData(streamRecord as import("@/services/streams").Stream);
+      }
+
+      // A protected source is unavailable until authorization succeeds; this is not an offline signal.
+      let authorizedToken: string | undefined;
+      if (!sources?.length && streamRecord && isMeTokenGateActive(streamRecord.requires_metoken, streamRecord.metoken_price)) {
+        const authorization = await requestStreamJwt();
+        if (!authorization.ok) {
+          setJwt(undefined);
+          if (authorization.gate) setStatus({kind:'metoken-gated',gate:authorization.gate,sources:[]});
+          else setStatus({kind:'error',userMessage:authorization.errorMessage??'Unable to verify playback access.'});
+          return;
+        }
+        authorizedToken = authorization.token;
+        sources = await getDetailPlaybackSource(playbackId, {authHeaders:getCachedAuthHeaders()??undefined,companionAddress:buildCompanionAddress()});
       }
 
       // Happy path — stream has sources; JWT is required for jwt playbackPolicy streams.
@@ -293,7 +308,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
           sourceTypes: sources.map((s) => s.type),
         });
         try {
-          const jwtResult = await requestStreamJwt();
+          const jwtResult = authorizedToken ? {ok:true as const,token:authorizedToken} : await requestStreamJwt();
           if (jwtResult.ok && jwtResult.token) {
             logger.info("[WatchClient] JWT issued for playback", { playbackId });
             setJwt(jwtResult.token);
@@ -347,7 +362,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     } finally {
       setIsChecking(false);
     }
-  }, [playbackId, user?.address, smartAccountAddress, videoTitle, requestStreamJwt]);
+  }, [playbackId, user?.address, smartAccountAddress, videoTitle, requestStreamJwt, getCachedAuthHeaders, buildCompanionAddress]);
 
   useEffect(() => {
     if (!playbackId) return;
@@ -373,8 +388,11 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     try {
       const jwtResult = await requestStreamJwt();
       if (jwtResult.ok && jwtResult.token) {
+        const sources = playbackId ? await getDetailPlaybackSource(playbackId, {
+          authHeaders:getCachedAuthHeaders()??undefined,companionAddress:buildCompanionAddress(),
+        }) : null;
         setJwt(jwtResult.token);
-        setStatus({ kind: "live", sources: status.sources });
+        setStatus(sources?.length ? { kind: "live", sources } : {kind:'offline-temporary',attempts:0});
       } else if (jwtResult.gate) {
         setStatus({ kind: "metoken-gated", gate: jwtResult.gate, sources: status.sources });
       } else {
@@ -388,7 +406,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     } finally {
       setIsChecking(false);
     }
-  }, [status, requestStreamJwt]);
+  }, [status, requestStreamJwt, playbackId, getCachedAuthHeaders, buildCompanionAddress]);
 
   const prevWalletKeyRef = useRef("");
   useEffect(() => {
@@ -427,8 +445,12 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         }
 
         // If Livepeer no longer reports sources, the stream has ended.
-        if (status.kind === "live" || status.kind === "metoken-gated") {
-          const sources = await getDetailPlaybackSource(playbackId);
+        if (status.kind === "live") {
+          const authHeaders=getCachedAuthHeaders();
+          // A short-lived wallet proof is not the lifetime of the issued playback JWT.
+          // Retain authorized playback rather than prompting or declaring the stream offline.
+          if (isGateLikelyActive() && !authHeaders) return;
+          const sources = await getDetailPlaybackSource(playbackId, {authHeaders:authHeaders??undefined,companionAddress:buildCompanionAddress()});
           if (!sources || sources.length === 0) {
             setStatus({ kind: "offline-temporary", attempts: 0 });
           }
@@ -436,7 +458,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
       } catch (err) {
         logger.warn("Stream metadata refresh failed:", err);
       }
-    }, [playbackId, status.kind]),
+    }, [playbackId, status.kind, getCachedAuthHeaders, buildCompanionAddress, isGateLikelyActive]),
     (status.kind === "live" || status.kind === "metoken-gated") &&
       !streamData?.lens_live_post_id
       ? 15000
@@ -449,15 +471,17 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     useCallback(async () => {
       if (!playbackId) return;
       try {
-        const sources = await getDetailPlaybackSource(playbackId);
+        const authHeaders=getCachedAuthHeaders();
+        if (isGateLikelyActive() && !authHeaders) return;
+        const sources = await getDetailPlaybackSource(playbackId, {authHeaders:authHeaders??undefined,companionAddress:buildCompanionAddress()});
         if (!sources || sources.length === 0) {
           setStatus({ kind: "offline-temporary", attempts: 0 });
         }
       } catch (err) {
         logger.warn("Live source health check failed:", err);
       }
-    }, [playbackId]),
-    status.kind === "live" || status.kind === "metoken-gated" ? 15000 : null
+    }, [playbackId, getCachedAuthHeaders, buildCompanionAddress, isGateLikelyActive]),
+    status.kind === "live" ? 15000 : null
   );
 
   // Generate a consistent sessionId based on playbackId so viewers share the same chat session.

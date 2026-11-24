@@ -2,6 +2,7 @@ import { Asset } from "livepeer/models/components";
 import VideoDetails from "@/components/Videos/VideoDetails";
 import { fetchAssetId } from "@/app/api/livepeer/actions";
 import { getVideoAssetByAssetId } from "@/services/video-assets";
+import { isVideoAssetId } from "@/lib/video-provider/asset-id";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -44,9 +45,6 @@ type VideoDetailsPageProps = {
 
 type VideoAssetRow = Awaited<ReturnType<typeof getVideoAssetByAssetId>>;
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 function assetFromVideoRow(
   videoAsset: NonNullable<VideoAssetRow>,
   assetId: string,
@@ -62,7 +60,7 @@ async function loadVideoPageData(id: string): Promise<{
   assetData: Asset | null;
   videoAsset: VideoAssetRow | null;
 }> {
-  if (!UUID_REGEX.test(id)) {
+  if (!isVideoAssetId(id)) {
     logger.error("Invalid video asset ID format:", id);
     return { assetData: null, videoAsset: null };
   }
@@ -148,6 +146,7 @@ export default async function VideoDetailsPage({
         <div className="max-w-4xl mx-auto space-y-6">
           <div>
             <VideoDetails
+              storedSubtitles={videoAsset.subtitles}
               asset={assetData}
               videoTitle={videoAsset?.title || assetData?.name}
               creatorAddress={creatorAddress}
@@ -292,7 +291,7 @@ export async function generateMetadata({
   try {
     const { id } = await params;
 
-    if (!UUID_REGEX.test(id)) {
+    if (!isVideoAssetId(id)) {
       logger.error("Invalid video asset ID format for metadata:", id);
       return { title: "Video Not Found" };
     }

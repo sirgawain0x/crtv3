@@ -1,3 +1,5 @@
+import { StreamProviderMigrationRequiredError } from "@/lib/video-provider/stream-provider-guard";
+import { resolveVideoProviderId } from "@/lib/video-provider/config";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAddress } from "viem";
@@ -7,6 +9,7 @@ import { resolveStreamForCreator } from "@/services/streams";
 import { ensureLivepeerStreamForCreator } from "@/lib/livepeer/ensure-stream";
 import { hasLivepeerPrivateApiKey } from "@/lib/sdk/livepeer/studioAuth";
 import { serverLogger } from "@/lib/utils/logger";
+import { FrameWorksStreamsCreateUnavailableError } from "@/lib/video-provider";
 
 const streamProfileSchema = z.object({
   name: z.string(),
@@ -26,7 +29,9 @@ const bodySchema = z.object({
   name: z.string().min(1),
   profiles: z.array(streamProfileSchema).min(1),
   record: z.boolean(),
-  playbackPolicy: z.record(z.unknown()),
+  playbackPolicy: z
+    .object({ type: z.literal("jwt") })
+    .passthrough(),
 });
 
 export async function POST(req: NextRequest) {
@@ -64,7 +69,7 @@ export async function POST(req: NextRequest) {
     throw authErr;
   }
 
-  if (!hasLivepeerPrivateApiKey()) {
+  if (resolveVideoProviderId() === "livepeer" && !hasLivepeerPrivateApiKey()) {
     serverLogger.error("[livepeer-proxy] LIVEPEER_FULL_API_KEY is not configured");
     return NextResponse.json(
       {
@@ -122,6 +127,12 @@ export async function POST(req: NextRequest) {
       replaced: ensured.replaced,
     });
   } catch (error) {
+    if (error instanceof StreamProviderMigrationRequiredError) {
+      return NextResponse.json({ error: error.message, code: "STREAM_PROVIDER_MIGRATION_REQUIRED" }, { status: 409 });
+    }
+    if (error instanceof FrameWorksStreamsCreateUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
     if (error instanceof Error && error.message === "MISSING_API_KEY") {
       return NextResponse.json(
         { error: "Missing Livepeer API key", code: "MISSING_API_KEY" },

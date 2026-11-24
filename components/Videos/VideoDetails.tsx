@@ -1,4 +1,5 @@
 "use client";
+import type { Subtitles } from "@/lib/types/video-asset";
 
 import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -37,6 +38,7 @@ import {
   useSubtitles,
 } from "@/components/Player/Subtitles";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
+import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import {
   livepeerViewMetricsQueryKey,
   type LivepeerViewMetrics,
@@ -182,6 +184,7 @@ function StoryIPBlock({
 
 type VideoDetailsProps = {
   asset: Asset;
+  storedSubtitles?: Subtitles | null;
   videoTitle?: string;
   /** Creator wallet — shown below the title. */
   creatorAddress?: string | null;
@@ -199,6 +202,7 @@ type VideoDetailsProps = {
 
 export default function VideoDetails({
   asset,
+  storedSubtitles,
   videoTitle,
   creatorAddress,
   livepeerAttestationId,
@@ -209,6 +213,7 @@ export default function VideoDetails({
   tokenId,
 }: VideoDetailsProps) {
   const isVideoAdmin = useIsVideoAdmin();
+  const { getAuthHeaders, getCachedAuthHeaders, isReady: walletAuthReady } = useWalletAuth();
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [sourcesLoading, setSourcesLoading] = useState(true);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
@@ -375,7 +380,7 @@ export default function VideoDetails({
     };
   }, [isConnected, asset?.playbackId, playbackSources, queryClient]);
 
-  const loadPlaybackSources = useCallback(async () => {
+  const loadPlaybackSources = useCallback(async (verifyWallet = false) => {
     if (!asset?.playbackId) {
       setSourcesLoading(false);
       setSourcesError("No playback ID available.");
@@ -388,7 +393,9 @@ export default function VideoDetails({
     setPlaybackSources(null);
 
     try {
-      const sources = await getDetailPlaybackSource(asset.playbackId);
+      const authHeaders = verifyWallet ? await getAuthHeaders() : getCachedAuthHeaders();
+      const sources = await getDetailPlaybackSource(asset.playbackId, { authHeaders: authHeaders ?? undefined,
+        companionAddress: user?.address });
       if (!sources?.length) {
         setSourcesError("Unable to load playback sources.");
         setPlaybackSources(null);
@@ -401,7 +408,7 @@ export default function VideoDetails({
     } finally {
       setSourcesLoading(false);
     }
-  }, [asset?.playbackId]);
+  }, [asset?.playbackId, getAuthHeaders, getCachedAuthHeaders, user?.address]);
 
   useEffect(() => {
     const fetchDbStatus = async () => {
@@ -416,7 +423,9 @@ export default function VideoDetails({
             }
           }
         }
-      } catch { }
+      } catch {
+        // Keep the existing status when the optional lookup is unavailable.
+      }
     };
     const fetchThumbnail = async () => {
       if (!asset?.playbackId) return;
@@ -712,8 +721,7 @@ export default function VideoDetails({
   }
 
   return (
-    <SubtitlesProvider>
-      <SubtitlesInitializer assetMetadata={null} />
+    <SubtitlesProvider key={asset.id} initialSubtitles={storedSubtitles ?? undefined}>
       <div className="w-full">
         <div className="w-full space-y-6">
           <h1 className="text-2xl font-bold">{videoTitle || asset?.name}</h1>
@@ -791,6 +799,9 @@ export default function VideoDetails({
               <Button type="button" variant="outline" onClick={() => void loadPlaybackSources()}>
                 Retry
               </Button>
+              {walletAuthReady && <Button type="button" onClick={() => void loadPlaybackSources(true)}>
+                Verify wallet access
+              </Button>}
             </div>
           ) : playbackSources ? (
             <>
@@ -1039,19 +1050,3 @@ export const PlayerLoading = ({
     )}
   </div>
 );
-
-function SubtitlesInitializer({
-  assetMetadata,
-}: {
-  assetMetadata: any;
-}) {
-  const { setSubtitles } = useSubtitles();
-
-  useEffect(() => {
-    if (assetMetadata?.subtitles) {
-      setSubtitles(assetMetadata.subtitles);
-    }
-  }, [assetMetadata, setSubtitles]);
-
-  return null;
-}
