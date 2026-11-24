@@ -17,8 +17,13 @@ export async function runVerifiedImportBatch(input:{
   const completed=new Set<string>();
   const pending:ArchivedSource[]=[];
   const polls=new Map<string,number>();
+  let requested=false;
   const report=(source:ArchivedSource,phase:BatchProgress['phase'])=>input.report({completed:completed.size,total:input.sources.length,sourceId:source.assetId,phase});
   const request=async(mode:MigrationMode,source:ArchivedSource)=>{
+    // All modes share the admin endpoint's 10/minute limit, including ready resumes.
+    // The caller waits ten seconds between requests; never retry uncertain mutations.
+    if(requested)await input.wait();
+    requested=true;
     try{return await input.request(mode,source);}
     catch{throw new Error(`Batch stopped at source ${source.assetId}; inspect its reservation before resuming`);}
   };
@@ -45,7 +50,7 @@ export async function runVerifiedImportBatch(input:{
     for(let i=0;i<pending.length&&!input.shouldStop?.();){
       const source=pending[i],count=polls.get(source.assetId)??0;
       if(count>=(input.maxPolls??60))throw new Error(`Source ${source.assetId} needs more processing time; no creation retry was attempted`);
-      report(source,'processing');await input.wait();
+      report(source,'processing');
       if(input.shouldStop?.())break;
       const result=await request('poll',source);polls.set(source.assetId,count+1);
       if(await accept(source,result))pending.splice(i,1);else i++;

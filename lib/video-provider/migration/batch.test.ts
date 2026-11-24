@@ -32,6 +32,14 @@ it('does not accept stored assets whose playback check fails',async()=>{
  await expect(runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{}})).rejects.toThrow('playback verification has not passed');
  expect(request).toHaveBeenCalledTimes(2);
 });
+it('paces every request when resuming ready sources, including manifest checks',async()=>{
+ const calls:string[]=[];
+ const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
+  calls.push(mode);return mode==='inspect-playback'?{diagnostic:{playableManifest:true}}:ready(source);
+ });
+ await runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{calls.push('wait');}});
+ expect(calls).toEqual(['import','wait','inspect-playback','wait','import','wait','inspect-playback']);
+});
 it('bounds polling and stops safely between completed sources',async()=>{
  const pending=vi.fn(async()=>({outcome:{state:'processing' as const,sourceId:one.assetId,action:'polled' as const}}));
  await expect(runVerifiedImportBatch({sources:[one],request:pending,report:vi.fn(),wait:async()=>{},maxPolls:2})).rejects.toThrow('more processing time');expect(pending).toHaveBeenCalledTimes(3);
