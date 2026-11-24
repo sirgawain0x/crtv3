@@ -109,6 +109,17 @@ describe("checkMeTokenAccess", () => {
     expect(readContract).not.toHaveBeenCalled();
   });
 
+  it("denies negative gate prices without on-chain checks", async () => {
+    const result = await checkMeTokenAccess({
+      viewerAddresses: [viewer],
+      creatorAddress: creator,
+      requiredAmount: -1,
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("insufficient_balance");
+    expect(readContract).not.toHaveBeenCalled();
+  });
+
   it("denies when no viewer address is provided", async () => {
     const result = await checkMeTokenAccess({
       viewerAddresses: [],

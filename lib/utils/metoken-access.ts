@@ -91,6 +91,9 @@ export async function checkMeTokenAccess(params: {
     } catch {
       return { allowed: false, reason: "insufficient_balance" };
     }
+    if (required < BigInt(0)) {
+      return { allowed: false, reason: "insufficient_balance" };
+    }
     if (required === BigInt(0)) {
       requiresPositiveBalance = true;
     }
