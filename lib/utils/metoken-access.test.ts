@@ -72,8 +72,22 @@ describe("checkMeTokenAccess", () => {
   });
 
   it.each([null, 0, "0"] as const)(
-    "denies authenticated viewers when gated price is %s",
+    "allows holders with a positive balance when gated price is %s",
     async (requiredAmount) => {
+      const result = await checkMeTokenAccess({
+        viewerAddresses: [viewer],
+        creatorAddress: creator,
+        requiredAmount,
+      });
+      expect(result.allowed).toBe(true);
+      expect(readContract).toHaveBeenCalled();
+    },
+  );
+
+  it.each([null, 0, "0"] as const)(
+    "denies a zero balance when gated price is %s",
+    async (requiredAmount) => {
+      readContract.mockResolvedValue(BigInt(0));
       const result = await checkMeTokenAccess({
         viewerAddresses: [viewer],
         creatorAddress: creator,
@@ -81,9 +95,19 @@ describe("checkMeTokenAccess", () => {
       });
       expect(result.allowed).toBe(false);
       expect(result.reason).toBe("insufficient_balance");
-      expect(readContract).not.toHaveBeenCalled();
     },
   );
+
+  it("denies unparsable gate prices without on-chain checks", async () => {
+    const result = await checkMeTokenAccess({
+      viewerAddresses: [viewer],
+      creatorAddress: creator,
+      requiredAmount: "not-a-number",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("insufficient_balance");
+    expect(readContract).not.toHaveBeenCalled();
+  });
 
   it("denies when no viewer address is provided", async () => {
     const result = await checkMeTokenAccess({

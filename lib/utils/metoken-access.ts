@@ -79,19 +79,21 @@ export async function checkMeTokenAccess(params: {
     return { allowed: true, reason: "creator_bypass" };
   }
 
-  if (requiredAmount === null || requiredAmount === undefined) {
-    return { allowed: false, reason: "insufficient_balance" };
-  }
-
+  let requiresPositiveBalance = false;
   let required: bigint;
-  try {
-    required = parseEther(String(requiredAmount));
-  } catch {
-    return { allowed: false, reason: "insufficient_balance" };
-  }
 
-  if (required === BigInt(0)) {
-    return { allowed: false, reason: "insufficient_balance" };
+  if (requiredAmount === null || requiredAmount === undefined) {
+    requiresPositiveBalance = true;
+    required = BigInt(0);
+  } else {
+    try {
+      required = parseEther(String(requiredAmount));
+    } catch {
+      return { allowed: false, reason: "insufficient_balance" };
+    }
+    if (required === BigInt(0)) {
+      requiresPositiveBalance = true;
+    }
   }
 
   const meToken = await getMeTokenByOwner(normalizedCreator);
@@ -133,7 +135,9 @@ export async function checkMeTokenAccess(params: {
     }
   }
 
-  const allowed = maxBalance >= required;
+  const allowed = requiresPositiveBalance
+    ? maxBalance > BigInt(0)
+    : maxBalance >= required;
 
   return {
     allowed,
