@@ -44,21 +44,38 @@ export async function POST(request: NextRequest) {
       400,
     );
   }
-  try {
-    if(mode==='inspect-playback'){
-      if(!isFrameworksMigrationStaging())return respond({error:'Not found'},404);
-      const {data:stream,error}=await createServiceClient().from('streams').select('creator_id,stream_id,playback_id,provider').eq('id',snapshot.id).single();
-      if(error||!stream||stream.provider!=='frameworks'||stream.stream_id!==snapshot.stream_id||stream.playback_id!==snapshot.playback_id||stream.creator_id.toLowerCase()!==snapshot.creator_id.toLowerCase())return respond({error:'Matching QA channel identity required'},409);
-      return respond({diagnostic:await inspectMigrationPlayback(stream.playback_id)});
+  if (mode === 'inspect-playback') {
+    try {
+      if (!isFrameworksMigrationStaging()) return respond({ error: 'Not found' }, 404);
+      const { data: stream, error } = await createServiceClient()
+        .from('streams')
+        .select('creator_id,stream_id,playback_id,provider')
+        .eq('id', snapshot.id)
+        .single();
+      if (
+        error ||
+        !stream ||
+        stream.provider !== 'frameworks' ||
+        stream.stream_id !== snapshot.stream_id ||
+        stream.playback_id !== snapshot.playback_id ||
+        stream.creator_id.toLowerCase() !== snapshot.creator_id.toLowerCase()
+      ) {
+        return respond({ error: 'Matching QA channel identity required' }, 409);
+      }
+      return respond({ diagnostic: await inspectMigrationPlayback(stream.playback_id) });
+    } catch {
+      return respond({
+        diagnostic: { playableManifest: false, probeUnavailable: true },
+      });
     }
-    return respond(
-      await prepareStoredStreamReplacement(createServiceClient(), snapshot),
-    );
+  }
+  try {
+    return respond(await prepareStoredStreamReplacement(createServiceClient(), snapshot));
   } catch {
     return respond(
       {
         error:
-          "Channel preparation stopped. Inspect its private reservation before continuing; no automatic creation retry is permitted.",
+          'Channel preparation stopped. Inspect its private reservation before continuing; no automatic creation retry is permitted.',
       },
       409,
     );
