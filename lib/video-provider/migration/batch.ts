@@ -2,7 +2,7 @@ import type {ArchivedSource} from './archive';
 import type {ImportOutcome} from './importer';
 import {ImportStoppedError} from './import-failure';
 
-export type MigrationMode='import'|'poll'|'inspect-playback'|'inspect-reservation';
+export type MigrationMode='import'|'poll'|'inspect-playback'|'inspect-reservation'|'prepare-recovery'|'import-recovery'|'poll-recovery'|'adopt-recovery';
 export type BatchProgress={completed:number;total:number;sourceId:string;phase:'importing'|'processing'|'checking'|'ready'};
 type RequestResult={outcome?:ImportOutcome;diagnostic?:{playableManifest:boolean}};
 /** Client orchestration only: every operation retains the existing signed-admin server boundary. */
