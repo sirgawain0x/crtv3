@@ -9,6 +9,7 @@ import { serverLogger } from "@/lib/utils/logger";
 import { resolveVideoProviderId } from '@/lib/video-provider/config';
 import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
 import { createServiceClient } from '@/lib/sdk/supabase/service';
+import { resolveFrameworksPlaybackAlias } from '@/lib/video-provider/frameworks/playback-alias';
 
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
@@ -63,8 +64,9 @@ async function handleClip(request: NextRequest) {
       if(accessError) throw new Error('Clip authority unavailable');
       if(!authority?.parent_stream_id || authority.playback_id!==playbackId || authority.creator_id!==address)
         return NextResponse.json({error:'Protected clip not found'},{status:404});
+      const canonicalParent=await resolveFrameworksPlaybackAlias(parentPlaybackId);
       const {data:clip,error}=await db.from('video_assets').select('*').eq('asset_id',assetId)
-        .eq('playback_id',playbackId).eq('creator_id',address).eq('parent_playback_id',parentPlaybackId).eq('source_type','Clip').maybeSingle();
+        .eq('playback_id',playbackId).eq('creator_id',address).eq('parent_playback_id',canonicalParent).eq('source_type','Clip').maybeSingle();
       if(error) throw new Error('Clip catalog unavailable');
       if(!clip) return NextResponse.json({error:'Protected clip not found'},{status:404});
       return NextResponse.json({clip},{headers:{'Cache-Control':'private, no-store'}});

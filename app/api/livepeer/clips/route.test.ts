@@ -36,4 +36,8 @@ describe('protected clip creation',()=>{
   m.secure.mockRejectedValue(new Error('private provider message'));
   const response=await POST(request());expect(response.status).toBe(500);expect(m.rpc).not.toHaveBeenCalled();expect(await response.text()).not.toContain('private provider');
  });
+ it('returns the canonical stored parent when creation starts from a historical link',async()=>{
+  m.stream.mockResolvedValue({id:'parent-id',playback_id:'canonical-parent',creator_id:broadcaster,requires_metoken:false});
+  expect(await (await POST(request())).json()).toMatchObject({parentPlaybackId:'canonical-parent'});
+ });
 });

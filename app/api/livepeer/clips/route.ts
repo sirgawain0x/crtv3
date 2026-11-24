@@ -118,7 +118,7 @@ async function handleClip(request: NextRequest) {
       playbackUrl: result.playbackUrl,
       assetId: result.assetId,
       newPlaybackId: result.newPlaybackId,
-      parentPlaybackId: playbackId,
+      parentPlaybackId: stream.playback_id??playbackId,
       parentStoryIpId: stream.story_ip_id ?? null,
       parentStoryLicenseTermsId: stream.story_license_terms_id ?? null,
       parentCreatorId: stream.creator_id ?? null,

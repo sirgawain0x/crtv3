@@ -17,12 +17,15 @@ export async function registerProtectedVod(db:SupabaseClient,input:{assetId:stri
 export async function updateFrameworksVodAccess(db:SupabaseClient,id:number,changes:VodAccessChanges,auth?:WalletAuthArgs):Promise<void> {
   if(changes.status===undefined && changes.requires_metoken===undefined && changes.metoken_price===undefined)return;
   const {address}=await verifyWalletAuthArgs(auth);
-  const {data:row,error}=await db.from('video_assets').select('asset_id,playback_id,creator_id,source_type').eq('id',id).single();
+  const {data:row,error}=await db.from('video_assets').select('asset_id,playback_id,creator_id').eq('id',id).single();
   if(error || !row || row.creator_id?.toLowerCase()!==address.toLowerCase())throw new Error('Video ownership authorization failed');
   if(changes.status!==undefined && !['draft','published','minted','archived'].includes(changes.status))throw new Error('Invalid VOD status');
   if(changes.metoken_price!==undefined && changes.metoken_price!==null && (!Number.isFinite(changes.metoken_price) || changes.metoken_price<0)) throw new Error('Invalid VOD access price');
   if(changes.status==='published' || changes.status==='minted') {
-   if(row.source_type==='Clip') {
+   const {data:authority,error:authorityError}=await db.from('frameworks_vod_access').select('parent_stream_id').eq('asset_id',row.asset_id).single();
+   if(authorityError||!authority)throw new Error('Protected playback authority unavailable');
+   // Imported historical clips are VOD uploads; only server-registered native clips use the Clip API.
+   if(authority.parent_stream_id) {
     await requireReadyFrameworksClip(row.asset_id,row.playback_id);
    } else {
     const asset=await frameworksAssets.get(row.asset_id);
