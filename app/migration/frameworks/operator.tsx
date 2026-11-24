@@ -6,14 +6,14 @@ import {archivedSourcesFromManifests} from '@/lib/video-provider/migration/archi
 import type {ImportOutcome} from '@/lib/video-provider/migration/importer';
 import {runVerifiedImportBatch,type MigrationMode} from '@/lib/video-provider/migration/batch';
 import type {ArchivedSource} from '@/lib/video-provider/migration/archive';
+import {requestMigrationImport} from '@/lib/video-provider/migration/import-request';
 export default function MigrationOperator(){
  const {adminAuthAddress,isAdmin}=usePlatformAdmin();
  const {getAuthHeaders,isReady}=usePlatformAdminWalletAuth(adminAuthAddress);const [metadata,setMetadata]=useState('');
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[outcome,setOutcome]=useState<ImportOutcome|null>(null);
  const stopRequested=useRef(false);
  async function request(mode:MigrationMode,source:ArchivedSource){
-  const response=await fetch('/api/migration/frameworks/import',{method:'POST',headers:{'Content-Type':'application/json',...await getAuthHeaders()},body:JSON.stringify({mode,source})});
-  const result=await response.json();if(!response.ok)throw new Error(result.error||'Migration request failed');return result;
+  return requestMigrationImport({mode,source},{headers:await getAuthHeaders()});
  }
  async function run(mode:MigrationMode){
   setBusy(true);setMessage('');
@@ -21,9 +21,12 @@ export default function MigrationOperator(){
    const parsed=JSON.parse(metadata);const sources=archivedSourcesFromManifests([{assets:[{...parsed,status:'archived'}]}]);
    if(sources.length!==1)throw new Error('Paste one source from the verified archive manifest.');
    const result=await request(mode,sources[0]);
-   if(result.message){setMessage(result.message);return;}
-   if(mode==='inspect-playback'||mode==='inspect-reservation'){setMessage(JSON.stringify(result.diagnostic));return;}
-   setOutcome(result.outcome);setMessage(result.recovery?(result.outcome.state==='ready'?'Replacement is ready. Adopt verified recovery to reconcile the original mapping.':'Replacement request finished. Poll replacement; never recreate an uncertain attempt.'):(result.outcome.state==='ready'?'Verified import ready.':'Request finished. Poll an existing processing import; do not recreate uncertain imports.'));
+   if('message' in result){setMessage(result.message);return;}
+   if(mode==='inspect-playback'||mode==='inspect-reservation'){if('diagnostic' in result)setMessage(JSON.stringify(result.diagnostic));return;}
+   if('outcome' in result){
+    setOutcome(result.outcome);setMessage(result.recovery?(result.outcome.state==='ready'?'Replacement is ready. Adopt verified recovery to reconcile the original mapping.':'Replacement request finished. Poll replacement; never recreate an uncertain attempt.'):(result.outcome.state==='ready'?'Verified import ready.':'Request finished. Poll an existing processing import; do not recreate uncertain imports.'));
+   }
+
   }catch(error){setMessage(error instanceof Error?error.message:'Migration request failed');}finally{setBusy(false);}
  }
  async function runBatch(){
@@ -31,7 +34,12 @@ export default function MigrationOperator(){
   try{
    const entries=JSON.parse(metadata);if(!Array.isArray(entries))throw new Error('Paste an array of verified archive source records for a batch.');
    const sources=archivedSourcesFromManifests([{assets:entries.map(entry=>({...entry,status:'archived'}))}]);
-   const result=await runVerifiedImportBatch({sources,request,shouldStop:()=>stopRequested.current,
+   const result=await runVerifiedImportBatch({sources,request:async(mode,source)=>{
+    const response=await request(mode,source);
+    if('outcome' in response)return {outcome:response.outcome};
+    if('diagnostic' in response)return {diagnostic:{playableManifest:response.diagnostic.playableManifest===true}};
+    throw new Error('error' in response?response.error:'Unexpected migration batch response');
+   },shouldStop:()=>stopRequested.current,
     wait:()=>new Promise(resolve=>setTimeout(resolve,10000)),
     report:progress=>setMessage(`${progress.completed}/${progress.total} verified. ${progress.phase}: ${progress.sourceId}`)});
    setMessage(`${result.completed.length}/${sources.length} sources verified.${result.stopped?' Stopped safely between sources.':' Batch complete.'}`);

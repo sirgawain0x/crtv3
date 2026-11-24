@@ -17,9 +17,21 @@ const source={assetId:'2499b6b6-314f-4251-b119-fbb6445a48a5',playbackId:'old-pla
 const request=(body:unknown)=>new NextRequest('https://staging.example/api/migration/frameworks/import',{method:'POST',body:JSON.stringify(body)});
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('VERCEL_ENV','preview');vi.stubEnv('VIDEO_PROVIDER','frameworks');vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://zxpobpucayevlrzdxhmr.supabase.co');auth.mockResolvedValue({address:'admin'});run.mockResolvedValue({sourceId:source.assetId,state:'processing',action:'created'});remote.mockReturnValue({verify:()=>{},read:()=>{}});});afterEach(()=>vi.unstubAllEnvs());
 describe('isolated admin import boundary',()=>{
+ it('preserves the fixed reason a reviewed recovery check refused the source',async()=>{
+  const response=await POST(request({mode:'prepare-recovery',source}));expect(response.status).toBe(409);
+  expect((await response.json()).error).toBe('This source has no reviewed replacement plan');expect(run).not.toHaveBeenCalled();
+ });
+ it('masks unknown replacement failures and directs the operator to the separate recovery reservation',async()=>{
+  const recoveredSource={assetId:'bd18c602-9323-4b6e-aa90-7f8e8065e416',playbackId:'bd18hlmb6vazgsy8',sizeBytes:160998594,sha256:'ab4ea28fdac612cf2f1f588ace9691683ac85fe3e9c84193e0e0c044a111313e'};
+  find.mockResolvedValue({state:'prepared'});run.mockRejectedValueOnce(new Error('https://private.example?secret=PRIVATE'));
+  const response=await POST(request({mode:'import-recovery',source:recoveredSource}));expect(response.status).toBe(409);
+  const body=await response.json();expect(body.error).toContain('separate recovery reservation');expect(body.error).not.toContain('use Poll');expect(JSON.stringify(body)).not.toContain('PRIVATE');
+  run.mockRejectedValueOnce(new ImportStoppedError('provider-auth'));
+  const classified=await (await POST(request({mode:'import-recovery',source:recoveredSource}))).json();expect(classified.error).toContain('provider-auth');expect(classified.error).toContain('separate recovery reservation');
+ });
  it('returns a fixed protected-upload failure classification while preserving reconciliation guidance',async()=>{
   run.mockRejectedValueOnce(new ImportStoppedError('policy-unconfirmed'));const response=await POST(request({mode:'import',source}));
-  expect(response.status).toBe(409);expect((await response.json()).error).toContain('policy-unconfirmed');
+  const body=await response.json();expect(response.status).toBe(409);expect(body.error).toContain('policy-unconfirmed');expect(body.failureCode).toBe('policy-unconfirmed');
  });
  it('inspects an uncertain reservation only when every source proof matches, without creating or fetching original bytes',async()=>{
   find.mockResolvedValue({state:'ambiguous',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes});

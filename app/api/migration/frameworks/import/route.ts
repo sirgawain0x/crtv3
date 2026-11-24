@@ -11,7 +11,7 @@ import {rateLimiters} from '@/lib/middleware/rateLimit';
 import {inspectMigrationPlayback} from '@/lib/video-provider/migration/inspect-playback';
 import {inspectMigrationReservation} from '@/lib/video-provider/migration/inspect-reservation';
 import {ImportStoppedError} from '@/lib/video-provider/migration/import-failure';
-import {prepareReviewedRecovery,adoptVerifiedRecovery,requireReviewedRecoverySource} from '@/lib/video-provider/migration/reviewed-recovery';
+import {prepareReviewedRecovery,adoptVerifiedRecovery,requireReviewedRecoverySource,ReviewedRecoveryError} from '@/lib/video-provider/migration/reviewed-recovery';
 export const runtime='nodejs';
 export const maxDuration=300;
 const respond=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -60,6 +60,9 @@ export async function POST(request:NextRequest){
   return respond({outcome});
  }catch(error){
   // A timeout can leave a reservation. Do not return provider errors, URLs or credentials, or retry creation automatically.
-  return respond({error:error instanceof ImportStoppedError?error.message:'Import stopped. Inspect its reservation before retrying; use Poll for an existing processing import.'},409);
+  if(error instanceof ReviewedRecoveryError)return respond({error:error.message},409);
+  if(mode.endsWith('-recovery'))return respond({error:error instanceof ImportStoppedError?`Replacement stopped during protected upload preparation (${error.failureCode}). Inspect its separate recovery reservation; do not recreate an uncertain replacement.`:'Replacement recovery stopped. The original is retained. Inspect the separate recovery reservation using the recovery controls; do not recreate an uncertain replacement.'},409);
+  if(error instanceof ImportStoppedError)return respond({error:error.message,failureCode:error.failureCode},409);
+  return respond({error:'Import stopped. Inspect its reservation before retrying; use Poll for an existing processing import.'},409);
  }
 }

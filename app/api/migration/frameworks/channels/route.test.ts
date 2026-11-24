@@ -65,6 +65,20 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.unstubAllEnvs());
+it('returns a read-only playback diagnostic miss when the probe fails without implying preparation stopped',async()=>{
+ vi.stubEnv('VIDEO_PROVIDER','frameworks');
+ const chain={select:()=>chain,eq:()=>chain,single:vi.fn(async()=>({data:{creator_id:source.creator_id,stream_id:source.stream_id,playback_id:source.playback_id,provider:'frameworks'},error:null}))};
+ client.mockReturnValue({from:()=>chain});
+ inspect.mockRejectedValueOnce(new Error('PRIVATE_SIGNING_KEY'));
+ const response=await POST(request({mode:'inspect-playback',snapshot:source}));
+ const body=await response.json();
+ expect(response.status).toBe(200);
+ expect(body.diagnostic).toEqual({playableManifest:false,probeUnavailable:true});
+ expect(JSON.stringify(body)).not.toContain('PRIVATE');
+ expect(JSON.stringify(body)).not.toContain('Channel preparation stopped');
+ expect(JSON.stringify(body)).not.toContain('no automatic creation retry');
+ expect(prepare).not.toHaveBeenCalled();
+});
 it('inspects only the actual matching QA FrameWorks channel without preparing or changing credentials',async()=>{
  vi.stubEnv('VIDEO_PROVIDER','frameworks');
  const single=vi.fn(async()=>({data:{creator_id:source.creator_id,stream_id:source.stream_id,playback_id:source.playback_id,provider:'frameworks'},error:null}));
