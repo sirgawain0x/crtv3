@@ -4,6 +4,7 @@ import { getVideoProvider } from '@/lib/video-provider';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
 import { handleSignJwt } from './sign-jwt-handler';
+import { resolveAuthorizedFrameworksHlsUrl } from '@/lib/video-provider/frameworks/resolve-playback';
 
 const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
 
@@ -87,13 +88,14 @@ export async function handlePlaybackInfo(request: NextRequest): Promise<NextResp
 
     if (viewerToken) {
       const sources = response.playbackInfo.meta?.source ?? [];
+      const authorizedUrl = sources.length
+        ? await resolveAuthorizedFrameworksHlsUrl(canonicalPlaybackId, viewerToken)
+        : undefined;
       response.playbackInfo = { ...response.playbackInfo, meta: {
         ...response.playbackInfo.meta,
         source: sources.map(source => {
           if (!source.url) return source;
-          const url = new URL(source.url);
-          url.searchParams.set('jwt', viewerToken);
-          return { ...source, url: url.toString() };
+          return { ...source, url: authorizedUrl };
         }),
       } };
     }

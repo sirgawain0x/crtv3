@@ -8,6 +8,8 @@ vi.mock('./sign-jwt-handler', () => ({ handleSignJwt: vi.fn() }));
 vi.mock('@/lib/video-provider/frameworks/playback-alias', () => ({ resolveFrameworksPlaybackAlias: vi.fn(async id => id) }));
 import { resolveFrameworksPlaybackAlias } from '@/lib/video-provider/frameworks/playback-alias';
 vi.mock('@/lib/video-provider', () => ({ getVideoProvider: vi.fn() }));
+vi.mock('@/lib/video-provider/frameworks/resolve-playback',()=>({resolveAuthorizedFrameworksHlsUrl:vi.fn(async()=> 'https://edge.frameworks.network/hls/video/index.m3u8?fwjwt=viewer-token')}));
+import {resolveAuthorizedFrameworksHlsUrl} from '@/lib/video-provider/frameworks/resolve-playback';
 const playback = vi.fn();
 const configured = vi.fn();
 describe('provider playback HTTP boundary', () => {
@@ -25,7 +27,8 @@ describe('provider playback HTTP boundary', () => {
     expect(response.status).toBe(200);
     expect(playback).toHaveBeenCalledWith('pb-1');
     expect((await response.json()).meta.source[0].url).toBe(id === 'frameworks'
-      ? 'https://media.example/hls.m3u8?jwt=viewer-token' : 'https://media.example/hls.m3u8');
+      ? 'https://edge.frameworks.network/hls/video/index.m3u8?fwjwt=viewer-token' : 'https://media.example/hls.m3u8');
+    if(id==='frameworks')expect(resolveAuthorizedFrameworksHlsUrl).toHaveBeenCalledWith('pb-1','viewer-token');
     if (id === 'frameworks') expect(response.headers.get('cache-control')).toBe('private, no-store');
   });
   it('resolves old embeds to the canonical playback URL', async () => {
@@ -38,6 +41,7 @@ describe('provider playback HTTP boundary', () => {
     configured.mockReturnValue(false);
     expect((await handlePlaybackInfo(new NextRequest('https://example.test/api/internal/playback-info?playbackId=pb-1'))).status).toBe(503);
     expect(playback).not.toHaveBeenCalled();
+    expect(resolveAuthorizedFrameworksHlsUrl).not.toHaveBeenCalled();
   });
   it('rejects wallet addresses as playback identifiers before provider calls', async () => {
     expect((await handlePlaybackInfo(new NextRequest('https://example.test/api/internal/playback-info?playbackId=0x' + '1'.repeat(40)))).status).toBe(400);
