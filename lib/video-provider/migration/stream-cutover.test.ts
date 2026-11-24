@@ -79,6 +79,12 @@ it("atomically cuts over all identities, repeats safely and rolls back keys with
         requires_metoken: true,
       },
     ]);
+    await expect(db.exec(sql)).rejects.toThrow('snapshot changed');
+    await db.exec('ROLLBACK');
+    const refreshed=(await db.query<{source_snapshot:StreamSnapshot}>('SELECT source_snapshot FROM frameworks_stream_replacements')).rows[0].source_snapshot;
+    expect(refreshed.updated_at).not.toBe(source.updated_at);
+    await db.exec(renderStreamCutoverSql([refreshed], 'apply'));
+    expect((await db.query('SELECT stream_id,name FROM streams')).rows).toEqual([{stream_id:newStream,name:'New name'}]);
   } finally {
     await db.close();
   }

@@ -43,7 +43,9 @@ BEGIN
      : `
  IF r.state<>'applied' OR s.provider IS DISTINCT FROM 'frameworks' OR s.stream_id IS DISTINCT FROM r.frameworks_stream_id OR s.playback_id IS DISTINCT FROM r.frameworks_playback_id OR s.stream_key IS DISTINCT FROM r.frameworks_stream_key THEN RAISE EXCEPTION 'Channel rollback identity changed'; END IF;
  UPDATE public.streams SET provider=r.source_provider,stream_id=e.stream_id,playback_id=e.playback_id,stream_key=r.source_stream_key,updated_at=now() WHERE id=s.id;
- UPDATE public.frameworks_stream_replacements SET state='ready',updated_at=now() WHERE stream_row_id=s.id;`
+ -- Advance only the reservation timestamp to the exact restored row version.
+ -- A later attempt requires a fresh reviewed snapshot; prior artifacts stay stale.
+ UPDATE public.frameworks_stream_replacements SET state='ready',source_snapshot=jsonb_set(source_snapshot,'{updated_at}',to_jsonb(now())),updated_at=now() WHERE stream_row_id=s.id;`
  }
 END $channel$;`,
     )

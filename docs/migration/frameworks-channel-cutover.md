@@ -16,7 +16,7 @@ npx tsx scripts/frameworks-stream-cutover.ts --snapshot /private/path/channels.j
 
 This command performs no database or provider requests and emits no ingest keys. Its apply transaction locks both tables, rejects an incomplete or changed channel catalog, and checks every source identity, owner, gate, recording preference, live state, update timestamp and old key against the reservation. Only ready targets can replace active identities. Existing row IDs and metadata remain stable; legacy watch aliases are retained. Repeated application verifies already-applied identities rather than changing them again.
 
-Rollback verifies the replacement identities, keys and access settings before restoring original identities and keys from the private ledger. It preserves later metadata and retains the migration evidence. Treat rollback as recovery, not as permission to resume ongoing Livepeer service; the release target is FrameWorks only.
+Rollback verifies the replacement identities, keys and access settings before restoring original identities and keys from the private ledger. It preserves later metadata and advances the reservation's expected update timestamp to the restored row version. A subsequent cutover requires a freshly reviewed snapshot; the previous artifacts remain stale. Original reviewed snapshots remain in the private release artifacts. Treat rollback as recovery, not as permission to resume ongoing Livepeer service; the release target is FrameWorks only.
 
 The production cutover remains blocked until the 45 archived sources, real upload/live/recording/clip flows, signed webhooks, access checks, fresh backup, VOD remap and channel preparation are verified. Never switch the provider merely because preparation tests pass.
 
