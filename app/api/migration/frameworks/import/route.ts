@@ -42,6 +42,7 @@ export async function POST(request:NextRequest){
   return respond({outcome});
  }catch(error){
   // A timeout can leave a reservation. Do not return provider errors, URLs or credentials, or retry creation automatically.
-  return respond({error:error instanceof ImportStoppedError?error.message:'Import stopped. Inspect its reservation before retrying; use Poll for an existing processing import.'},409);
+  if(error instanceof ImportStoppedError)return respond({error:error.message,failureCode:error.failureCode},409);
+  return respond({error:'Import stopped. Inspect its reservation before retrying; use Poll for an existing processing import.'},409);
  }
 }
