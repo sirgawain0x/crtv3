@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-const { auth, prepare, client } = vi.hoisted(() => ({
+const { auth, prepare, client, inspect } = vi.hoisted(() => ({
   auth: vi.fn(),
   prepare: vi.fn(),
   client: vi.fn(),
+  inspect:vi.fn(),
 }));
 vi.mock("@/lib/access/require-platform-admin", () => ({
   requirePlatformAdmin: auth,
@@ -20,6 +21,7 @@ vi.mock("@/lib/middleware/rateLimit", () => ({
   rateLimiters: { standard: vi.fn(async () => null) },
 }));
 vi.mock("@/lib/sdk/supabase/service", () => ({ createServiceClient: client }));
+vi.mock('@/lib/video-provider/migration/inspect-playback',()=>({inspectMigrationPlayback:inspect}));
 vi.mock(
   "@/lib/video-provider/migration/stream-replacement-server",
   async (original) => ({
@@ -49,6 +51,7 @@ const request = (body: unknown = source) =>
   });
 beforeEach(() => {
   vi.clearAllMocks();
+  client.mockReturnValue(undefined);
   vi.stubEnv("VERCEL_ENV", "preview");
   vi.stubEnv(
     "NEXT_PUBLIC_SUPABASE_URL",
@@ -62,6 +65,17 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.unstubAllEnvs());
+it('inspects only the actual matching QA FrameWorks channel without preparing or changing credentials',async()=>{
+ vi.stubEnv('VIDEO_PROVIDER','frameworks');
+ const single=vi.fn(async()=>({data:{creator_id:source.creator_id,stream_id:source.stream_id,playback_id:source.playback_id,provider:'frameworks'},error:null}));
+ const chain={select:()=>chain,eq:()=>chain,single};client.mockReturnValue({from:()=>chain});inspect.mockResolvedValue({playableManifest:true,hops:[]});
+ const response=await POST(request({mode:'inspect-playback',snapshot:source}));expect(response.status).toBe(200);expect(inspect).toHaveBeenCalledWith(source.playback_id);expect(prepare).not.toHaveBeenCalled();
+ single.mockResolvedValue({data:{creator_id:source.creator_id,stream_id:source.stream_id,playback_id:'changed',provider:'frameworks'},error:null});expect((await POST(request({mode:'inspect-playback',snapshot:source}))).status).toBe(409);expect(inspect).toHaveBeenCalledOnce();
+});
+it('does not expose the channel playback probe against production',async()=>{
+ vi.stubEnv('VERCEL_ENV','production');vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://zdeiezfoemibjgrkyzvs.supabase.co');
+ expect((await POST(request({mode:'inspect-playback',snapshot:source}))).status).toBe(404);expect(client).not.toHaveBeenCalled();expect(inspect).not.toHaveBeenCalled();
+});
 it.each([
   ["VERCEL_ENV", "development"],
   ["NEXT_PUBLIC_SUPABASE_URL", "https://unexpected.supabase.co"],

@@ -15,13 +15,13 @@ export default function MigrationOperator(){
   const response=await fetch('/api/migration/frameworks/import',{method:'POST',headers:{'Content-Type':'application/json',...await getAuthHeaders()},body:JSON.stringify({mode,source})});
   const result=await response.json();if(!response.ok)throw new Error(result.error||'Migration request failed');return result;
  }
- async function run(mode:'import'|'poll'|'inspect-playback'){
+ async function run(mode:MigrationMode){
   setBusy(true);setMessage('');
   try{
    const parsed=JSON.parse(metadata);const sources=archivedSourcesFromManifests([{assets:[{...parsed,status:'archived'}]}]);
    if(sources.length!==1)throw new Error('Paste one source from the verified archive manifest.');
    const result=await request(mode,sources[0]);
-   if(mode==='inspect-playback'){setMessage(JSON.stringify(result.diagnostic));return;}
+   if(mode==='inspect-playback'||mode==='inspect-reservation'){setMessage(JSON.stringify(result.diagnostic));return;}
    setOutcome(result.outcome);setMessage(result.outcome.state==='ready'?'Verified import ready.':'Request finished. Poll an existing processing import; do not recreate uncertain imports.');
   }catch(error){setMessage(error instanceof Error?error.message:'Migration request failed');}finally{setBusy(false);}
  }
@@ -44,6 +44,7 @@ export default function MigrationOperator(){
   <div className="flex gap-4"><button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('import')}>Import verified source</button>
   <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('poll')}>Poll existing import</button></div>
   <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('inspect-playback')}>Check playback manifest</button>
+  <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={()=>run('inspect-reservation')}>Inspect import reservation</button>
   <button className="rounded border px-4 py-2" disabled={busy||!isReady||!metadata} onClick={runBatch}>Import verified batch</button>
   {busy&&<><button className="rounded border px-4 py-2" onClick={()=>{stopRequested.current=true;}}>Stop after current source</button><p role="status">Verifying sources. Keep this page open; completed reservations are reused when resuming.</p></>}
   {message&&<p role="status">{message}</p>}{outcome&&<p>State: <strong>{outcome.state}</strong></p>}

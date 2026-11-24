@@ -11,6 +11,9 @@ export function frameworksHlsDiagnostics(sources: Src[]) {
   return {
     xhrSetup(xhr: XMLHttpRequest, url: string) {
       if (!new URL(url).pathname.endsWith('.m3u8')) return;
+      for(const event of ['error','timeout'])xhr.addEventListener(event,()=>{
+        console.warn('[frameworks] playlist network failure '+JSON.stringify({status:xhr.status,host:new URL(url).hostname,event}));
+      });
       xhr.addEventListener('load', () => {
         if (xhr.responseType && xhr.responseType !== 'text') return;
         const body = xhr.responseText.slice(0, 4096);

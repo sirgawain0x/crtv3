@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { CREATIVE_TV_ASSET_UUID_REGEX } from '@/lib/utils/creative-tv-url';
 import type { ArchivedSource } from './archive';
 import { isVideoAssetId } from '../asset-id';
+import {ImportStoppedError,MigrationProviderFailure} from './import-failure';
 export type ImportState = 'prepared' | 'importing' | 'processing' | 'ready' | 'ambiguous' | 'failed';
 export type ImportRecord = {
   livepeer_asset_id: string; livepeer_playback_id: string | null; source_sha256: string; source_bytes: number;
@@ -98,9 +99,10 @@ export async function runAssetImport(input: {source: ArchivedSource; ledger: Imp
     const completed=await provider.complete(upload.uploadId,completedParts);
     if (completed.assetId !== target.assetId || completed.playbackId !== target.playbackId) throw new Error('Completion returned conflicting identities');
     return {sourceId:source.assetId,state:'processing',action:'created'};
-  } catch {
+  } catch (error) {
     // Do not record provider messages: they can contain signed URLs, headers or other private context.
     await ledger.transition(source.assetId,recordedTarget?'processing':'importing','ambiguous');
+    if(error instanceof MigrationProviderFailure)throw new ImportStoppedError(error.failureCode);
     throw new Error('Import stopped with an uncertain outcome; reconcile its reservation before any retry');
   }
 }

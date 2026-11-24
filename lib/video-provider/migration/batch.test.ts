@@ -1,6 +1,7 @@
 import {expect,it,vi} from 'vitest';
 import {runVerifiedImportBatch,type MigrationMode} from './batch';
 import type {ArchivedSource} from './archive';
+import {ImportStoppedError} from './import-failure';
 const one:ArchivedSource={assetId:'11111111-1111-4111-8111-111111111111',playbackId:'old-one',sha256:'a'.repeat(64),sizeBytes:100};
 const two:ArchivedSource={...one,assetId:'22222222-2222-4222-8222-222222222222'};
 const ready=(source:ArchivedSource)=>({outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}});
@@ -25,6 +26,18 @@ it.each(['ambiguous','importing','failed','prepared'] as const)('stops on %s wit
 it('stops uncertain requests without exposing provider details',async()=>{
  const request=vi.fn(async()=>{throw new Error('PRIVATE_URL?jwt=PRIVATE');});
  await expect(runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{}})).rejects.toThrow(`Batch stopped at source ${one.assetId}; inspect its reservation before resuming`);
+ expect(request).toHaveBeenCalledTimes(1);
+});
+it('preserves import stop classification and adds batch source context',async()=>{
+ const request=vi.fn(async()=>{throw new ImportStoppedError('policy-unconfirmed');});
+ await expect(runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{}})).rejects.toSatisfy((error:unknown)=>{
+  expect(error).toBeInstanceOf(ImportStoppedError);
+  const stopped=error as ImportStoppedError;
+  expect(stopped.failureCode).toBe('policy-unconfirmed');
+  expect(stopped.message).toContain(`Batch stopped at source ${one.assetId}`);
+  expect(stopped.message).toContain('policy-unconfirmed');
+  return true;
+ });
  expect(request).toHaveBeenCalledTimes(1);
 });
 it('does not accept stored assets whose playback check fails',async()=>{

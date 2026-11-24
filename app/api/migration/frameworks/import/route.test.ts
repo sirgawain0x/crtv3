@@ -1,6 +1,6 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {NextRequest} from 'next/server';
-const {auth,run,remote,client,find,inspect}=vi.hoisted(()=>({auth:vi.fn(),run:vi.fn(),remote:vi.fn(),client:vi.fn(),find:vi.fn(),inspect:vi.fn()}));
+const {auth,run,remote,client,find,inspect,reservation}=vi.hoisted(()=>({auth:vi.fn(),run:vi.fn(),remote:vi.fn(),client:vi.fn(),find:vi.fn(),inspect:vi.fn(),reservation:vi.fn()}));
 vi.mock('@/lib/access/require-platform-admin',()=>({requirePlatformAdmin:auth,PlatformAdminAuthError:class extends Error{constructor(public status:number,message:string){super(message);}}}));
 vi.mock('@/lib/middleware/rateLimit',()=>({rateLimiters:{standard:vi.fn(async()=>null)}}));
 vi.mock('@/lib/sdk/supabase/service',()=>({createServiceClient:client}));
@@ -8,13 +8,26 @@ vi.mock('@/lib/video-provider/migration/importer',()=>({runAssetImport:run}));
 vi.mock('@/lib/video-provider/migration/studio-source',()=>({createStudioImportSource:remote}));
 vi.mock('@/lib/video-provider/migration/supabase-ledger',()=>({createImportLedger:()=>({find})}));
 vi.mock('@/lib/video-provider/migration/inspect-playback',()=>({inspectMigrationPlayback:inspect}));
+vi.mock('@/lib/video-provider/migration/inspect-reservation',()=>({inspectMigrationReservation:reservation}));
 vi.mock('@/lib/video-provider/migration/frameworks-import-provider',()=>({createFrameworksImportProvider:()=>({})}));
 import {PlatformAdminAuthError} from '@/lib/access/require-platform-admin';
 import {POST} from './route';
+import {ImportStoppedError} from '@/lib/video-provider/migration/import-failure';
 const source={assetId:'2499b6b6-314f-4251-b119-fbb6445a48a5',playbackId:'old-play',sizeBytes:5,sha256:'a'.repeat(64)};
 const request=(body:unknown)=>new NextRequest('https://staging.example/api/migration/frameworks/import',{method:'POST',body:JSON.stringify(body)});
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('VERCEL_ENV','preview');vi.stubEnv('VIDEO_PROVIDER','frameworks');vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://zxpobpucayevlrzdxhmr.supabase.co');auth.mockResolvedValue({address:'admin'});run.mockResolvedValue({sourceId:source.assetId,state:'processing',action:'created'});remote.mockReturnValue({verify:()=>{},read:()=>{}});});afterEach(()=>vi.unstubAllEnvs());
 describe('isolated admin import boundary',()=>{
+ it('returns a fixed protected-upload failure classification while preserving reconciliation guidance',async()=>{
+  run.mockRejectedValueOnce(new ImportStoppedError('policy-unconfirmed'));const response=await POST(request({mode:'import',source}));
+  expect(response.status).toBe(409);expect((await response.json()).error).toContain('policy-unconfirmed');
+ });
+ it('inspects an uncertain reservation only when every source proof matches, without creating or fetching original bytes',async()=>{
+  find.mockResolvedValue({state:'ambiguous',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes});
+  reservation.mockResolvedValue({providerAvailable:true,matchingArtifacts:[]});
+  expect((await POST(request({mode:'inspect-reservation',source}))).status).toBe(200);expect(reservation).toHaveBeenCalledWith(source);expect(run).not.toHaveBeenCalled();expect(remote).not.toHaveBeenCalled();
+  find.mockResolvedValue({state:'ambiguous',source_sha256:'different'});
+  expect((await POST(request({mode:'inspect-reservation',source}))).status).toBe(409);expect(reservation).toHaveBeenCalledTimes(1);
+ });
  it('inspects only the exact ready reservation without fetching originals or creating another upload',async()=>{
   find.mockResolvedValue({state:'ready',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes,frameworks_playback_id:'verified-target',frameworks_asset_id:'verified-artifact'});
   inspect.mockResolvedValue({playableManifest:false,hops:[{status:403,code:'PLAYBACK_ACCESS_DENIED'}]});

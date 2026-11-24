@@ -14,3 +14,9 @@ it('reports playlist failure metadata without bearer URLs or response messages',
 it('does not change legacy player request configuration',()=>{
   expect(frameworksHlsDiagnostics([{src:'https://example.com/video.m3u8',type:'hls',mime:'application/vnd.apple.mpegurl',width:null,height:null}])).toBeUndefined();
 });
+it('reports browser network failures without exposing the query credential',()=>{
+ const log=vi.spyOn(console,'warn').mockImplementation(()=>{}),events:Record<string,()=>void>={};
+ const xhr={status:0,addEventListener:(name:string,fn:()=>void)=>{events[name]=fn;}} as unknown as XMLHttpRequest;
+ frameworksHlsDiagnostics([{src:'https://edge.frameworks.network/test.m3u8?fwjwt=PRIVATE_TOKEN',type:'hls',mime:'application/vnd.apple.mpegurl',width:null,height:null}])?.xhrSetup(xhr,'https://edge.frameworks.network/test.m3u8?fwjwt=PRIVATE_TOKEN');events.error();
+ expect(log).toHaveBeenCalledWith(expect.stringContaining('"event":"error"'));expect(JSON.stringify(log.mock.calls)).not.toContain('PRIVATE');
+});
