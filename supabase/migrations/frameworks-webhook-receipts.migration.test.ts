@@ -11,6 +11,10 @@ beforeAll(async()=>{
  INSERT INTO streams VALUES(1,'parent','parent-play','${owner}',false,NULL,now(),true,'Creator stream',NULL,true,2);`);
  await db.exec(readFileSync(new URL('./20261123143443_frameworks_webhook_receipts.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('./20261123144030_frameworks_recording_thumbnail_fallback.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./20261123051536_frameworks_asset_identity.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./20261123053537_frameworks_vod_access.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./20261124170039_frameworks_recording_authority.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('./20261124182327_frameworks_recording_gate_preservation.sql',import.meta.url),'utf8'));
 },30000);
 afterAll(()=>db.close());
 const process=(id:string,type:string,time='2026-11-23T10:00:00Z',stream:string|null='parent',artifact:Record<string,unknown>|null=null,hash=sha)=>db.query<{process_frameworks_webhook:string}>('SELECT process_frameworks_webhook($1,$2,$3,$4,$5,$6)',[id,type,hash,time,stream,artifact]);
@@ -31,9 +35,53 @@ describe.sequential('atomic FrameWorks webhook receipts',()=>{
   expect((await process('retry','stream.live','2026-11-23T10:02:00Z')).rows[0].process_frameworks_webhook).toBe('processed');
  });
  it('stores a recording once across different event IDs, deriving its owner and gate from the stream',async()=>{
-  const artifact={assetId:'recording',playbackId:'recording-play',durationSeconds:12,creator_id:'attacker'};
+  const artifact={assetId:'recording',playbackId:'recording-play',durationSeconds:12,creator_id:'attacker',policyConfirmed:true};
   await process('record1','recording.ready',undefined,undefined,artifact);await process('record2','recording.ready',undefined,undefined,artifact);
   expect((await db.query('SELECT asset_id,creator_id,requires_metoken,metoken_price::text,thumbnail_url FROM video_assets')).rows).toEqual([{asset_id:'recording',creator_id:owner,requires_metoken:true,metoken_price:'2',thumbnail_url:''}]);
+  expect((await db.query('SELECT asset_id,playback_id,creator_id,status,requires_metoken,metoken_price::text FROM frameworks_vod_access')).rows).toEqual([{asset_id:'recording',playback_id:'recording-play',creator_id:owner,status:'published',requires_metoken:true,metoken_price:'2'}]);
+ });
+ it('preserves catalog gate on first authority insert when parent later ungates',async()=>{
+  await db.exec(`INSERT INTO video_assets(title,asset_id,playback_id,category,location,creator_id,status,duration,views_count,likes_count,is_minted,current_supply,thumbnail_url,source_type,parent_playback_id,requires_metoken,metoken_price)
+    VALUES('Catalog recording','catalog-record','catalog-play','livestream','','${owner}','published',10,0,0,false,0,'','Livestream','parent-play',true,2)`);
+  await db.exec('UPDATE streams SET requires_metoken=false,metoken_price=NULL');
+  await process('catalog-ready','recording.ready',undefined,undefined,{assetId:'catalog-record',playbackId:'catalog-play',policyConfirmed:true});
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM frameworks_vod_access WHERE asset_id='catalog-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'2'}]);
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM video_assets WHERE asset_id='catalog-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'2'}]);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=2');
+ });
+ it('raises gate from parent when catalog row is ungated on first authority insert',async()=>{
+  await db.exec(`INSERT INTO video_assets(title,asset_id,playback_id,category,location,creator_id,status,duration,views_count,likes_count,is_minted,current_supply,thumbnail_url,source_type,parent_playback_id,requires_metoken,metoken_price)
+    VALUES('Ungated catalog','ungated-record','ungated-play','livestream','','${owner}','published',10,0,0,false,0,'','Livestream','parent-play',false,NULL)`);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=5');
+  await process('ungated-ready','recording.ready',undefined,undefined,{assetId:'ungated-record',playbackId:'ungated-play',policyConfirmed:true});
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM frameworks_vod_access WHERE asset_id='ungated-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'5'}]);
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM video_assets WHERE asset_id='ungated-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'5'}]);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=2');
+ });
+ it('keeps the higher gated price when catalog and parent differ',async()=>{
+  await db.exec(`INSERT INTO video_assets(title,asset_id,playback_id,category,location,creator_id,status,duration,views_count,likes_count,is_minted,current_supply,thumbnail_url,source_type,parent_playback_id,requires_metoken,metoken_price)
+    VALUES('Lower catalog gate','higher-price-record','higher-price-play','livestream','','${owner}','published',10,0,0,false,0,'','Livestream','parent-play',true,2)`);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=5');
+  await process('higher-price-ready','recording.ready',undefined,undefined,{assetId:'higher-price-record',playbackId:'higher-price-play',policyConfirmed:true});
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM frameworks_vod_access WHERE asset_id='higher-price-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'5'}]);
+  expect((await db.query("SELECT requires_metoken,metoken_price::text FROM video_assets WHERE asset_id='higher-price-record'")).rows).toEqual([{requires_metoken:true,metoken_price:'5'}]);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=2');
+ });
+ it('does not relax an existing recording gate when the parent changes or republish an archived recording',async()=>{
+  await db.exec("UPDATE streams SET requires_metoken=false,metoken_price=NULL;UPDATE frameworks_vod_access SET status='archived' WHERE asset_id='recording'");
+  await process('record3','recording.ready',undefined,undefined,{assetId:'recording',playbackId:'recording-play',policyConfirmed:true});
+  expect((await db.query("SELECT status,requires_metoken,metoken_price::text FROM frameworks_vod_access WHERE asset_id='recording'")).rows).toEqual([{status:'archived',requires_metoken:true,metoken_price:'2'}]);
+  expect((await db.query("SELECT provider,status,requires_metoken,frameworks_asset_id FROM video_assets WHERE asset_id='recording'")).rows).toEqual([{provider:'frameworks',status:'archived',requires_metoken:true,frameworks_asset_id:'recording'}]);
+  await db.exec('UPDATE streams SET requires_metoken=true,metoken_price=2');
+ });
+ it('rolls back metadata and receipt rather than adopting conflicting playback authority',async()=>{
+  await db.exec(`INSERT INTO frameworks_vod_access(asset_id,playback_id,creator_id) VALUES('conflicting-record','conflicting-play','0x${'b'.repeat(40)}')`);
+  await expect(process('bad-record','recording.ready',undefined,undefined,{assetId:'conflicting-record',playbackId:'conflicting-play',policyConfirmed:true})).rejects.toThrow('authority conflict');
+  expect((await db.query("SELECT count(*)::int AS count FROM video_assets WHERE asset_id='conflicting-record'")).rows).toEqual([{count:0}]);expect((await db.query("SELECT count(*)::int AS count FROM frameworks_webhook_receipts WHERE event_id='bad-record'")).rows).toEqual([{count:0}]);
+ });
+ it('rejects an enabled recording without server-confirmed provider protection before granting authority',async()=>{
+  await expect(process('unprotected','recording.ready',undefined,undefined,{assetId:'unprotected-record',playbackId:'unprotected-play'})).rejects.toThrow('policy confirmation required');
+  expect((await db.query("SELECT count(*)::int AS count FROM frameworks_vod_access WHERE asset_id='unprotected-record'")).rows).toEqual([{count:0}]);expect((await db.query("SELECT count(*)::int AS count FROM frameworks_webhook_receipts WHERE event_id='unprotected'")).rows).toEqual([{count:0}]);
  });
  it('preserves an upload observation before browser persistence without publishing or inventing ownership',async()=>{
   await process('upload','upload.ready',undefined,null,{assetId:'upload',playbackId:'upload-play',durationSeconds:7});
@@ -48,6 +96,7 @@ describe.sequential('atomic FrameWorks webhook receipts',()=>{
   await db.exec('UPDATE streams SET save_recording=false');
   expect((await process('no-record','recording.ready',undefined,undefined,{assetId:'no-record',playbackId:'no-record-play'})).rows[0].process_frameworks_webhook).toBe('ignored');
   expect((await db.query("SELECT count(*)::int AS count FROM video_assets WHERE asset_id='no-record'")).rows).toEqual([{count:0}]);
+  expect((await db.query("SELECT count(*)::int AS count FROM frameworks_vod_access WHERE asset_id='no-record'")).rows).toEqual([{count:0}]);
  });
  it('keeps receipts and RPC inaccessible to public roles',async()=>{
   for(const role of ['anon','authenticated']){
