@@ -4,6 +4,7 @@ import {isVideoAssetId} from '../asset-id';
 import {FrameworksWebhookRetryableError} from './webhook-errors';
 import {toFrameworksStreamNodeId} from './stream-id';
 import {commitFrameworksWebhook,type ReadyWebhookArtifact} from './webhook-store';
+import {secureFrameworksVod} from './vod-policy';
 export type FrameworksWebhookEvent={id:string;type:string;api_version?:string;created_at?:string;data:Record<string,unknown>};
 const businessTypes=new Set(['stream.live','stream.idle','recording.ready','clip.ready','upload.ready']);
 function string(data:Record<string,unknown>,key:string):string|undefined {
@@ -28,7 +29,9 @@ export async function handleFrameworksWebhookEvent(event:FrameworksWebhookEvent)
   if(streamId && asset.source?.streamId && toFrameworksStreamNodeId(streamId)!==toFrameworksStreamNodeId(asset.source.streamId))throw new FrameworksWebhookRetryableError('Artifact parent stream conflicts with event');
   streamId=asset.source?.streamId??streamId;
   if(event.type==='recording.ready' && !streamId)throw new FrameworksWebhookRetryableError('Recording parent is missing');
+  if(event.type==='recording.ready')await secureFrameworksVod(asset.id,asset.playbackId);
   artifact={assetId:asset.id,playbackId:asset.playbackId,
+    ...(event.type==='recording.ready'?{policyConfirmed:true as const}:{}),
     ...(asset.name?{name:asset.name.slice(0,500)}:{}),
     ...(Number.isFinite(asset.videoSpec?.duration) && asset.videoSpec!.duration!>=0?{durationSeconds:asset.videoSpec!.duration!}:{})};
  }
