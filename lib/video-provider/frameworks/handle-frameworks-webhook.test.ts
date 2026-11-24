@@ -1,11 +1,12 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const {get,commit}=vi.hoisted(()=>({get:vi.fn(),commit:vi.fn()}));
+const {get,commit,secure}=vi.hoisted(()=>({get:vi.fn(),commit:vi.fn(),secure:vi.fn()}));
 vi.mock('../index',()=>({getVideoProvider:()=>({assets:{get}})}));
 vi.mock('./webhook-store',()=>({commitFrameworksWebhook:commit}));
+vi.mock('./vod-policy',()=>({secureFrameworksVod:secure}));
 import {handleFrameworksWebhookEvent,type FrameworksWebhookEvent} from './handle-frameworks-webhook';
 const event=(type:string,data:Record<string,unknown>={}):FrameworksWebhookEvent=>({id:'evt',type,created_at:'2026-11-23T10:00:00Z',data});
 const asset={id:'hash',playbackId:'play',status:{phase:'ready'},source:{type:'recording',streamId:'parent'},videoSpec:{duration:12}};
-beforeEach(()=>{vi.clearAllMocks();commit.mockResolvedValue('processed');get.mockResolvedValue(asset);});
+beforeEach(()=>{vi.clearAllMocks();secure.mockResolvedValue(undefined);commit.mockResolvedValue('processed');get.mockResolvedValue(asset);});
 describe('durable FrameWorks event dispatch',()=>{
  it.each(['stream.live','stream.idle'])('normalizes %s parent IDs and delegates atomic persistence',async(type)=>{
   const uuid='12345678-abcd-4abc-8def-123456789abc';
@@ -18,8 +19,13 @@ describe('durable FrameWorks event dispatch',()=>{
  });
  it('records verified canonical recording data, excluding event-supplied owner and URLs',async()=>{
   await handleFrameworksWebhookEvent(event('recording.ready',{artifact:{artifactId:'hash'},creator:'attacker',url:'https://private.example'}));
-  expect(commit).toHaveBeenCalledWith(expect.objectContaining({streamId:'parent',artifact:{assetId:'hash',playbackId:'play',durationSeconds:12}}));
+  expect(commit).toHaveBeenCalledWith(expect.objectContaining({streamId:'parent',artifact:{assetId:'hash',playbackId:'play',durationSeconds:12,policyConfirmed:true}}));
   expect(JSON.stringify(commit.mock.calls[0])).not.toContain('attacker');
+  expect(secure).toHaveBeenCalledWith('hash','play');expect(secure.mock.invocationCallOrder[0]).toBeLessThan(commit.mock.invocationCallOrder[0]);
+ });
+ it('does not acknowledge a recording or create authority until its exact JWT policy is confirmed',async()=>{
+  secure.mockRejectedValueOnce(new Error('Policy unavailable'));await expect(handleFrameworksWebhookEvent(event('recording.ready',{artifact:{artifactHash:'hash'}}))).rejects.toThrow('Policy unavailable');expect(commit).not.toHaveBeenCalled();
+  await handleFrameworksWebhookEvent(event('recording.ready',{artifact:{artifactHash:'hash'}}));expect(commit).toHaveBeenCalledOnce();
  });
  it.each(['upload.ready','clip.ready'])('stores %s readiness without inventing ownership or publishing',async(type)=>{
   get.mockResolvedValue({...asset,source:{type:'vod'}});await handleFrameworksWebhookEvent(event(type,{artifact:{artifactHash:'hash'}}));expect(commit).toHaveBeenCalled();

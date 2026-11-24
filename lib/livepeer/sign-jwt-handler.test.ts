@@ -116,6 +116,13 @@ describe('provider-aware viewer signing', () => {
     vi.mocked(checkMeTokenAccess).mockResolvedValue({ allowed: false });
     expect((await handleSignJwt(request())).status).toBe(403);
   });
+  it('checks a published clip against the broadcaster token rather than the clip owner token',async()=>{
+    vi.mocked(getStreamByPlaybackId).mockResolvedValue(null);
+    videoLookup.mockResolvedValue({data:{creator_id:'0xclipper',gate_creator_id:'0xbroadcaster',requires_metoken:true,metoken_price:2,status:'published'},error:null});
+    vi.mocked(checkMeTokenAccess).mockResolvedValue({allowed:false});
+    expect((await handleSignJwt(request())).status).toBe(403);
+    expect(checkMeTokenAccess).toHaveBeenCalledWith(expect.objectContaining({creatorAddress:'0xbroadcaster',requiredAmount:2}));
+  });
   it('fails closed when VOD authorization storage is unavailable', async () => {
     vi.mocked(getStreamByPlaybackId).mockResolvedValue(null);
     videoLookup.mockResolvedValue({ data: null, error: { message: 'offline' } });

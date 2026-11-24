@@ -54,7 +54,7 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
     let resource = stream;
     if (!stream && resolveVideoProviderId() === 'frameworks') {
       const { data, error } = await createServiceClient().from('frameworks_vod_access')
-        .select('creator_id, requires_metoken, metoken_price, status')
+        .select('creator_id, gate_creator_id, requires_metoken, metoken_price, status')
         .eq('playback_id', authorizedPlaybackId).maybeSingle();
       if (error) return NextResponse.json({ message: 'Playback authorization unavailable' }, { status: 503 });
       if (data?.status === 'draft') {
@@ -74,7 +74,7 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
       if (!data || !['published', 'minted'].includes(data.status)) {
         return NextResponse.json({ message: 'Playback not found' }, { status: 404 });
       }
-      resource = data;
+      resource = { ...data, creator_id: data.gate_creator_id ?? data.creator_id };
     }
 
     if (

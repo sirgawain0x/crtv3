@@ -1,13 +1,18 @@
 "use client";
 import { useCallback, useState } from "react";
-import { useUser } from "@/lib/wallet/react";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { useUser } from '@/lib/wallet/react';
+import { walletAuthHeadersToArgs } from '@/lib/auth/require-wallet';
+import { updateVideoAsset } from '@/services/video-assets';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Scissors, Settings2, Share2 } from "lucide-react";
 import { SongchainShareClipDialog } from "@/components/songchain/SongchainShareClipDialog";
 import type { ClipLensShareInput } from "@/lib/songchain/clip-to-video-asset";
+import type { Src } from '@livepeer/react';
+import { PreviewPlayer } from '@/components/Player/PreviewPlayer';
+import { getDetailPlaybackSource } from '@/lib/hooks/livepeer/useDetailPlaybackSources';
 
 interface ClipCreatorProps {
   playbackId: string;
@@ -26,6 +31,7 @@ interface ClipState {
   clipVideoAssetId?: number;
   title: string;
   thumbnailUrl?: string | null;
+  published?: boolean;
 }
 
 export function ClipCreator({
@@ -35,9 +41,12 @@ export function ClipCreator({
   parentStoryIpId,
   parentCommercialRevShare,
 }: ClipCreatorProps) {
-  const user = useUser();
-  const { getAuthHeaders } = useWalletAuth();
-  const clipperAddress = user?.address;
+  const { getAuthHeaders, address: clipperAddress } = useWalletAuth();
+  const user=useUser();
+  const companionAddress=user?.address&&user.address.toLowerCase()!==clipperAddress?.toLowerCase()?user.address:undefined;
+  const [publishing,setPublishing]=useState(false);
+  const [previewSources,setPreviewSources]=useState<Src[]|null>(null);
+  const [previewLoading,setPreviewLoading]=useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clip, setClip] = useState<ClipState | null>(null);
@@ -60,11 +69,13 @@ export function ClipCreator({
       setIsLoading(true);
       setError(null);
       setClip(null);
+      setPreviewSources(null);
       setMintResult(null);
       try {
+        const authHeaders=await getAuthHeaders();
         const res = await fetch("/api/livepeer/clips", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({
             playbackId,
             sessionId,
@@ -72,6 +83,7 @@ export function ClipCreator({
             endTime: endMs,
             name: name.trim() || undefined,
             clipperAddress,
+            companionAddress,
           }),
         });
         const data = await res.json();
@@ -82,7 +94,7 @@ export function ClipCreator({
 
         const persistRes = await fetch("/api/video-assets/clips", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({
             assetId: data.assetId,
             playbackId: data.newPlaybackId,
@@ -96,6 +108,7 @@ export function ClipCreator({
           }),
         });
         const persist = await persistRes.json().catch(() => ({}));
+        if(!persistRes.ok) throw new Error(persist?.error || 'Clip could not be saved');
 
         const clipTitle =
           name.trim() ||
@@ -120,7 +133,7 @@ export function ClipCreator({
         setIsLoading(false);
       }
     },
-    [clipperAddress, name, parentCommercialRevShare, parentStoryIpId, playbackId, sessionId]
+    [clipperAddress, companionAddress, getAuthHeaders, name, parentCommercialRevShare, parentStoryIpId, playbackId, sessionId]
   );
 
   const handleQuickClip = (durationSec: number) => {
@@ -191,7 +204,7 @@ export function ClipCreator({
     );
   }
 
-  const canMint = !!clip?.parentStoryIpId && !!clip?.clipVideoAssetId;
+  const canMint = !!clip?.published && !!clip?.parentStoryIpId && !!clip?.clipVideoAssetId;
 
   const clipSharePayload: ClipLensShareInput | null =
     clip && clipperAddress
@@ -278,17 +291,31 @@ export function ClipCreator({
         <Alert>
           <AlertTitle>Clip Created!</AlertTitle>
           <AlertDescription className="space-y-3">
-            <video
-              src={clip.playbackUrl}
-              controls
-              className="w-full max-w-sm rounded shadow"
-              style={{ aspectRatio: "16/9" }}
-            />
+            {previewSources ? <PreviewPlayer src={previewSources} title={clip.title} playbackId={clip.newPlaybackId}/> : (
+              <Button disabled={previewLoading} onClick={async()=>{
+                setPreviewLoading(true);setError(null);
+                try {
+                  const sources=await getDetailPlaybackSource(clip.newPlaybackId,{authHeaders:await getAuthHeaders(),companionAddress});
+                  if(sources?.length)setPreviewSources(sources);
+                  else setError('Your clip is still processing. Try the preview again shortly.');
+                } catch {setError('Could not load the protected clip preview. Please try again.');}
+                finally {setPreviewLoading(false);}
+              }}>{previewLoading?'Loading preview…':'Preview clip'}</Button>
+            )}
             <div className="flex flex-wrap items-center gap-2">
+              {!clip.published&&<Button disabled={publishing||!clip.clipVideoAssetId} onClick={async()=>{
+                if(!clip.clipVideoAssetId)return;
+                setPublishing(true);setError(null);
+                try {
+                  await updateVideoAsset(clip.clipVideoAssetId,{status:'published'},walletAuthHeadersToArgs(await getAuthHeaders()));
+                  setClip(current=>current?.assetId===clip.assetId?{...current,published:true}:current);
+                }catch {setError('The clip is not ready to publish yet. Retry once processing finishes.');}
+                finally {setPublishing(false);}
+              }}>{publishing?'Publishing…':'Publish clip'}</Button>}
               <Button
                 type="button"
                 variant="secondary"
-                disabled={!clipSharePayload}
+                disabled={!clipSharePayload||!clip.published}
                 onClick={() => setSongchainShareOpen(true)}
               >
                 <Share2 className="h-4 w-4 mr-1.5" />

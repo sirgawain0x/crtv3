@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/sdk/supabase/service';
-export type ReadyWebhookArtifact={assetId:string;playbackId:string;name?:string;durationSeconds?:number};
+export type ReadyWebhookArtifact={assetId:string;playbackId:string;name?:string;durationSeconds?:number;policyConfirmed?:true};
 export type DurableWebhookInput={eventId:string;type:string;payloadSha256:string;occurredAt:string;streamId?:string;artifact?:ReadyWebhookArtifact};
 /** Receipts and effects share one server-only transaction. No early ACK or expired worker lease. */
 export async function commitFrameworksWebhook(input:DurableWebhookInput):Promise<'processed'|'duplicate'|'ignored'> {

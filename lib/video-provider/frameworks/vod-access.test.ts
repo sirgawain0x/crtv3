@@ -1,6 +1,7 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 import type {SupabaseClient} from '@supabase/supabase-js';
-const {verify,getAsset,secure}=vi.hoisted(()=>({verify:vi.fn(),getAsset:vi.fn(),secure:vi.fn()}));
+const {verify,getAsset,secure,readyClip}=vi.hoisted(()=>({verify:vi.fn(),getAsset:vi.fn(),secure:vi.fn(),readyClip:vi.fn()}));
+vi.mock('./clip-policy',()=>({requireReadyFrameworksClip:readyClip}));
 vi.mock('@/lib/auth/require-wallet',()=>({verifyWalletAuthArgs:verify}));
 vi.mock('./assets',()=>({frameworksAssets:{get:getAsset}}));vi.mock('./vod-policy',()=>({secureFrameworksVod:secure}));
 import {registerProtectedVod,updateFrameworksVodAccess} from './vod-access';
@@ -27,5 +28,15 @@ describe('verified VOD publishing',()=>{
  });
  it('does not treat ordinary metadata as a playback permission update',async()=>{
   await updateFrameworksVodAccess(db,1,{});expect(verify).not.toHaveBeenCalled();expect(rpc).not.toHaveBeenCalled();
+ });
+ it('uses private native-clip provenance rather than editable catalog labels',async()=>{
+  single.mockResolvedValueOnce({data:{asset_id:'asset',playback_id:'play',creator_id:creator,source_type:'video'}})
+   .mockResolvedValueOnce({data:{parent_stream_id:'stored-parent'}});
+  await updateFrameworksVodAccess(db,1,{status:'published'});expect(readyClip).toHaveBeenCalledWith('asset','play');expect(getAsset).not.toHaveBeenCalled();
+ });
+ it('publishes historical clips imported as VOD through the VOD provider API',async()=>{
+  single.mockResolvedValueOnce({data:{asset_id:'asset',playback_id:'play',creator_id:creator,source_type:'Clip'}})
+   .mockResolvedValueOnce({data:{parent_stream_id:null}});
+  await updateFrameworksVodAccess(db,1,{status:'published'});expect(getAsset).toHaveBeenCalledWith('asset');expect(readyClip).not.toHaveBeenCalled();
  });
 });

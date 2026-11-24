@@ -19,7 +19,7 @@ beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('VERCEL_ENV','preview');vi.stubEnv
 describe('isolated admin import boundary',()=>{
  it('returns a fixed protected-upload failure classification while preserving reconciliation guidance',async()=>{
   run.mockRejectedValueOnce(new ImportStoppedError('policy-unconfirmed'));const response=await POST(request({mode:'import',source}));
-  expect(response.status).toBe(409);expect((await response.json()).error).toContain('policy-unconfirmed');
+  const body=await response.json();expect(response.status).toBe(409);expect(body.error).toContain('policy-unconfirmed');expect(body.failureCode).toBe('policy-unconfirmed');
  });
  it('inspects an uncertain reservation only when every source proof matches, without creating or fetching original bytes',async()=>{
   find.mockResolvedValue({state:'ambiguous',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes});
