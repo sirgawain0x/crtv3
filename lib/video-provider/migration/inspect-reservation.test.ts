@@ -10,8 +10,12 @@ it('reports malformed configuration without returning the secret or its fingerpr
 });
 it('returns only exact source matches and safe canonical identities',async()=>{
  query.mockResolvedValue({storageArtifactsConnection:{totalCount:2,hasNextPage:false,nodes:[{hash:'Canonical_Hash',playbackId:'New_Play',title:source.assetId,status:'PROCESSING',sizeBytes:100,url:'PRIVATE_URL'},{hash:'Other_Hash',playbackId:'Other_Play',title:'other',status:'ready',sizeBytes:100}]}});
- const result=await inspectMigrationReservation(source);expect(result.matchingArtifacts).toEqual([{assetId:'Canonical_Hash',playbackId:'New_Play',sizeMatches:true,status:'processing'}]);expect(result.providerAvailable).toBe(true);expect(JSON.stringify(result)).not.toContain('PRIVATE');
+ const result=await inspectMigrationReservation(source);expect(result.matchingArtifacts).toEqual([{assetId:'Canonical_Hash',playbackId:'New_Play',identityUsable:true,sizeMatches:true,status:'processing'}]);expect(result.providerAvailable).toBe(true);expect(JSON.stringify(result)).not.toContain('PRIVATE');
  expect(query).toHaveBeenCalledWith(expect.any(String),{input:{kinds:['VOD'],search:source.assetId,first:10}});
+});
+it('retains unfinished matches with missing identities without misreporting an outage or leaking invalid values',async()=>{
+ query.mockResolvedValue({storageArtifactsConnection:{totalCount:1,hasNextPage:false,nodes:[{hash:'https://PRIVATE',playbackId:null,title:source.assetId,status:'processing',sizeBytes:100}]}});
+ const result=await inspectMigrationReservation(source);expect(result.providerAvailable).toBe(true);expect(result.completeSearch).toBe(true);expect(result.matchingArtifacts).toEqual([{assetId:null,playbackId:null,identityUsable:false,sizeMatches:true,status:'processing'}]);expect(JSON.stringify(result)).not.toContain('PRIVATE');
 });
 it('does not imply absence when a search is truncated or unavailable',async()=>{
  query.mockResolvedValueOnce({storageArtifactsConnection:{totalCount:20,hasNextPage:true,nodes:[]}});expect((await inspectMigrationReservation(source)).completeSearch).toBe(false);

@@ -23,6 +23,7 @@ import {
 import { FloatingTipHearts } from "@/components/Live/FloatingTipHearts";
 import { safelyPauseVideo } from "@/lib/utils/video-controls";
 import { logger } from '@/lib/utils/logger';
+import {frameworksHlsDiagnostics} from '@/lib/video-provider/frameworks/hls-diagnostics';
 
 
 export const PlayerLoading: React.FC<{ title: string }> = ({ title }) => {
@@ -83,6 +84,11 @@ export function Player(props: PlayerProps) {
   );
   const activeIdsRef = useRef<Set<string>>(new Set());
   const lastTickRef = useRef(0);
+  const hlsConfig=useMemo(()=>({
+    manifestLoadingTimeOut:HLS_WARMUP_MS,manifestLoadingMaxRetry:6,manifestLoadingRetryDelay:1500,
+    levelLoadingTimeOut:20000,fragLoadingTimeOut:20000,
+    ...(typeof window!=='undefined'&&window.location.hostname==='staging.tv.creativeplatform.xyz'?frameworksHlsDiagnostics(src??[]):undefined),
+  }),[src]);
 
   const annotationMap = useMemo(() => {
     const map = new Map<number, ShoppableAnnotation[]>();
@@ -277,13 +283,7 @@ export function Player(props: PlayerProps) {
           playsInline
           controls={false}
           onTimeUpdate={handleShoppableTimeUpdate}
-          hlsConfig={{
-            manifestLoadingTimeOut: HLS_WARMUP_MS,
-            manifestLoadingMaxRetry: 6,
-            manifestLoadingRetryDelay: 1_500,
-            levelLoadingTimeOut: 20_000,
-            fragLoadingTimeOut: 20_000,
-          }}
+          hlsConfig={hlsConfig}
         />
 
         <CreativeBrandOverlay />

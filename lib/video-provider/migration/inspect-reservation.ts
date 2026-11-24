@@ -21,8 +21,9 @@ export async function inspectMigrationReservation(source: ArchivedSource) {
       nodes: Array<{ hash: string; playbackId: string | null; title: string; status: string; sizeBytes: number | null }>;
     } }>('query InspectMigrationReservation($input:StorageArtifactsInput!){storageArtifactsConnection(input:$input){totalCount hasNextPage nodes{hash playbackId title status sizeBytes}}}', { input: { kinds: ['VOD'], search: source.assetId, first: 10 } });
     const artifacts = result.storageArtifactsConnection.nodes.filter(node => node.title === source.assetId).map(node => {
-      if (!isVideoAssetId(node.hash) || !node.playbackId || !isVideoAssetId(node.playbackId)) throw new Error('Unusable identity');
-      return { assetId: node.hash, playbackId: node.playbackId, sizeMatches: node.sizeBytes === source.sizeBytes,
+      const assetId=isVideoAssetId(node.hash)?node.hash:null;
+      const playbackId=node.playbackId&&isVideoAssetId(node.playbackId)?node.playbackId:null;
+      return { assetId, playbackId, identityUsable:Boolean(assetId&&playbackId),sizeMatches: node.sizeBytes === source.sizeBytes,
         status: ['processing', 'ready', 'failed', 'expired'].includes(node.status.toLowerCase()) ? node.status.toLowerCase() : 'unknown' };
     });
     return { configuration, providerAvailable: true, completeSearch: !result.storageArtifactsConnection.hasNextPage, matchingArtifacts: artifacts };

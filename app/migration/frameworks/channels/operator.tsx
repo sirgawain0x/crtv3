@@ -9,7 +9,7 @@ export default function ChannelOperator() {
   const [snapshot, setSnapshot] = useState(""),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
-  async function prepare() {
+  async function prepare(mode:'prepare'|'inspect-playback'='prepare') {
     setBusy(true);
     setMessage("");
     try {
@@ -19,7 +19,7 @@ export default function ChannelOperator() {
           "Content-Type": "application/json",
           ...(await getAuthHeaders()),
         },
-        body: JSON.stringify(JSON.parse(snapshot)),
+        body: JSON.stringify(mode==='prepare'?JSON.parse(snapshot):{mode,snapshot:JSON.parse(snapshot)}),
       });
       const result = await response.json();
       if (!response.ok)
@@ -59,10 +59,11 @@ export default function ChannelOperator() {
       <button
         className="rounded border p-3"
         disabled={busy || !isReady || !snapshot}
-        onClick={prepare}
+        onClick={()=>prepare()}
       >
         {busy ? "Preparing…" : "Prepare replacement"}
       </button>
+      <button className="rounded border p-3" disabled={busy||!isReady||!snapshot} onClick={()=>prepare('inspect-playback')}>Check channel playback</button>
       {message && <p role="status">{message}</p>}
     </main>
   );
