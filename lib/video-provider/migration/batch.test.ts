@@ -2,6 +2,7 @@ import {expect,it,vi} from 'vitest';
 import {runVerifiedImportBatch,type MigrationMode} from './batch';
 import type {ArchivedSource} from './archive';
 import {ImportStoppedError} from './import-failure';
+import {requestMigrationImport} from './import-request';
 const one:ArchivedSource={assetId:'11111111-1111-4111-8111-111111111111',playbackId:'old-one',sha256:'a'.repeat(64),sizeBytes:100};
 const two:ArchivedSource={...one,assetId:'22222222-2222-4222-8222-222222222222'};
 const ready=(source:ArchivedSource)=>({outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}});
@@ -28,8 +29,9 @@ it('stops uncertain requests without exposing provider details',async()=>{
  await expect(runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{}})).rejects.toThrow(`Batch stopped at source ${one.assetId}; inspect its reservation before resuming`);
  expect(request).toHaveBeenCalledTimes(1);
 });
-it('preserves import stop classification and adds batch source context',async()=>{
- const request=vi.fn(async()=>{throw new ImportStoppedError('policy-unconfirmed');});
+it('preserves import stop classification through the HTTP helper and adds batch source context',async()=>{
+ const importFetch=vi.fn(async()=>new Response(JSON.stringify({error:'Import stopped during protected upload preparation (policy-unconfirmed). Inspect its reservation before retrying.',failureCode:'policy-unconfirmed'}),{status:409,headers:{'Content-Type':'application/json'}}));
+ const request=async(mode:MigrationMode,source:ArchivedSource)=>(await requestMigrationImport({mode,source},{fetch:importFetch,url:'https://staging.example/api/migration/frameworks/import'})) as {outcome?:{state:'ready'|'processing';sourceId:string;action:string};diagnostic?:{playableManifest:boolean}};
  await expect(runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{}})).rejects.toSatisfy((error:unknown)=>{
   expect(error).toBeInstanceOf(ImportStoppedError);
   const stopped=error as ImportStoppedError;
@@ -38,7 +40,7 @@ it('preserves import stop classification and adds batch source context',async()=
   expect(stopped.message).toContain('policy-unconfirmed');
   return true;
  });
- expect(request).toHaveBeenCalledTimes(1);
+ expect(importFetch).toHaveBeenCalledOnce();
 });
 it('does not accept stored assets whose playback check fails',async()=>{
  const request=vi.fn(async(mode:MigrationMode)=>mode==='inspect-playback'?{diagnostic:{playableManifest:false}}:ready(one));
