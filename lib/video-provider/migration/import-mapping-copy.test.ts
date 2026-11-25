@@ -72,6 +72,30 @@ describe('import mapping copy planning', () => {
     expect(() => renderImportMappingCopySql(plan, 'apply')).toThrow(/conflict/);
   });
 
+  it('blocks inserts when prod already owns the frameworks identity on another row', () => {
+    const sharedAsset = 'shared-fw-asset';
+    const sharedPlay = 'shared-fw-play';
+    const prodOwner = '6ba7b812-9dad-11d1-80b4-00c04fd430c8';
+    const plan = buildImportMappingCopyPlan({
+      source: [
+        readyRow(sourceId2, {
+          frameworks_asset_id: sharedAsset,
+          frameworks_playback_id: sharedPlay,
+        }),
+      ],
+      target: [
+        readyRow(prodOwner, {
+          frameworks_asset_id: sharedAsset,
+          frameworks_playback_id: sharedPlay,
+        }),
+      ],
+    });
+    expect(plan.plannedInserts).toBe(0);
+    expect(plan.conflicts).toBe(1);
+    expect(plan.items[0].reason).toMatch(/frameworks_asset_id/);
+    expect(plan.executable).toBe(false);
+  });
+
   it('validates ledger exports and migration database URLs', () => {
     expect(readyMappingFromRow(readyRow(sourceId))?.state).toBe('ready');
     expect(readyMappingFromRow({ ...readyRow(sourceId), state: 'failed' })).toBeNull();

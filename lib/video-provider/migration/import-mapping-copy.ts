@@ -108,6 +108,16 @@ export function buildImportMappingCopyPlan(input: {
   const targetById = new Map(
     input.target.map((row) => [row.livepeer_asset_id, row]),
   );
+  const targetByFrameworksAsset = new Map<string, ImportLedgerRow>();
+  const targetByFrameworksPlayback = new Map<string, ImportLedgerRow>();
+  for (const row of input.target) {
+    if (row.frameworks_asset_id) {
+      targetByFrameworksAsset.set(row.frameworks_asset_id, row);
+    }
+    if (row.frameworks_playback_id) {
+      targetByFrameworksPlayback.set(row.frameworks_playback_id, row);
+    }
+  }
   const seenFrameworksAsset = new Set<string>();
   const seenFrameworksPlayback = new Set<string>();
   const items: ImportCopyItem[] = [];
@@ -151,6 +161,33 @@ export function buildImportMappingCopyPlan(input: {
     }
     seenFrameworksAsset.add(ready.frameworks_asset_id);
     seenFrameworksPlayback.add(ready.frameworks_playback_id);
+
+    const assetHolder = targetByFrameworksAsset.get(ready.frameworks_asset_id);
+    if (
+      assetHolder &&
+      assetHolder.livepeer_asset_id !== ready.livepeer_asset_id
+    ) {
+      items.push({
+        row: ready,
+        action: 'conflict',
+        reason: `Target already maps frameworks_asset_id under livepeer_asset_id ${assetHolder.livepeer_asset_id}`,
+      });
+      continue;
+    }
+    const playbackHolder = targetByFrameworksPlayback.get(
+      ready.frameworks_playback_id,
+    );
+    if (
+      playbackHolder &&
+      playbackHolder.livepeer_asset_id !== ready.livepeer_asset_id
+    ) {
+      items.push({
+        row: ready,
+        action: 'conflict',
+        reason: `Target already maps frameworks_playback_id under livepeer_asset_id ${playbackHolder.livepeer_asset_id}`,
+      });
+      continue;
+    }
 
     const existing = targetById.get(ready.livepeer_asset_id);
     if (!existing) {

@@ -1,8 +1,11 @@
 /** Copy reviewed ready import mappings from QA into prod. Dry-run by default. */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { neon } from '@neondatabase/serverless';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  applyImportMappingCopyPlan,
+  executeImportMappingCopySql,
+} from '../lib/video-provider/migration/import-mapping-apply';
 import {
   assertProdImportSupabaseUrl,
   assertQaMigrationSupabaseUrl,
@@ -11,19 +14,19 @@ import {
   renderImportMappingCopySql,
   type ImportLedgerRow,
 } from '../lib/video-provider/migration/import-mapping-copy';
+import { fetchImportLedgerRows } from '../lib/video-provider/migration/import-mapping-ledger';
 
 const columns =
   'livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id,created_at,updated_at';
 
-async function loadLedger(
-  db: SupabaseClient,
-): Promise<ImportLedgerRow[]> {
-  const { data, error } = await db
-    .from('frameworks_asset_imports')
-    .select(columns)
-    .order('livepeer_asset_id');
-  if (error) throw new Error('Cannot read frameworks_asset_imports ledger');
-  return parseImportLedgerRows(data);
+async function loadLedger(db: SupabaseClient): Promise<ImportLedgerRow[]> {
+  return fetchImportLedgerRows((from, to) =>
+    db
+      .from('frameworks_asset_imports')
+      .select(columns)
+      .order('livepeer_asset_id')
+      .range(from, to),
+  );
 }
 
 async function main() {
@@ -151,14 +154,6 @@ async function main() {
   }
 
   if (apply) {
-    if (plan.conflicts) {
-      throw new Error(
-        `Refusing --apply with ${plan.conflicts} import mapping conflict(s)`,
-      );
-    }
-    if (!plan.plannedInserts) {
-      throw new Error('Nothing to apply: prod already has the reviewed ready set');
-    }
     assertProdImportSupabaseUrl(process.env.FRAMEWORKS_PROD_IMPORT_SUPABASE_URL);
     const connection = process.env.FRAMEWORKS_PROD_IMPORT_DATABASE_URL;
     if (
@@ -170,9 +165,9 @@ async function main() {
         'FRAMEWORKS_PROD_IMPORT_DATABASE_URL must be an explicit production postgres session URL',
       );
     }
-    const sql = renderImportMappingCopySql(plan, 'apply');
-    const run = neon(connection);
-    await run(sql);
+    await applyImportMappingCopyPlan(plan, (sql) =>
+      executeImportMappingCopySql(connection, sql),
+    );
   }
 
   console.log(JSON.stringify(summary));
