@@ -93,6 +93,7 @@ describe('applyImportMappingCopyPlan', () => {
       connectionString: prodUrl,
       ssl: PROD_IMPORT_PG_TLS,
     });
+    expect(config.connectionString).not.toMatch(/sslmode=/i);
     expect(config.ssl).toBeDefined();
     expect(mocks.Client).toHaveBeenCalledWith(config);
     expect(mocks.connect).toHaveBeenCalled();
@@ -101,14 +102,14 @@ describe('applyImportMappingCopyPlan', () => {
   });
 
   it('refuses plaintext or weak sslmode database URLs', () => {
-    for (const mode of ['disable', 'allow', 'prefer'] as const) {
+    for (const mode of ['no-verify', 'disable', 'allow', 'prefer'] as const) {
       expect(() =>
-        assertProdImportDatabaseUrl(`postgresql://x?sslmode=${mode}`),
-      ).toThrow(/TLS/i);
+        assertProdImportDatabaseUrl(`postgresql://h:1/db?sslmode=${mode}`),
+      ).toThrow(/permitted|postgres|sslmode/i);
     }
     expect(() => prodImportPgClientConfig('http://not-postgres')).toThrow();
-    expect(prodImportPgClientConfig(`${prodUrl}?sslmode=require`).ssl).toEqual(
-      PROD_IMPORT_PG_TLS,
-    );
+    const config = prodImportPgClientConfig(`${prodUrl}?sslmode=require`);
+    expect(config.ssl).toEqual(PROD_IMPORT_PG_TLS);
+    expect(config.connectionString).not.toMatch(/sslmode=/i);
   });
 });

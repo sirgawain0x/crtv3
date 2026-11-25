@@ -24,35 +24,78 @@ export async function applyImportMappingCopyPlan(
 /** Certificate-verifying TLS for prod pooler sessions (never plaintext). */
 export const PROD_IMPORT_PG_TLS = { rejectUnauthorized: true } as const;
 
-const refusedSslModes = ['disable', 'allow', 'prefer'] as const;
+const ALLOWED_SSLMODE = new Set(['require', 'verify-ca', 'verify-full']);
 
-/** Refuse plaintext / negotiable-down TLS; TLS is always forced on the pg client. */
-export function assertProdImportDatabaseUrl(connectionString: string): void {
-  if (
-    !connectionString.startsWith('postgresql://') &&
-    !connectionString.startsWith('postgres://')
-  ) {
-    throw new Error(
+const FORBIDDEN_TLS_QUERY_KEYS = [
+  'ssl',
+  'sslcert',
+  'sslkey',
+  'sslrootcert',
+  'sslnegotiation',
+] as const;
+
+function refusedTlsUrl(message: string): never {
+  throw new Error(message);
+}
+
+/**
+ * Validate prod pooler URLs and strip sslmode so pg uses the explicit ssl config
+ * (pg merges connection-string sslmode over config.ssl when sslmode remains).
+ */
+export function sanitizeProdImportDatabaseUrl(connectionString: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(connectionString);
+  } catch {
+    refusedTlsUrl(
       'Production import database URL must be a postgres connection string',
     );
   }
-  const lowered = connectionString.toLowerCase();
-  for (const mode of refusedSslModes) {
-    if (lowered.includes(`sslmode=${mode}`)) {
-      throw new Error('Plaintext or negotiable-down TLS database URLs are refused');
+  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
+    refusedTlsUrl(
+      'Production import database URL must use postgres or postgresql scheme',
+    );
+  }
+
+  for (const key of [...parsed.searchParams.keys()]) {
+    const lower = key.toLowerCase();
+    if (lower === 'sslmode') {
+      const mode = parsed.searchParams.get(key)?.toLowerCase();
+      if (!mode || !ALLOWED_SSLMODE.has(mode)) {
+        refusedTlsUrl('Database URL sslmode is not permitted for prod import apply');
+      }
+      continue;
+    }
+    if (
+      FORBIDDEN_TLS_QUERY_KEYS.includes(
+        lower as (typeof FORBIDDEN_TLS_QUERY_KEYS)[number],
+      ) ||
+      lower.startsWith('ssl')
+    ) {
+      refusedTlsUrl(`Database URL TLS query parameter is not permitted: ${key}`);
     }
   }
-  if (lowered.includes('ssl=false') || lowered.includes('ssl=0')) {
-    throw new Error('Plaintext or disabled TLS database URLs are refused');
+
+  parsed.searchParams.delete('sslmode');
+  for (const key of [...parsed.searchParams.keys()]) {
+    if (key.toLowerCase().startsWith('ssl')) {
+      parsed.searchParams.delete(key);
+    }
   }
+
+  return parsed.toString();
+}
+
+/** @deprecated use sanitizeProdImportDatabaseUrl */
+export function assertProdImportDatabaseUrl(connectionString: string): void {
+  sanitizeProdImportDatabaseUrl(connectionString);
 }
 
 export function prodImportPgClientConfig(
   connectionString: string,
 ): pg.ClientConfig {
-  assertProdImportDatabaseUrl(connectionString);
   return {
-    connectionString,
+    connectionString: sanitizeProdImportDatabaseUrl(connectionString),
     ssl: PROD_IMPORT_PG_TLS,
   };
 }
