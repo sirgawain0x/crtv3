@@ -22,6 +22,20 @@ describe("frameworks assets (#406)", () => {
     fetchMock.mockReset();
   });
 
+  it("maps the native Clip API's done status to playable readiness", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ data: { storageArtifactsConnection: { nodes: [] } } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ data: { vodAsset: null } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ data: { clip: { id: 'clip-node', clipHash: 'clip-hash', playbackId: 'clip-play', status: 'done' } } }) });
+    const asset = await getVideoProvider().assets.get('clip-hash');
+    expect(asset).toMatchObject({ id: 'clip-hash', playbackId: 'clip-play', source: { type: 'clip' }, status: { phase: 'ready' } });
+  });
+
+  it("does not apply Clip completion statuses to a VOD", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ data: { storageArtifactsConnection: { nodes: [] } } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ data: { vodAsset: { id: 'vod', playbackId: 'vod-play', status: 'done' } } }) });
+    expect((await getVideoProvider().assets.get('vod'))?.status?.phase).toBe('processing');
+  });
+
   it("assets.get returns vodAsset summary", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,

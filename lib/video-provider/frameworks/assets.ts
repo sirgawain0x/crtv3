@@ -242,10 +242,10 @@ const ABORT_VOD_UPLOAD = `
   }
 `;
 
-function mapStatusToPhase(status?: string): { phase?: string } | undefined {
+function mapStatusToPhase(status?: string, kind = "vod"): { phase?: string } | undefined {
   if (!status) return undefined;
   const normalized = status.toLowerCase();
-  if (normalized === "ready") return { phase: "ready" };
+  if (normalized === "ready" || (kind === "clip" && normalized === "done")) return { phase: "ready" };
   if (normalized === "failed") return { phase: "failed" };
   return { phase: "processing" };
 }
@@ -264,7 +264,7 @@ function mapVodToSummary(node: VodAssetNode, kind = "vod"): AssetSummary {
       node.durationMs != null
         ? { duration: Math.round(node.durationMs / 1000) }
         : undefined,
-    status: mapStatusToPhase(node.status),
+    status: mapStatusToPhase(node.status, kind),
   };
 }
 
