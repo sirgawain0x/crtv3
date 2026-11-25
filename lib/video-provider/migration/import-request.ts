@@ -1,12 +1,14 @@
 import type { ArchivedSource } from './archive';
 import type { MigrationMode } from './batch';
 import type { ImportOutcome } from './importer';
+import type { LedgerReservationState } from './reservation-state';
 import { ImportStoppedError, type ImportFailureCode } from './import-failure';
 
 export type MigrationImportResponse =
-  | { outcome: ImportOutcome; recovery?: boolean }
-  | { message: string }
+  | { outcome: ImportOutcome; recovery?: boolean; retry?: boolean }
+  | { message: string; prepared?: { action: string } }
   | { diagnostic: Record<string, unknown> & { playableManifest?: boolean } }
+  | { import: { state: LedgerReservationState } }
   | { error: string; failureCode?: ImportFailureCode };
 
 const importFailureCodes = ['policy-unconfirmed', 'provider-auth', 'provider-validation', 'provider-timeout', 'provider-unavailable'] as const satisfies readonly ImportFailureCode[];

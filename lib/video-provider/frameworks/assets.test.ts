@@ -36,6 +36,23 @@ describe("frameworks assets (#406)", () => {
     expect((await getVideoProvider().assets.get('vod'))?.status?.phase).toBe('processing');
   });
 
+  it.each([["TRANSCODE_FAILED", "failed"], ["TRANSCODING", "processing"]])(
+    "preserves provider status %s and classifies it as %s",
+    async (status, phase) => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: async () => ({ data: { storageArtifactsConnection: { nodes: [] } } }),
+      });
+      fetchMock.mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: async () => ({ data: { vodAsset: { id: "vod", status } } }),
+      });
+      expect(await getVideoProvider().assets.get("vod")).toMatchObject({
+        status: { phase }, providerProcessingStatus: status,
+      });
+    },
+  );
+
   it("assets.get returns vodAsset summary", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,

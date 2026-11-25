@@ -1,6 +1,6 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {NextRequest} from 'next/server';
-const {auth,run,remote,client,find,inspect,reservation}=vi.hoisted(()=>({auth:vi.fn(),run:vi.fn(),remote:vi.fn(),client:vi.fn(),find:vi.fn(),inspect:vi.fn(),reservation:vi.fn()}));
+const {auth,run,remote,client,find,inspect,reservation,prepareRetry,archiveOpen}=vi.hoisted(()=>({auth:vi.fn(),run:vi.fn(),remote:vi.fn(),client:vi.fn(),find:vi.fn(),inspect:vi.fn(),reservation:vi.fn(),prepareRetry:vi.fn(),archiveOpen:vi.fn()}));
 vi.mock('@/lib/access/require-platform-admin',()=>({requirePlatformAdmin:auth,PlatformAdminAuthError:class extends Error{constructor(public status:number,message:string){super(message);}}}));
 vi.mock('@/lib/middleware/rateLimit',()=>({rateLimiters:{standard:vi.fn(async()=>null)}}));
 vi.mock('@/lib/sdk/supabase/service',()=>({createServiceClient:client}));
@@ -10,13 +10,36 @@ vi.mock('@/lib/video-provider/migration/supabase-ledger',()=>({createImportLedge
 vi.mock('@/lib/video-provider/migration/inspect-playback',()=>({inspectMigrationPlayback:inspect}));
 vi.mock('@/lib/video-provider/migration/inspect-reservation',()=>({inspectMigrationReservation:reservation}));
 vi.mock('@/lib/video-provider/migration/frameworks-import-provider',()=>({createFrameworksImportProvider:()=>({})}));
+vi.mock('@/lib/video-provider/migration/failed-import-retry',()=>({prepareFailedImportRetry:prepareRetry,FailedImportRetryError:class extends Error{}}));
+vi.mock('@/lib/video-provider/migration/archive-source',()=>({resolveMigrationArchiveRoot:()=>'/archive',openArchiveImportSource:archiveOpen}));
 import {PlatformAdminAuthError} from '@/lib/access/require-platform-admin';
 import {POST} from './route';
 import {ImportStoppedError} from '@/lib/video-provider/migration/import-failure';
 const source={assetId:'2499b6b6-314f-4251-b119-fbb6445a48a5',playbackId:'old-play',sizeBytes:5,sha256:'a'.repeat(64)};
 const request=(body:unknown)=>new NextRequest('https://staging.example/api/migration/frameworks/import',{method:'POST',body:JSON.stringify(body)});
-beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('VERCEL_ENV','preview');vi.stubEnv('VIDEO_PROVIDER','frameworks');vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://zxpobpucayevlrzdxhmr.supabase.co');auth.mockResolvedValue({address:'admin'});run.mockResolvedValue({sourceId:source.assetId,state:'processing',action:'created'});remote.mockReturnValue({verify:()=>{},read:()=>{}});});afterEach(()=>vi.unstubAllEnvs());
+beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('VERCEL_ENV','preview');vi.stubEnv('VIDEO_PROVIDER','frameworks');vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://zxpobpucayevlrzdxhmr.supabase.co');auth.mockResolvedValue({address:'admin'});run.mockResolvedValue({sourceId:source.assetId,state:'processing',action:'created'});remote.mockReturnValue({verify:()=>{},read:()=>{}});prepareRetry.mockResolvedValue({action:'reset'});archiveOpen.mockResolvedValue({verify:async()=>{},read:async()=>new Uint8Array(),close:async()=>{}});});afterEach(()=>vi.unstubAllEnvs());
 describe('isolated admin import boundary',()=>{
+ it('inspect-import reads the ledger only and never opens a source file',async()=>{
+  find.mockResolvedValue({livepeer_asset_id:source.assetId,state:'failed',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes});
+  expect((await POST(request({mode:'inspect-import',source}))).status).toBe(200);
+  expect((await (await POST(request({mode:'inspect-import',source}))).json()).import.state).toBe('failed');
+  find.mockResolvedValue(null);
+  expect((await (await POST(request({mode:'inspect-import',source}))).json()).import.state).toBe('missing');
+  expect(run).not.toHaveBeenCalled();expect(remote).not.toHaveBeenCalled();expect(reservation).not.toHaveBeenCalled();
+  find.mockResolvedValue({livepeer_asset_id:source.assetId,state:'failed',livepeer_playback_id:'different',source_sha256:source.sha256,source_bytes:source.sizeBytes});
+  expect((await POST(request({mode:'inspect-import',source}))).status).toBe(409);
+ });
+ it('prepares failed retries without touching ready imports',async()=>{
+  const response=await POST(request({mode:'prepare-retry',source}));expect(response.status).toBe(200);
+  expect(prepareRetry).toHaveBeenCalled();expect(run).not.toHaveBeenCalled();
+ });
+ it('reimports from the archive mirror only when prepared',async()=>{
+  find.mockResolvedValue({state:'prepared',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes});
+  const response=await POST(request({mode:'retry-import',source}));expect(response.status).toBe(200);
+  expect(archiveOpen).toHaveBeenCalled();expect(run).toHaveBeenCalledWith(expect.objectContaining({file:expect.any(Object)}));
+  find.mockResolvedValue({state:'ready',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes});
+  expect((await POST(request({mode:'retry-import',source}))).status).toBe(409);
+ });
  it('preserves the fixed reason a reviewed recovery check refused the source',async()=>{
   const response=await POST(request({mode:'prepare-recovery',source}));expect(response.status).toBe(409);
   expect((await response.json()).error).toBe('This source has no reviewed replacement plan');expect(run).not.toHaveBeenCalled();

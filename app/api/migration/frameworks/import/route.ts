@@ -12,6 +12,9 @@ import {inspectMigrationPlayback} from '@/lib/video-provider/migration/inspect-p
 import {inspectMigrationReservation} from '@/lib/video-provider/migration/inspect-reservation';
 import {ImportStoppedError} from '@/lib/video-provider/migration/import-failure';
 import {prepareReviewedRecovery,adoptVerifiedRecovery,requireReviewedRecoverySource,ReviewedRecoveryError} from '@/lib/video-provider/migration/reviewed-recovery';
+import {FailedImportRetryError,prepareFailedImportRetry} from '@/lib/video-provider/migration/failed-import-retry';
+import {openArchiveImportSource,resolveMigrationArchiveRoot} from '@/lib/video-provider/migration/archive-source';
+import {readImportInspectState} from '@/lib/video-provider/migration/reservation-state';
 export const runtime='nodejs';
 export const maxDuration=300;
 const respond=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -24,11 +27,34 @@ export async function POST(request:NextRequest){
  try{
   const raw=await request.text();if(Buffer.byteLength(raw)>4096)return respond({error:'Source request too large'},413);
   const body=JSON.parse(raw);mode=body.mode;
-  if(!['import','poll','inspect-playback','inspect-reservation','prepare-recovery','import-recovery','poll-recovery','adopt-recovery'].includes(mode)||!body.source||typeof body.source!=='object')throw new Error();
+  if(!['import','poll','inspect-playback','inspect-reservation','inspect-import','prepare-recovery','import-recovery','poll-recovery','adopt-recovery','prepare-retry','retry-import'].includes(mode)||!body.source||typeof body.source!=='object')throw new Error();
   [source]=archivedSourcesFromManifests([{assets:[{...body.source,status:'archived'}]}]);
   if(!source || source.sizeBytes>1024**3)throw new Error();
  }catch{return respond({error:'One verified source up to 1 GiB is required'},400);}
  try{
+  if(mode==='inspect-import'){
+   const record=await createImportLedger(createServiceClient()).find(source.assetId);
+   return respond({import:{state:readImportInspectState(record,source)}});
+  }
+  if(mode==='prepare-retry'){
+   const db=createServiceClient();
+   const prepared=await prepareFailedImportRetry(db,source);
+   return respond({message:prepared.action==='reset'?'Failed import reset to prepared; retry from the verified archive mirror.':prepared.action==='reserved'?'Import reserved from archive evidence; proceed with retry-import.':'Import already prepared for checksum-verified retry.',prepared});
+  }
+  if(mode==='retry-import'){
+   const archiveRoot=resolveMigrationArchiveRoot();
+   if(!archiveRoot)return respond({error:'FRAMEWORKS_MIGRATION_ARCHIVE_ROOT is required for archive retries'},503);
+   const ledger=createImportLedger(createServiceClient());
+   const record=await ledger.find(source.assetId);
+   if(record?.state==='ready')return respond({error:'Ready imports cannot be retried'},409);
+   if(!record||record.livepeer_playback_id!==source.playbackId||record.source_sha256!==source.sha256||record.source_bytes!==source.sizeBytes)return respond({error:'Prepare retry and matching reservation required'},409);
+   if(record.state!=='prepared')return respond({error:'Import must be in prepared state after prepare-retry'},409);
+   const file=await openArchiveImportSource(archiveRoot,source);
+   try{
+    const outcome=await runAssetImport({source,ledger,provider:createFrameworksImportProvider(),file});
+    return respond({outcome,retry:true});
+   }finally{await file.close();}
+  }
   if(mode.endsWith('-recovery')){
    requireReviewedRecoverySource(source);
    const db=createServiceClient();
@@ -60,6 +86,7 @@ export async function POST(request:NextRequest){
   return respond({outcome});
  }catch(error){
   // A timeout can leave a reservation. Do not return provider errors, URLs or credentials, or retry creation automatically.
+  if(error instanceof FailedImportRetryError)return respond({error:error.message},409);
   if(error instanceof ReviewedRecoveryError)return respond({error:error.message},409);
   if(mode.endsWith('-recovery'))return respond({error:error instanceof ImportStoppedError?`Replacement stopped during protected upload preparation (${error.failureCode}). Inspect its separate recovery reservation; do not recreate an uncertain replacement.`:'Replacement recovery stopped. The original is retained. Inspect the separate recovery reservation using the recovery controls; do not recreate an uncertain replacement.'},409);
   if(error instanceof ImportStoppedError)return respond({error:error.message,failureCode:error.failureCode},409);

@@ -34,7 +34,7 @@ export function createFrameworksImportProvider(): ImportProvider {
     },
     async inspect(assetId) {
       const asset=await frameworksAssets.get(assetId);
-      return asset?{assetId:asset.id,playbackId:asset.playbackId??'',phase:asset.status?.phase??'processing',durationSeconds:asset.videoSpec?.duration}:null;
+      return asset?{assetId:asset.id,playbackId:asset.playbackId??'',phase:asset.status?.phase??'processing',durationSeconds:asset.videoSpec?.duration,providerStatus:asset.providerProcessingStatus}:null;
     },
     confirmProtection:secureFrameworksVod,
   };
