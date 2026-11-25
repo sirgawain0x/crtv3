@@ -52,7 +52,7 @@ vi.mock("@/components/songchain/SongchainShareLiveDialog", () => ({ SongchainSha
 vi.mock("@/components/Live/ModeratorsDialog", () => ({ ModeratorsDialog: () => null }));
 vi.mock("@/components/Videos/ShareDialog", () => ({ ShareDialog: () => null }));
 
-import LivePage from "./page";
+import LivePage from "./LiveStudio";
 
 describe("Live Studio recording preferences", () => {
   let container: HTMLDivElement;

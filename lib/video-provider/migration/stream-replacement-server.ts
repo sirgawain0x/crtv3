@@ -1,3 +1,4 @@
+import { frameworksReplayEnabled } from "@/lib/video-provider/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { frameworksStreams } from "../frameworks/streams";
 import { frameworksGraphqlRequest } from "../frameworks-graphql";
@@ -47,7 +48,7 @@ async function verifyTarget(record: Replacement) {
     s.id !== id ||
     s.playbackId !== expectedPlayback ||
     s.streamKey !== expectedKey ||
-    s.record !== (record.source_snapshot.save_recording === true) ||
+    s.record !== (frameworksReplayEnabled() && record.source_snapshot.save_recording === true) ||
     s.playbackPolicy?.type !== "JWT" ||
     s.playbackPolicy.jwt?.allowedKids.length !== 1 ||
     s.playbackPolicy.jwt.allowedKids[0] !== kid ||
@@ -152,7 +153,7 @@ export async function prepareStoredStreamReplacement(
       const target = await frameworksStreams.create({
         name: `crtv-replacement-${snapshot.id}`,
         profiles: [],
-        record: snapshot.save_recording === true,
+        record: frameworksReplayEnabled() && snapshot.save_recording === true,
         playbackPolicy: { type: "jwt" },
         creatorId: snapshot.creator_id,
       });

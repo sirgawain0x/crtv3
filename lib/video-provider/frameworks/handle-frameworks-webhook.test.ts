@@ -1,4 +1,4 @@
-import {beforeEach,describe,expect,it,vi} from 'vitest';
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 const {get,commit,secure}=vi.hoisted(()=>({get:vi.fn(),commit:vi.fn(),secure:vi.fn()}));
 vi.mock('../index',()=>({getVideoProvider:()=>({assets:{get}})}));
 vi.mock('./webhook-store',()=>({commitFrameworksWebhook:commit}));
@@ -6,8 +6,16 @@ vi.mock('./vod-policy',()=>({secureFrameworksVod:secure}));
 import {handleFrameworksWebhookEvent,type FrameworksWebhookEvent} from './handle-frameworks-webhook';
 const event=(type:string,data:Record<string,unknown>={}):FrameworksWebhookEvent=>({id:'evt',type,created_at:'2026-11-23T10:00:00Z',data});
 const asset={id:'hash',playbackId:'play',status:{phase:'ready'},source:{type:'recording',streamId:'parent'},videoSpec:{duration:12}};
-beforeEach(()=>{vi.clearAllMocks();secure.mockResolvedValue(undefined);commit.mockResolvedValue('processed');get.mockResolvedValue(asset);});
+afterEach(()=>vi.unstubAllEnvs());
+beforeEach(()=>{vi.stubEnv("FRAMEWORKS_NATIVE_REPLAY_ENABLED","true");vi.clearAllMocks();secure.mockResolvedValue(undefined);commit.mockResolvedValue('processed');get.mockResolvedValue(asset);});
 describe('durable FrameWorks event dispatch',()=>{
+ it('ignores recording callbacks with replay disabled before provider or catalog work', async () => {
+  vi.stubEnv('FRAMEWORKS_NATIVE_REPLAY_ENABLED', undefined);
+  expect(await handleFrameworksWebhookEvent(event('recording.ready', {artifact:{artifactHash:'hash'}}))).toBe('ignored');
+  expect(get).not.toHaveBeenCalled();
+  expect(secure).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
+ });
  it.each(['stream.live','stream.idle'])('normalizes %s parent IDs and delegates atomic persistence',async(type)=>{
   const uuid='12345678-abcd-4abc-8def-123456789abc';
   expect(await handleFrameworksWebhookEvent(event(type,{streamId:uuid}))).toBe('processed');

@@ -1,5 +1,7 @@
 "use server";
 
+import { frameworksReplayEnabled, resolveVideoProviderId } from "@/lib/video-provider/config";
+
 import {
   getLivepeerAsset,
   getStreamSessions,
@@ -27,6 +29,7 @@ export async function persistRecordingAsset(
   asset: LivepeerAssetSummary,
   options?: { streamId?: string }
 ) {
+  if (resolveVideoProviderId() === "frameworks" && !frameworksReplayEnabled()) return null;
   if (!isRecordingAsset(asset)) return null;
   if (!asset.id || !asset.playbackId) return null;
   if (asset.status?.phase && asset.status.phase !== "ready") return null;
@@ -94,6 +97,9 @@ async function findRecordingAssetForSession(
  * that do not yet have a video_assets row.
  */
 export async function finalizeStreamRecordings(streamId: string) {
+  if (resolveVideoProviderId() === "frameworks" && !frameworksReplayEnabled()) {
+    return { created: 0, skipped: 0, ignored: true };
+  }
   const stream = await getStreamByStreamId(streamId);
   if (!stream) {
     return { created: 0, skipped: 0, error: "Stream not found" };
