@@ -8,6 +8,7 @@ import { alchemy } from "@account-kit/infra";
 import { useSessionKeyStorage } from "./useSessionKeyStorage";
 import { buildSessionKeyContext } from "@/lib/wallet/session-keys";
 import { logger } from '@/lib/utils/logger';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 
 export interface SessionKeyPermissions {
@@ -44,7 +45,7 @@ export function useSessionKey(options: UseSessionKeyOptions = {}) {
         LocalAccountSigner.privateKeyToAccountSigner(sessionKeyPrivate);
 
       // Get API key from existing transport
-      const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+      const apiKey = getAlchemyApiKey();
 
       if (!apiKey) {
         throw new Error("Alchemy API key not found");
@@ -96,7 +97,7 @@ export function useSessionKey(options: UseSessionKeyOptions = {}) {
         throw new Error("Smart account not initialized or chain not selected");
       }
 
-      const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+      const apiKey = getAlchemyApiKey();
       if (!apiKey) {
         throw new Error("Alchemy API key not found");
       }

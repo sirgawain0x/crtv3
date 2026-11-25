@@ -13,6 +13,7 @@ import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from '@/lib/contracts/USDCT
 import { base, alchemy } from '@account-kit/infra';
 import { erc20Abi, createPublicClient } from 'viem';
 import { logger } from '@/lib/utils/logger';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 async function loadX402Fetch() {
   const mod = await import('x402-fetch');
@@ -68,7 +69,7 @@ export function useX402Payment() {
     return createPublicClient({
       chain: base,
       transport: alchemy({
-        apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+        apiKey: getAlchemyApiKey() as string,
       }),
     });
   }, []);

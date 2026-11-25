@@ -11,10 +11,11 @@ import {
 import { base } from "@account-kit/infra";
 import { parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
 import { serverLogger } from "@/lib/utils/logger";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 /** Resolve Base mainnet RPC URL. Avoids Alchemy client when key is missing (returns non-JSON → parse error). */
 function getBaseRpcUrl(): string {
-  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const apiKey = getAlchemyApiKey();
 
   // Only use Alchemy URL if we have a valid, non-empty API key
   if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) {
@@ -357,7 +358,7 @@ export class UnlockService {
           error
         );
         throw this.createError(
-          `RPC configuration error: Alchemy API key may be missing or invalid. Please check NEXT_PUBLIC_ALCHEMY_API_KEY environment variable.`,
+          `RPC configuration error: Alchemy API key may be missing or invalid. Please check the ALCHEMY_API_KEY (server) or NEXT_PUBLIC_ALCHEMY_API_KEY (browser) environment variable.`,
           "RPC_CONFIG_ERROR",
           {
             lockAddress,

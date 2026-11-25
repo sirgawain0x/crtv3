@@ -1,4 +1,5 @@
 // NOTE: This module is not currently used - Account Kit manages its own signer
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 // The useSigner() hook from @/lib/wallet/react should be used instead
 // 
 // The aggressive iframe cleanup that was here has been removed because it was
@@ -82,7 +83,7 @@ function createSigner(): AlchemyWebSigner {
     const newSigner = new AlchemyWebSigner({
       client: {
         connection: {
-          apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+          apiKey: getAlchemyApiKey() as string,
         },
         iframeConfig: {
           iframeContainerId: "alchemy-signer-iframe-container",
@@ -101,7 +102,7 @@ function createSigner(): AlchemyWebSigner {
       const retrySigner = new AlchemyWebSigner({
         client: {
           connection: {
-            apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+            apiKey: getAlchemyApiKey() as string,
           },
           iframeConfig: {
             iframeContainerId: "alchemy-signer-iframe-container",

@@ -6,6 +6,7 @@ import { modularAccountFactoryAddresses } from "@/lib/utils/modularAccount";
 import { signer } from "./signer";
 import { serverLogger } from "@/lib/utils/logger";
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 interface CreateModularAccountClientParams {
   chain?: Chain;
@@ -23,7 +24,7 @@ interface CreateModularAccountClientParams {
  */
 export async function createModularAccountClient({
   chain = base,
-  apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+  apiKey = getAlchemyApiKey() as string,
   privateKey = generatePrivateKey(),
 }: CreateModularAccountClientParams) {
   // Get the factory address for the chain

@@ -11,6 +11,7 @@ import { storyChain, lensChain } from "@/lib/wallet/chains";
 import { SITE_TOPIC_LOGO } from "./context/context";
 import Image from "next/image";
 import React from "react";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 export { walletChains as chains, lensChain } from "@/lib/wallet/chains";
 
@@ -19,7 +20,7 @@ const defaultChain = base;
 
 // Create transport
 const transport = alchemy({
-  apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+  apiKey: getAlchemyApiKey() as string,
 });
 
 // Custom storage implementation with 30-day expiration to prevent auto-logout

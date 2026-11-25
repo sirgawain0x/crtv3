@@ -8,17 +8,18 @@ import {
 } from "@alchemy/wallet-apis";
 import { serverLogger } from "@/lib/utils/logger";
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 export const config = {
   policyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID!,
 };
 
 function getClientParams() {
-  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const apiKey = getAlchemyApiKey();
   const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
 
   if (!apiKey) {
-    throw new Error("NEXT_PUBLIC_ALCHEMY_API_KEY is not configured");
+    throw new Error("ALCHEMY_API_KEY is not configured");
   }
 
   if (!privateKey) {
@@ -97,7 +98,7 @@ export async function executeSwap(params: {
 }) {
   serverLogger.debug("Starting swap execution with params:", params);
 
-  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const apiKey = getAlchemyApiKey();
   const policyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
   const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
 

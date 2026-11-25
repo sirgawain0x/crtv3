@@ -6,6 +6,7 @@ import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { serverLogger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 const DIAMOND = METOKEN_DIAMOND_BASE;
 
@@ -103,7 +104,7 @@ export async function GET(
     if (currentTotalSupply === BigInt(0) || currentTvl === 0) {
       try {
         serverLogger.debug('DB data missing/zero, fetching from blockchain for:', meToken.address);
-        const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+        const apiKey = getAlchemyApiKey();
         const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
         const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
         const rpcUrls: string[] = [];

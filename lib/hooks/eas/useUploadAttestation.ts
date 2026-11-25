@@ -31,6 +31,7 @@ import { logger } from "@/lib/utils/logger";
 import { parseBundlerError } from "@/lib/utils/bundlerErrorParser";
 import { base } from "viem/chains";
 import { buildSponsoredAttestationGasContext } from "@/lib/eas/attestation-gas";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 export type AttestationStatus =
   | "idle"
@@ -110,7 +111,7 @@ const MIN_USDC_FOR_GAS = 5_000_000n; // $5 USDC (6 decimals) — paymaster usual
  * extended with publicActions.
  */
 function getBasePublicClient() {
-  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const apiKey = getAlchemyApiKey();
   const transport = apiKey
     ? http(`https://base-mainnet.g.alchemy.com/v2/${apiKey}`)
     : http("https://mainnet.base.org");

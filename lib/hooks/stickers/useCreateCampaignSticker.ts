@@ -131,7 +131,7 @@ export function useCreateCampaignSticker() {
           })
         );
 
-        const gasContext = getGasContext("sponsored");
+        const gasContext = getGasContext("usdc");
         const operation = await client.sendUserOperation({
           uo: {
             target: CAMPAIGN_STICKERS_ADDRESS,

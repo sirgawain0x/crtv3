@@ -264,7 +264,7 @@ export function ClaimStickerButton({ proposalId }: ClaimStickerButtonProps) {
         })
       );
 
-      const gasContext = getGasContext("sponsored");
+      const gasContext = getGasContext("usdc");
       const operation = await client.sendUserOperation({
         uo: {
           target: CAMPAIGN_STICKERS_ADDRESS,

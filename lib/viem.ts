@@ -1,7 +1,8 @@
 import { createPublicClient, http, type Address } from "viem";
 import { alchemy, base } from "@account-kit/infra";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
-const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+const apiKey = getAlchemyApiKey();
 export const fallbackRpc = "https://mainnet.base.org";
 
 // Create a public client for reading blockchain data

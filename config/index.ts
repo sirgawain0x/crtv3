@@ -1,12 +1,16 @@
 import { z } from "zod";
 import { serverLogger } from "@/lib/utils/logger";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 const isProduction = process.env.NODE_ENV === "production";
+// `@/config` is imported by client providers too (queryClient, chains), where
+// non-public env vars do not exist. Validation and fail-fast are server-only.
+const isServerRuntime = typeof window === "undefined";
 
 // Define required vs optional environment variables
 const configSchema = z.object({
   // Required for core functionality
-  alchemyApiKey: z.string().min(1, "NEXT_PUBLIC_ALCHEMY_API_KEY is required"),
+  alchemyApiKey: z.string().min(1, "ALCHEMY_API_KEY is required"),
   supabaseUrl: z.string().url("NEXT_PUBLIC_SUPABASE_URL must be a valid URL"),
   supabaseAnonKey: z.string().min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
   supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
@@ -24,7 +28,7 @@ export type Config = z.infer<typeof configSchema>;
 
 // Load config from environment variables
 export const config: Config = {
-  alchemyApiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "",
+  alchemyApiKey: getAlchemyApiKey() ?? "",
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
@@ -46,7 +50,7 @@ if (!validationResult.success) {
   
   const errorMessage = `Environment variable validation failed:\n${errors}`;
   
-  if (isProduction) {
+  if (isProduction && isServerRuntime) {
     // Fail fast in production - missing required env vars will cause runtime errors
     throw new Error(errorMessage);
   } else {

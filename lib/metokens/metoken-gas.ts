@@ -1,4 +1,5 @@
 import { stripEnvQuotes } from '@/lib/eas/attestation-gas';
+import { isGasSponsorshipEnabled } from '@/lib/wallet/gas-policy';
 
 const POLICY_UUID =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -23,6 +24,7 @@ function isValidPolicyId(policyId?: string): policyId is string {
  * Does not use the USDC any-token policy.
  */
 export function resolveMeTokenPaymasterPolicyId(): string | undefined {
+  if (!isGasSponsorshipEnabled()) return undefined;
   const policy = stripEnvQuotes(process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID);
   if (isValidPolicyId(policy)) return policy;
   return undefined;

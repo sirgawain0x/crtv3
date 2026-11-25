@@ -8,6 +8,7 @@ import {
 } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
 import { enrichPredictionDisplaySync } from "@/lib/predictions/enrich-prediction-display";
 import { getUserClaimStatus } from "@/lib/predictions/claim-status";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 export async function GET(request: NextRequest) {
   const rl = await rateLimiters.generous(request);
@@ -37,8 +38,8 @@ export async function GET(request: NextRequest) {
     chain: base,
     transport: fallback([
       http(
-        process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
-          ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+        getAlchemyApiKey()
+          ? `https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`
           : undefined
       ),
       http("https://mainnet.base.org"),

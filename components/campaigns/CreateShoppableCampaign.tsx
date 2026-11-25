@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { logger } from "@/lib/utils/logger";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 const formSchema = CampaignFormSchemaBase.omit({ brandAddress: true });
 type FormValues = z.infer<typeof formSchema>;
@@ -125,7 +126,7 @@ export function CreateShoppableCampaign() {
 
       const publicClient = createPublicClient({
         chain: base,
-        transport: alchemy({ apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY! }),
+        transport: alchemy({ apiKey: getAlchemyApiKey()! }),
       });
       const blockNumber = Number(await publicClient.getBlockNumber());
       const start = Math.floor(values.startDate.getTime() / 1000);

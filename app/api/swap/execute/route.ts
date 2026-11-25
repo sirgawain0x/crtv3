@@ -4,6 +4,7 @@ import { executeSwap } from '@/lib/sdk/alchemy/swap-client';
 import { BASE_TOKENS, type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check environment variables
-    const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+    const apiKey = getAlchemyApiKey();
     const policyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
     const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
 
@@ -81,13 +82,12 @@ export async function POST(request: NextRequest) {
       hasApiKey: !!apiKey,
       hasPolicyId: !!policyId,
       hasPrivateKey: !!privateKey,
-      apiKeyPrefix: apiKey ? apiKey.slice(0, 10) + '...' : 'MISSING',
     });
 
     if (!apiKey) {
-      serverLogger.error('Missing NEXT_PUBLIC_ALCHEMY_API_KEY');
+      serverLogger.error('Missing ALCHEMY_API_KEY');
       return NextResponse.json(
-        { error: 'Alchemy API key not configured. Please set NEXT_PUBLIC_ALCHEMY_API_KEY environment variable.' },
+        { error: 'Alchemy API key not configured. Please set ALCHEMY_API_KEY on the server.' },
         { status: 500 }
       );
     }

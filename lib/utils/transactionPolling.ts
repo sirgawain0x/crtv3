@@ -8,11 +8,12 @@
 import { createPublicClient, http, decodeEventLog, Log, TransactionReceipt } from 'viem';
 import { baseMainnet } from '@/lib/utils/chains/base';
 import { logger } from '@/lib/utils/logger';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 
 // Base RPC endpoints with fallbacks
 const RPC_ENDPOINTS = [
-  `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`,
+  `https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`,
   'https://mainnet.base.org',
   'https://base.publicnode.com',
 ];
