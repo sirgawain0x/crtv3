@@ -3,16 +3,19 @@ import { CREATIVE_TV_ASSET_UUID_REGEX } from '@/lib/utils/creative-tv-url';
 import type { ArchivedSource } from './archive';
 import { isVideoAssetId } from '../asset-id';
 import {ImportStoppedError,MigrationProviderFailure} from './import-failure';
+import {sanitizeProviderFailureReason} from './provider-failure';
 export type ImportState = 'prepared' | 'importing' | 'processing' | 'ready' | 'ambiguous' | 'failed';
 export type ImportRecord = {
   livepeer_asset_id: string; livepeer_playback_id: string | null; source_sha256: string; source_bytes: number;
   state: ImportState; frameworks_asset_id: string | null; frameworks_playback_id: string | null;
+  provider_failure_phase?: string | null; provider_failure_reason?: string | null;
 };
 export interface ImportLedger {
   find(sourceId: string): Promise<ImportRecord | null>;
   reserve(source: ArchivedSource): Promise<ImportRecord>;
   transition(sourceId: string, expected: ImportState, next: ImportState,
     target?: { assetId: string; playbackId: string }): Promise<boolean>;
+  recordProviderFailure?(sourceId: string, detail: { phase: string; reason: string }): Promise<void>;
 }
 export type ProtectedUpload = { assetId: string; playbackId: string; uploadId: string;
   partSize: number; parts: Array<{ partNumber: number; url: string }> };
@@ -21,7 +24,7 @@ export interface ImportProvider {
   createProtectedUpload(source: ArchivedSource): Promise<ProtectedUpload>;
   uploadPart(url: string, bytes: Uint8Array): Promise<string>;
   complete(uploadId: string, parts: Array<{partNumber: number; etag: string}>): Promise<{assetId:string;playbackId:string}>;
-  inspect(assetId: string): Promise<{assetId:string;playbackId:string;phase:string;durationSeconds?:number} | null>;
+  inspect(assetId: string): Promise<{assetId:string;playbackId:string;phase:string;durationSeconds?:number;providerStatus?:string} | null>;
   confirmProtection(assetId: string, playbackId: string): Promise<void>;
 }
 export interface VerifiedImportSource {
@@ -53,6 +56,8 @@ export async function runAssetImport(input: {source: ArchivedSource; ledger: Imp
     if (!asset) return {sourceId:source.assetId,state:'processing',action:'polled'};
     if (asset.assetId !== target.assetId || asset.playbackId !== target.playbackId) throw new Error('Provider inspection returned conflicting identities');
     if (asset.phase.toLowerCase() === 'failed') {
+      const reason = sanitizeProviderFailureReason({ phase: asset.phase, providerStatus: asset.providerStatus });
+      await ledger.recordProviderFailure?.(source.assetId, { phase: asset.phase, reason });
       await ledger.transition(source.assetId,'processing','failed');
       return {sourceId:source.assetId,state:'failed',action:'polled'};
     }

@@ -4,8 +4,8 @@ import type { ImportOutcome } from './importer';
 import { ImportStoppedError, type ImportFailureCode } from './import-failure';
 
 export type MigrationImportResponse =
-  | { outcome: ImportOutcome; recovery?: boolean }
-  | { message: string }
+  | { outcome: ImportOutcome; recovery?: boolean; retry?: boolean }
+  | { message: string; prepared?: { action: string } }
   | { diagnostic: Record<string, unknown> & { playableManifest?: boolean } }
   | { error: string; failureCode?: ImportFailureCode };
 

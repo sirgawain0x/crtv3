@@ -6,6 +6,17 @@ import {requestMigrationImport} from './import-request';
 const one:ArchivedSource={assetId:'11111111-1111-4111-8111-111111111111',playbackId:'old-one',sha256:'a'.repeat(64),sizeBytes:100};
 const two:ArchivedSource={...one,assetId:'22222222-2222-4222-8222-222222222222'};
 const ready=(source:ArchivedSource)=>({outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}});
+it('prepares and retries failed sources when retryFailedImports is enabled',async()=>{
+ const modes:string[]=[];
+ const request=vi.fn(async(mode:MigrationMode)=>{
+  modes.push(mode);
+  if(mode==='prepare-retry')return {};
+  if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
+  return {outcome:{state:'ready' as const,sourceId:one.assetId,action:'created' as const}};
+ });
+ await runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
+ expect(modes).toEqual(['prepare-retry','retry-import','inspect-playback']);
+});
 it('uploads sequentially while earlier sources process, then verifies every source',async()=>{
  let polled=false;
  const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{

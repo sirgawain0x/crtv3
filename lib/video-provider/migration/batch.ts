@@ -2,7 +2,7 @@ import type {ArchivedSource} from './archive';
 import type {ImportOutcome} from './importer';
 import {ImportStoppedError} from './import-failure';
 
-export type MigrationMode='import'|'poll'|'inspect-playback'|'inspect-reservation'|'prepare-recovery'|'import-recovery'|'poll-recovery'|'adopt-recovery';
+export type MigrationMode='import'|'poll'|'inspect-playback'|'inspect-reservation'|'prepare-recovery'|'import-recovery'|'poll-recovery'|'adopt-recovery'|'prepare-retry'|'retry-import';
 export type BatchProgress={completed:number;total:number;sourceId:string;phase:'importing'|'processing'|'checking'|'ready'};
 type RequestResult={outcome?:ImportOutcome;diagnostic?:{playableManifest:boolean}};
 /** Client orchestration only: every operation retains the existing signed-admin server boundary. */
@@ -13,6 +13,8 @@ export async function runVerifiedImportBatch(input:{
   wait:()=>Promise<void>;
   shouldStop?:()=>boolean;
   maxPolls?:number;
+  /** When set, reserves/resets failed rows then re-imports from the verified archive mirror. */
+  retryFailedImports?:boolean;
 }){
   if(!input.sources.length||input.sources.length>45)throw new Error('A verified batch must contain between 1 and 45 sources');
   const completed=new Set<string>();
@@ -47,10 +49,17 @@ export async function runVerifiedImportBatch(input:{
     if(result.outcome.state!=='processing')throw new Error(`Source ${source.assetId} needs reconciliation or more processing time; no creation retry was attempted`);
     return false;
   };
+  const startImport=async(source:ArchivedSource)=>{
+    if(input.retryFailedImports){
+      await request('prepare-retry',source);
+      return request('retry-import',source);
+    }
+    return request('import',source);
+  };
   for(const source of input.sources){
     if(input.shouldStop?.())break;
     report(source,'importing');
-    const result=await request('import',source);
+    const result=await startImport(source);
     if(!await accept(source,result))pending.push(source);
   }
   // Uploads stay sequential; earlier assets may transcode while later sources transfer.

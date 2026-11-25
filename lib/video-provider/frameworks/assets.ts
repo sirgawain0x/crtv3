@@ -265,6 +265,7 @@ function mapVodToSummary(node: VodAssetNode, kind = "vod"): AssetSummary {
         ? { duration: Math.round(node.durationMs / 1000) }
         : undefined,
     status: mapStatusToPhase(node.status),
+    providerProcessingStatus: node.status,
   };
 }
 

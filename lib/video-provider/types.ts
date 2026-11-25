@@ -46,6 +46,8 @@ export type AssetSummary = {
   source?: AssetSource;
   videoSpec?: { duration?: number };
   status?: { phase?: string };
+  /** Raw provider processing status before phase normalization (safe to persist when sanitized). */
+  providerProcessingStatus?: string;
 };
 
 export type CreateClipParams = {

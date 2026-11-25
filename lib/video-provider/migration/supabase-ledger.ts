@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ArchivedSource } from './archive';
 import type { ImportLedger, ImportRecord, ImportState } from './importer';
-const columns='livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id';
+const columns='livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id,provider_failure_phase,provider_failure_reason';
 /** Supply the explicitly selected migration database, never the application's implicit production client. */
 export function createImportLedger(db: SupabaseClient,table:'frameworks_asset_imports'|'frameworks_import_recoveries'='frameworks_asset_imports'): ImportLedger {
   const find=async(sourceId:string):Promise<ImportRecord|null>=>{
@@ -23,6 +23,13 @@ export function createImportLedger(db: SupabaseClient,table:'frameworks_asset_im
         .eq('livepeer_asset_id',sourceId).eq('state',expected).select('livepeer_asset_id');
       if(error) throw new Error('Cannot persist migration import state');
       return data?.length===1;
+    },
+    async recordProviderFailure(sourceId:string,detail:{phase:string;reason:string}) {
+      if(table!=='frameworks_asset_imports') return;
+      const {error}=await db.from(table).update({provider_failure_phase:detail.phase,provider_failure_reason:detail.reason,
+        provider_failure_recorded_at:new Date().toISOString(),updated_at:new Date().toISOString()})
+        .eq('livepeer_asset_id',sourceId).neq('state','ready');
+      if(error) throw new Error('Cannot persist provider failure context');
     },
   };
 }
