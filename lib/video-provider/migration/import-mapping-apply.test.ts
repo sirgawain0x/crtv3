@@ -1,19 +1,25 @@
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it, vi } from 'vitest';
 
-const connect = vi.fn();
-const query = vi.fn().mockResolvedValue({ rows: [] });
-const end = vi.fn();
+const mocks = vi.hoisted(() => {
+  const connect = vi.fn();
+  const query = vi.fn().mockResolvedValue({ rows: [] });
+  const end = vi.fn();
+  const Client = vi.fn(() => ({ connect, query, end }));
+  return { connect, query, end, Client };
+});
 
 vi.mock('pg', () => ({
   default: {
-    Client: vi.fn(() => ({ connect, query, end })),
+    Client: mocks.Client,
   },
 }));
 
 import {
   applyImportMappingCopyPlan,
+  assertProdImportDatabaseUrl,
   executeImportMappingCopySql,
+  prodImportPgClientConfig,
 } from './import-mapping-apply';
 import {
   buildImportMappingCopyPlan,
@@ -21,6 +27,8 @@ import {
 } from './import-mapping-copy';
 
 const sourceId = '2499b6b6-314f-4251-b119-fbb6445a48a5';
+const prodUrl =
+  'postgresql://postgres.zdeiezfoemibjgrkyzvs:secret@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
 
 function readyRow(id: string): ImportLedgerRow {
   return {
@@ -67,22 +75,37 @@ describe('applyImportMappingCopyPlan', () => {
     }
   }, 30000);
 
-  it('uses pg Client for production session URLs', async () => {
-    connect.mockClear();
-    query.mockClear();
-    end.mockClear();
+  it('forces TLS on pg Client for production session URLs', async () => {
+    mocks.connect.mockClear();
+    mocks.query.mockClear();
+    mocks.end.mockClear();
+    mocks.Client.mockClear();
     const plan = buildImportMappingCopyPlan({
       source: [readyRow(sourceId)],
       target: [],
     });
     await applyImportMappingCopyPlan(plan, (sql) =>
-      executeImportMappingCopySql(
-        'postgresql://postgres.zdeiezfoemibjgrkyzvs@localhost/postgres',
-        sql,
-      ),
+      executeImportMappingCopySql(prodUrl, sql),
     );
-    expect(connect).toHaveBeenCalled();
-    expect(query).toHaveBeenCalled();
-    expect(end).toHaveBeenCalled();
+    expect(prodImportPgClientConfig(prodUrl)).toEqual({
+      connectionString: prodUrl,
+      ssl: { rejectUnauthorized: true },
+    });
+    expect(mocks.Client).toHaveBeenCalledWith({
+      connectionString: prodUrl,
+      ssl: { rejectUnauthorized: true },
+    });
+    expect(mocks.connect).toHaveBeenCalled();
+    expect(mocks.query).toHaveBeenCalled();
+    expect(mocks.end).toHaveBeenCalled();
+  });
+
+  it('refuses plaintext or sslmode=disable database URLs', () => {
+    expect(() =>
+      assertProdImportDatabaseUrl(
+        'postgresql://x?sslmode=disable',
+      ),
+    ).toThrow(/TLS/i);
+    expect(() => prodImportPgClientConfig('http://not-postgres')).toThrow();
   });
 });

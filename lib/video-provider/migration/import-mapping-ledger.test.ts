@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   IMPORT_LEDGER_PAGE_SIZE,
   fetchImportLedgerRows,
+  totalFromContentRange,
 } from './import-mapping-ledger';
 import type { ImportLedgerRow } from './import-mapping-copy';
 
@@ -23,12 +24,12 @@ function row(id: string): ImportLedgerRow {
 }
 
 describe('fetchImportLedgerRows', () => {
-  it('paginates until a short page and surfaces query errors', async () => {
+  it('paginates until exact count is satisfied and surfaces query errors', async () => {
     const total = IMPORT_LEDGER_PAGE_SIZE + 3;
     const all = Array.from({ length: total }, (_, i) => row(uuidAt(i + 1)));
     const queryPage = vi.fn(async (from: number, to: number) => {
       const page = all.slice(from, to + 1);
-      return { data: page, error: null };
+      return { data: page, error: null, totalCount: total };
     });
     const loaded = await fetchImportLedgerRows(queryPage);
     expect(loaded).toHaveLength(total);
@@ -39,5 +40,27 @@ describe('fetchImportLedgerRows', () => {
         error: { message: 'boom' },
       })),
     ).rejects.toThrow(/ledger/);
+  });
+
+  it('rejects a capped short first page when exact count proves truncation', async () => {
+    const all = Array.from({ length: 100 }, (_, i) => row(uuidAt(i + 1)));
+    await expect(
+      fetchImportLedgerRows(async () => ({
+        data: all,
+        error: null,
+        totalCount: 250,
+      })),
+    ).rejects.toThrow(/truncated|incomplete/);
+  });
+
+  it('accepts Content-Range totals when count is absent', async () => {
+    const all = [row(uuidAt(1))];
+    const loaded = await fetchImportLedgerRows(async () => ({
+      data: all,
+      error: null,
+      contentRange: '0-0/1',
+    }));
+    expect(loaded).toHaveLength(1);
+    expect(totalFromContentRange('0-99/250')).toBe(250);
   });
 });

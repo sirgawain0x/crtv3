@@ -21,11 +21,41 @@ export async function applyImportMappingCopyPlan(
   await runSql(sql);
 }
 
+/** Refuse plaintext / disabled TLS; TLS is always forced on the pg client. */
+export function assertProdImportDatabaseUrl(connectionString: string): void {
+  if (
+    !connectionString.startsWith('postgresql://') &&
+    !connectionString.startsWith('postgres://')
+  ) {
+    throw new Error(
+      'Production import database URL must be a postgres connection string',
+    );
+  }
+  const lowered = connectionString.toLowerCase();
+  if (
+    lowered.includes('sslmode=disable') ||
+    lowered.includes('ssl=false') ||
+    lowered.includes('ssl=0')
+  ) {
+    throw new Error('Plaintext or disabled TLS database URLs are refused');
+  }
+}
+
+export function prodImportPgClientConfig(
+  connectionString: string,
+): pg.ClientConfig {
+  assertProdImportDatabaseUrl(connectionString);
+  return {
+    connectionString,
+    ssl: { rejectUnauthorized: true },
+  };
+}
+
 export async function executeImportMappingCopySql(
   connectionString: string,
   sql: string,
 ): Promise<void> {
-  const client = new pg.Client({ connectionString });
+  const client = new pg.Client(prodImportPgClientConfig(connectionString));
   await client.connect();
   try {
     await client.query(sql);

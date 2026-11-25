@@ -20,13 +20,18 @@ const columns =
   'livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id,created_at,updated_at';
 
 async function loadLedger(db: SupabaseClient): Promise<ImportLedgerRow[]> {
-  return fetchImportLedgerRows((from, to) =>
-    db
+  return fetchImportLedgerRows(async (from, to) => {
+    const result = await db
       .from('frameworks_asset_imports')
-      .select(columns)
+      .select(columns, { count: 'exact' })
       .order('livepeer_asset_id')
-      .range(from, to),
-  );
+      .range(from, to);
+    return {
+      data: result.data,
+      error: result.error,
+      totalCount: result.count,
+    };
+  });
 }
 
 async function main() {
