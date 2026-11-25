@@ -13,7 +13,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import "./Player.css";
 import { ViewsComponent } from "./ViewsComponent";
 import { useVideo } from "@/context/VideoContext";
-import { safelyPauseVideo, safelyPlayVideo } from "@/lib/utils/video-controls";
+import { safelyPauseVideo } from "@/lib/utils/video-controls";
 import { logger } from '@/lib/utils/logger';
 import { CreativeBrandOverlay } from "./CreativeBrandOverlay";
 
@@ -28,6 +28,8 @@ export const PreviewPlayer: React.FC<{
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
+  const currentPlayingIdRef = useRef(currentPlayingId);
+  currentPlayingIdRef.current = currentPlayingId;
   const playerId = useRef(Math.random().toString(36).substring(7)).current;
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -77,6 +79,7 @@ export const PreviewPlayer: React.FC<{
   }, []);
 
   useEffect(() => {
+    isUnmountingRef.current = false;
     const video = containerRef.current?.querySelector("video");
     if (video) {
       videoRef.current = video;
@@ -85,6 +88,7 @@ export const PreviewPlayer: React.FC<{
 
     return () => {
       isUnmountingRef.current = true;
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
     };
   }, []);
 
@@ -103,7 +107,7 @@ export const PreviewPlayer: React.FC<{
 
     const handlePause = () => {
       setIsPlaying(false);
-      if (currentPlayingId === playerId) {
+      if (currentPlayingIdRef.current === playerId) {
         setCurrentPlayingId("");
       }
     };
@@ -123,11 +127,11 @@ export const PreviewPlayer: React.FC<{
         safelyPauseCurrentVideo();
       }
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      if (currentPlayingId === playerId) {
+      if (currentPlayingIdRef.current === playerId) {
         setCurrentPlayingId("");
       }
     };
-  }, [playerId, currentPlayingId, setCurrentPlayingId, safelyPauseCurrentVideo]);
+  }, [playerId, setCurrentPlayingId, safelyPauseCurrentVideo]);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -166,22 +170,6 @@ export const PreviewPlayer: React.FC<{
       setControlsVisible(false);
     }, 2000);
   };
-
-  const handleControlInteraction = useCallback(() => {
-    resetFadeTimeout();
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        safelyPlayVideo(videoRef.current).catch((error) => {
-          // Ignore AbortError as it's expected when interrupted
-          if (error instanceof Error && error.name !== "AbortError") {
-            logger.error("Error playing video:", error);
-          }
-        });
-      } else {
-        safelyPauseCurrentVideo();
-      }
-    }
-  }, [safelyPauseCurrentVideo]);
 
   return (
     <div
@@ -256,7 +244,7 @@ export const PreviewPlayer: React.FC<{
                 className={`group relative flex h-16 w-16 cursor-pointer items-center 
                   justify-center rounded-full bg-black/50 hover:bg-black/70 
                   transition-transform duration-200 hover:scale-110`}
-                onClick={handleControlInteraction}
+                onClick={resetFadeTimeout}
               >
                 <Player.PlayingIndicator asChild matcher={false}>
                   <PlayIcon className="h-10 w-10 text-white" />
@@ -287,7 +275,7 @@ export const PreviewPlayer: React.FC<{
                   <Player.MuteTrigger
                     className="group relative flex h-8 w-8 cursor-pointer items-center 
                       justify-center rounded-full hover:bg-white/10"
-                    onClick={handleControlInteraction}
+                    onClick={resetFadeTimeout}
                   >
                     <Player.VolumeIndicator asChild matcher={false}>
                       <MuteIcon className="h-5 w-5 text-white" />

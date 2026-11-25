@@ -16,4 +16,15 @@ describe('protected clips',()=>{
   request.mockResolvedValueOnce({clip:{...clip,status:'processing'}});await expect(requireReadyFrameworksClip('hash','play')).rejects.toThrow(/not ready/);
   request.mockResolvedValueOnce({clip}).mockResolvedValueOnce({setPlaybackPolicy:{__typename:'AuthError'}});await expect(requireReadyFrameworksClip('hash','play')).rejects.toThrow(/did not confirm/);
  });
+ it.each(['done','ready'])('publishes a completed %s clip only after confirming exact protection',async status=>{
+  request.mockResolvedValueOnce({clip:{...clip,status}}).mockResolvedValueOnce({setPlaybackPolicy:clip});
+  await expect(requireReadyFrameworksClip('hash','play')).resolves.toBeUndefined();
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(request.mock.calls[1][1].input.clipId).toBe('hash');
+ });
+ it.each(['processing','failed','pending','unknown',null])('refuses incomplete or unknown clip status %s before changing policy',async status=>{
+  request.mockResolvedValueOnce({clip:{...clip,status}});
+  await expect(requireReadyFrameworksClip('hash','play')).rejects.toThrow(/not ready/);
+  expect(request).toHaveBeenCalledTimes(1);
+ });
 });

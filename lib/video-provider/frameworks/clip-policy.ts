@@ -23,7 +23,9 @@ export async function secureFrameworksClip(assetId: string, playbackId: string):
 export async function requireReadyFrameworksClip(assetId: string, playbackId: string): Promise<void> {
   const { clip } = await frameworksGraphqlRequest<{clip: {clipHash:string;playbackId:string;status:string}|null}>(
     `query InspectProtectedClip($id:ID!){clip(id:$id){clipHash playbackId status}}`, { id: assetId });
-  if (!clip || clip.clipHash !== assetId || clip.playbackId !== playbackId || clip.status.toLowerCase() !== 'ready') {
+  // The live Clip API reports completed artifacts as "done"; uploads use "ready".
+  const completed = typeof clip?.status === 'string' && ['done', 'ready'].includes(clip.status.toLowerCase());
+  if (!clip || clip.clipHash !== assetId || clip.playbackId !== playbackId || !completed) {
     throw new Error('Clip is not ready for publishing');
   }
   await secureFrameworksClip(assetId, playbackId);
