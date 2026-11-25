@@ -16,6 +16,7 @@ vi.mock('pg', () => ({
 }));
 
 import {
+  PROD_IMPORT_PG_TLS,
   applyImportMappingCopyPlan,
   assertProdImportDatabaseUrl,
   executeImportMappingCopySql,
@@ -87,25 +88,27 @@ describe('applyImportMappingCopyPlan', () => {
     await applyImportMappingCopyPlan(plan, (sql) =>
       executeImportMappingCopySql(prodUrl, sql),
     );
-    expect(prodImportPgClientConfig(prodUrl)).toEqual({
+    const config = prodImportPgClientConfig(prodUrl);
+    expect(config).toEqual({
       connectionString: prodUrl,
-      ssl: { rejectUnauthorized: true },
+      ssl: PROD_IMPORT_PG_TLS,
     });
-    expect(mocks.Client).toHaveBeenCalledWith({
-      connectionString: prodUrl,
-      ssl: { rejectUnauthorized: true },
-    });
+    expect(config.ssl).toBeDefined();
+    expect(mocks.Client).toHaveBeenCalledWith(config);
     expect(mocks.connect).toHaveBeenCalled();
     expect(mocks.query).toHaveBeenCalled();
     expect(mocks.end).toHaveBeenCalled();
   });
 
-  it('refuses plaintext or sslmode=disable database URLs', () => {
-    expect(() =>
-      assertProdImportDatabaseUrl(
-        'postgresql://x?sslmode=disable',
-      ),
-    ).toThrow(/TLS/i);
+  it('refuses plaintext or weak sslmode database URLs', () => {
+    for (const mode of ['disable', 'allow', 'prefer'] as const) {
+      expect(() =>
+        assertProdImportDatabaseUrl(`postgresql://x?sslmode=${mode}`),
+      ).toThrow(/TLS/i);
+    }
     expect(() => prodImportPgClientConfig('http://not-postgres')).toThrow();
+    expect(prodImportPgClientConfig(`${prodUrl}?sslmode=require`).ssl).toEqual(
+      PROD_IMPORT_PG_TLS,
+    );
   });
 });

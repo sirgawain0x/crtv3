@@ -21,7 +21,12 @@ export async function applyImportMappingCopyPlan(
   await runSql(sql);
 }
 
-/** Refuse plaintext / disabled TLS; TLS is always forced on the pg client. */
+/** Certificate-verifying TLS for prod pooler sessions (never plaintext). */
+export const PROD_IMPORT_PG_TLS = { rejectUnauthorized: true } as const;
+
+const refusedSslModes = ['disable', 'allow', 'prefer'] as const;
+
+/** Refuse plaintext / negotiable-down TLS; TLS is always forced on the pg client. */
 export function assertProdImportDatabaseUrl(connectionString: string): void {
   if (
     !connectionString.startsWith('postgresql://') &&
@@ -32,11 +37,12 @@ export function assertProdImportDatabaseUrl(connectionString: string): void {
     );
   }
   const lowered = connectionString.toLowerCase();
-  if (
-    lowered.includes('sslmode=disable') ||
-    lowered.includes('ssl=false') ||
-    lowered.includes('ssl=0')
-  ) {
+  for (const mode of refusedSslModes) {
+    if (lowered.includes(`sslmode=${mode}`)) {
+      throw new Error('Plaintext or negotiable-down TLS database URLs are refused');
+    }
+  }
+  if (lowered.includes('ssl=false') || lowered.includes('ssl=0')) {
     throw new Error('Plaintext or disabled TLS database URLs are refused');
   }
 }
@@ -47,7 +53,7 @@ export function prodImportPgClientConfig(
   assertProdImportDatabaseUrl(connectionString);
   return {
     connectionString,
-    ssl: { rejectUnauthorized: true },
+    ssl: PROD_IMPORT_PG_TLS,
   };
 }
 
