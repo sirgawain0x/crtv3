@@ -246,7 +246,7 @@ function mapStatusToPhase(status?: string, kind = "vod"): { phase?: string } | u
   if (!status) return undefined;
   const normalized = status.toLowerCase();
   if (normalized === "ready" || (kind === "clip" && normalized === "done")) return { phase: "ready" };
-  if (normalized === "failed") return { phase: "failed" };
+  if (normalized === "failed" || /^[a-z][a-z0-9]*([_-][a-z0-9]+)*[_-]failed$/.test(normalized)) return { phase: "failed" };
   return { phase: "processing" };
 }
 

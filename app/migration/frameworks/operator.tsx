@@ -44,7 +44,7 @@ export default function MigrationOperator(){
    },shouldStop:()=>stopRequested.current,
     wait:()=>new Promise(resolve=>setTimeout(resolve,10000)),
     report:progress=>setMessage(`${progress.completed}/${progress.total} verified. ${progress.phase}: ${progress.sourceId}`)});
-   setMessage(`${result.completed.length}/${sources.length} sources verified.${result.stopped?' Stopped safely between sources.':' Batch complete.'}`);
+   setMessage(`${result.completed.length}/${sources.length} sources verified.${result.reconciliationRequired.length ? ' Needs reconciliation: '+result.reconciliationRequired.join(', ')+'.' : result.stopped?' Stopped safely between sources.':' Batch complete.'}`);
   }catch(error){setMessage(error instanceof Error?error.message:'Batch stopped. Inspect its reservation before retrying.');}finally{setBusy(false);}
  }
  if(!isAdmin)return <main className="mx-auto max-w-2xl p-8"><h1>Staging video migration</h1><p>Sign in with the platform admin wallet to continue.</p></main>;

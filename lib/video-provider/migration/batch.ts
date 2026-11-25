@@ -19,6 +19,7 @@ export async function runVerifiedImportBatch(input:{
 }){
   if(!input.sources.length||input.sources.length>45)throw new Error('A verified batch must contain between 1 and 45 sources');
   const completed=new Set<string>();
+  const reconciliationRequired=new Set<string>();
   const pending:ArchivedSource[]=[];
   const polls=new Map<string,number>();
   /** At most one prepare-retry + retry-import cycle after a recorded failure per source. */
@@ -49,6 +50,10 @@ export async function runVerifiedImportBatch(input:{
   const accept=async(source:ArchivedSource,result:RequestResult)=>{
     if(result.outcome?.sourceId!==source.assetId)throw new Error('Import response identity differs from its requested source');
     if(result.outcome.state==='ready'){await finish(source);return true;}
+    if(input.retryFailedImports&&result.outcome.state==='importing'){
+      reconciliationRequired.add(source.assetId);
+      return true;
+    }
     if(result.outcome.state!=='processing')throw new Error(`Source ${source.assetId} needs reconciliation or more processing time; no creation retry was attempted`);
     return false;
   };
@@ -76,9 +81,6 @@ export async function runVerifiedImportBatch(input:{
       }
       if(state==='processing'||state==='importing'){
         const polled=await request('poll',source);
-        if(polled.outcome?.state==='importing'){
-          return {outcome:{state:'processing' as const,sourceId:source.assetId,action:'polled' as const}};
-        }
         if(polled.outcome?.state==='failed'&&polled.outcome.sourceId===source.assetId){
           return retryAfterRecordedFailure(source);
         }
@@ -122,5 +124,5 @@ export async function runVerifiedImportBatch(input:{
       if(await accept(source,result))pending.splice(i,1);else i++;
     }
   }
-  return {completed:input.sources.filter(source=>completed.has(source.assetId)).map(source=>source.assetId),stopped:completed.size<input.sources.length};
+  return {completed:input.sources.filter(source=>completed.has(source.assetId)).map(source=>source.assetId),reconciliationRequired:[...reconciliationRequired],stopped:completed.size<input.sources.length};
 }

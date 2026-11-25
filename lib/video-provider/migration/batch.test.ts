@@ -218,7 +218,7 @@ it('uploads sequentially while earlier sources process, then verifies every sour
  });
  const report=vi.fn(),wait=vi.fn(async()=>{});
  const result=await runVerifiedImportBatch({sources:[one,two],request,report,wait});
- expect(result).toEqual({completed:[one.assetId,two.assetId],stopped:false});
+ expect(result).toEqual({completed:[one.assetId,two.assetId],reconciliationRequired:[],stopped:false});
  expect(request.mock.calls.map(([mode,source])=>[mode,source.assetId])).toEqual([['import',one.assetId],['import',two.assetId],['inspect-playback',two.assetId],['poll',one.assetId],['poll',one.assetId],['inspect-playback',one.assetId]]);
  expect(report).toHaveBeenLastCalledWith({completed:2,total:2,sourceId:one.assetId,phase:'ready'});
 });
@@ -264,5 +264,21 @@ it('bounds polling and stops safely between completed sources',async()=>{
  let stop=false;
  const request=vi.fn(async(mode:MigrationMode)=>mode==='inspect-playback'?{diagnostic:{playableManifest:true}}:ready(one));
  const result=await runVerifiedImportBatch({sources:[one,two],request,wait:async()=>{},shouldStop:()=>stop,report:p=>{if(p.phase==='ready')stop=true;}});
- expect(result).toEqual({completed:[one.assetId],stopped:true});expect(request).toHaveBeenCalledTimes(2);
+ expect(result).toEqual({completed:[one.assetId],reconciliationRequired:[],stopped:true});expect(request).toHaveBeenCalledTimes(2);
+});
+
+it('reports a still-importing reservation for reconciliation while verifying other sources', async () => {
+  const request = vi.fn(async (mode: MigrationMode, source: ArchivedSource) => {
+    if (mode === 'inspect-import') return inspectImport(source === one ? 'importing' : 'ready');
+    if (mode === 'inspect-playback') return { diagnostic: { playableManifest: true } };
+    return { outcome: { state: 'importing' as const, sourceId: source.assetId, action: 'polled' as const } };
+  });
+  const result = await runVerifiedImportBatch({
+    sources: [one, two], request, report: vi.fn(), wait: async () => {}, retryFailedImports: true,
+  });
+  expect(result.reconciliationRequired).toEqual([one.assetId]);
+  expect(result.completed).toEqual([two.assetId]);
+  expect(request.mock.calls.map(([mode]) => mode)).toEqual([
+    'inspect-import', 'poll', 'inspect-import', 'inspect-playback',
+  ]);
 });
