@@ -26,7 +26,8 @@
     "metokens:inspect-diamond": "louper-cli inspect diamond -a 0xba5502db2aC2cBff189965e991C07109B14eB3f5 -n base --json",
     "metokens:validate-deployments": "npx tsx scripts/metokens/sync-base-deployments.ts",
     "frameworks:vod-import": "tsx scripts/frameworks-vod-import.ts",
-    "frameworks:vod-remap": "tsx scripts/frameworks-vod-remap.ts"
+    "frameworks:vod-remap": "tsx scripts/frameworks-vod-remap.ts",
+    "frameworks:import-mapping-copy": "tsx scripts/frameworks-import-mapping-copy.ts"
   },
   "dependencies": {
     "@0xsplits/splits-kit": "^2.2.0",
@@ -118,6 +119,9 @@
     "@vercel/functions": "3.9.0",
     "@wagmi/connectors": "^5.8.2",
     "@wagmi/core": "^2.17.2",
+    "@x402/core": "2.31.0",
+    "@x402/evm": "2.31.0",
+    "@x402/fetch": "2.31.0",
     "@xmtp/browser-sdk": "^5.0.1",
     "ai": "^4.0.0",
     "alchemy-sdk": "^3.6.5",
@@ -153,6 +157,7 @@
     "next-themes": "^0.4.4",
     "nsfwjs": "4.2.1",
     "ox": "^0.14.20",
+    "pg": "^8.16.3",
     "pino-pretty": "^13.0.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.3",
@@ -171,21 +176,20 @@
     "uuid": "^11.1.0",
     "viem": "^2.48.8",
     "wagmi": "^2.15.3",
-    "web-vitals": "^5.1.0",
-    "zod": "^3.25.0",
     "web-push": "^3.6.7",
-    "@x402/core": "2.31.0",
-    "@x402/evm": "2.31.0",
-    "@x402/fetch": "2.31.0"
+    "web-vitals": "^5.1.0",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.14",
     "@thirdweb-dev/contracts": "^3.15.0",
     "@types/d3": "^7.4.3",
     "@types/node": "^22.15.18",
+    "@types/pg": "^8.15.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/three": "^0.169.0",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^2.1.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "^16.1.6",
@@ -195,8 +199,7 @@
     "tailwindcss": "^3.4.4",
     "tsx": "^4.20.5",
     "typescript": "^5.8.3",
-    "vitest": "^2.1.0",
-    "@types/web-push": "^3.6.4"
+    "vitest": "^2.1.0"
   },
   "optionalDependencies": {
     "@mark3labs/louper-cli": "^0.5.10"
