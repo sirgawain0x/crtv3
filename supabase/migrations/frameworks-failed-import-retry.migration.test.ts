@@ -33,6 +33,9 @@ describe('failed import retry migration', () => {
       { state: 'prepared', frameworks_asset_id: null },
     ]);
     await db.query('SELECT reset_frameworks_failed_import($1,$2,$3,$4)', [source, 'play', 'a'.repeat(64), 100]);
+    expect((await db.query('SELECT failed_attempt_history FROM frameworks_asset_imports')).rows).toEqual([
+      { failed_attempt_history: [expect.objectContaining({ asset_id: 'old-asset', playback_id: 'old-play' })] },
+    ]);
     await db.exec("UPDATE frameworks_asset_imports SET state='ready',frameworks_asset_id='new',frameworks_playback_id='new-play'");
     await expect(db.query('SELECT reset_frameworks_failed_import($1,$2,$3,$4)', [source, 'play', 'a'.repeat(64), 100])).rejects.toThrow(/Ready/);
   });

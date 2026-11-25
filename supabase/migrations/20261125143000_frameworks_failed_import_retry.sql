@@ -3,7 +3,8 @@ ALTER TABLE public.frameworks_asset_imports
   ADD COLUMN IF NOT EXISTS provider_failure_phase text,
   ADD COLUMN IF NOT EXISTS provider_failure_reason text
     CHECK (provider_failure_reason IS NULL OR (length(provider_failure_reason) BETWEEN 1 AND 500 AND provider_failure_reason !~* 'https?://')),
-  ADD COLUMN IF NOT EXISTS provider_failure_recorded_at timestamptz;
+  ADD COLUMN IF NOT EXISTS provider_failure_recorded_at timestamptz,
+  ADD COLUMN IF NOT EXISTS failed_attempt_history jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 COMMENT ON COLUMN public.frameworks_asset_imports.provider_failure_reason IS
   'Sanitized FrameWorks processing failure summary. Raw provider bodies and signed URLs are never stored.';
@@ -39,6 +40,19 @@ BEGIN
   END IF;
   UPDATE public.frameworks_asset_imports
     SET state = 'prepared',
+        failed_attempt_history = v_row.failed_attempt_history || jsonb_build_array(
+          jsonb_build_object(
+            'asset_id', v_row.frameworks_asset_id,
+            'playback_id', v_row.frameworks_playback_id,
+            'failure_phase', v_row.provider_failure_phase,
+            'failure_reason', v_row.provider_failure_reason,
+            'failed_at', v_row.provider_failure_recorded_at,
+            'retried_at', now()
+          )
+        ),
+        provider_failure_phase = NULL,
+        provider_failure_reason = NULL,
+        provider_failure_recorded_at = NULL,
         frameworks_asset_id = NULL,
         frameworks_playback_id = NULL,
         updated_at = now()
