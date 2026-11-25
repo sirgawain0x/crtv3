@@ -21,7 +21,7 @@ export function createImportLedger(db: SupabaseClient,table:'frameworks_asset_im
     async reserve(source:ArchivedSource) {
       const {data,error}=await db.from(table).insert({livepeer_asset_id:source.assetId,
         livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes,state:'prepared'}).select(columns).single();
-      if(!error && data) return data as ImportRecord;
+      if(!error && data) return data as unknown as ImportRecord;
       if(error?.code==='23505') { const existing=await find(source.assetId); if(existing) return existing; }
       throw new Error('Cannot reserve migration import');
     },

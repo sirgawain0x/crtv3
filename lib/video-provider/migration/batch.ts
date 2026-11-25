@@ -56,7 +56,7 @@ export async function runVerifiedImportBatch(input:{
       const state=polled.outcome?.state;
       if(state==='ready')return polled;
       if(state==='processing'||state==='importing'){
-        return state==='importing'?{outcome:{state:'processing',sourceId:source.assetId,action:'polled'}}:polled;
+        return state==='importing'?{outcome:{state:'processing' as const,sourceId:source.assetId,action:'polled' as const}}:polled;
       }
       await request('prepare-retry',source);
       return request('retry-import',source);
