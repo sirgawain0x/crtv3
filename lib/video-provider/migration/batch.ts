@@ -51,8 +51,7 @@ export async function runVerifiedImportBatch(input:{
   };
   const startImport=async(source:ArchivedSource)=>{
     if(input.retryFailedImports){
-      let polled:RequestResult={};
-      try{polled=await request('poll',source);}catch{polled={};}
+      const polled=await request('poll',source);
       const state=polled.outcome?.state;
       if(state==='ready')return polled;
       if(state==='processing'||state==='importing'){

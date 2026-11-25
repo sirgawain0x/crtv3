@@ -18,6 +18,18 @@ it('prepares and retries failed sources when retryFailedImports is enabled',asyn
  await runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
  expect(modes).toEqual(['poll','prepare-retry','retry-import','inspect-playback']);
 });
+it('stops the batch when poll fails and does not prepare-retry later sources',async()=>{
+ const modes:MigrationMode[]=[];
+ const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
+  modes.push(mode);
+  if(mode==='poll' && source===one)throw new Error('Matching reservation required');
+  return {outcome:{state:'failed' as const,sourceId:source.assetId,action:'unchanged' as const}};
+ });
+ const third:ArchivedSource={...one,assetId:'33333333-3333-4333-8333-333333333333'};
+ await expect(runVerifiedImportBatch({sources:[one,two,third],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true})).rejects.toThrow(`Batch stopped at source ${one.assetId}`);
+ expect(modes).toEqual(['poll']);
+ expect(request).toHaveBeenCalledTimes(1);
+});
 it('skips ready and in-flight sources in a mixed retry batch',async()=>{
  const modes:string[]=[];
  let twoPolls=0;
