@@ -21,6 +21,39 @@ it('prepares and retries failed sources when retryFailedImports is enabled',asyn
  await runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
  expect(modes).toEqual(['inspect-import','prepare-retry','retry-import','inspect-playback']);
 });
+it('prepare-retries when an in-flight poll records failed and continues the batch',async()=>{
+ const modes:string[]=[];
+ const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
+  modes.push(`${mode}:${source.assetId}`);
+  if(mode==='inspect-import')return inspectImport(source===one?'processing':'missing');
+  if(mode==='poll' && source===one)return {outcome:{state:'failed' as const,sourceId:source.assetId,action:'polled' as const}};
+  if(mode==='prepare-retry')return {};
+  if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
+  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
+ });
+ const result=await runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
+ expect(result.completed).toEqual([one.assetId,two.assetId]);
+ expect(modes).toContain(`poll:${one.assetId}`);
+ expect(modes).toContain(`prepare-retry:${one.assetId}`);
+ expect(modes).toContain(`retry-import:${one.assetId}`);
+ expect(modes).toContain(`prepare-retry:${two.assetId}`);
+});
+it('prepare-retries when a pending poll records failed and continues the batch',async()=>{
+ const modes:string[]=[];
+ const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
+  modes.push(`${mode}:${source.assetId}`);
+  if(mode==='inspect-import')return inspectImport(source===one?'importing':'missing');
+  if(mode==='poll' && source===one)return {outcome:{state:(modes.filter(line=>line.startsWith(`poll:${one.assetId}`)).length>1?'failed':'processing') as 'processing'|'failed',sourceId:source.assetId,action:'polled' as const}};
+  if(mode==='prepare-retry')return {};
+  if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
+  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
+ });
+ const result=await runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
+ expect(result.completed).toEqual([one.assetId,two.assetId]);
+ expect(modes.filter(line=>line.startsWith(`poll:${one.assetId}`))).toHaveLength(2);
+ expect(modes).toContain(`prepare-retry:${one.assetId}`);
+ expect(modes).toContain(`prepare-retry:${two.assetId}`);
+});
 it('stops the batch when poll fails and does not prepare-retry later sources',async()=>{
  const modes:MigrationMode[]=[];
  const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{

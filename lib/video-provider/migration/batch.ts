@@ -50,6 +50,10 @@ export async function runVerifiedImportBatch(input:{
     if(result.outcome.state!=='processing')throw new Error(`Source ${source.assetId} needs reconciliation or more processing time; no creation retry was attempted`);
     return false;
   };
+  const retryAfterRecordedFailure=async(source:ArchivedSource)=>{
+    await request('prepare-retry',source);
+    return request('retry-import',source);
+  };
   const startImport=async(source:ArchivedSource)=>{
     if(input.retryFailedImports){
       const probe=await request('inspect-import',source);
@@ -62,6 +66,9 @@ export async function runVerifiedImportBatch(input:{
         const polled=await request('poll',source);
         if(polled.outcome?.state==='importing'){
           return {outcome:{state:'processing' as const,sourceId:source.assetId,action:'polled' as const}};
+        }
+        if(polled.outcome?.state==='failed'&&polled.outcome.sourceId===source.assetId){
+          return retryAfterRecordedFailure(source);
         }
         return polled;
       }
@@ -88,6 +95,11 @@ export async function runVerifiedImportBatch(input:{
       report(source,'processing');
       if(input.shouldStop?.())break;
       const result=await request('poll',source);polls.set(source.assetId,count+1);
+      if(input.retryFailedImports&&result.outcome?.state==='failed'&&result.outcome.sourceId===source.assetId){
+        const retried=await retryAfterRecordedFailure(source);
+        if(await accept(source,retried))pending.splice(i,1);else i++;
+        continue;
+      }
       if(await accept(source,result))pending.splice(i,1);else i++;
     }
   }
