@@ -14,6 +14,7 @@ import {ImportStoppedError} from '@/lib/video-provider/migration/import-failure'
 import {prepareReviewedRecovery,adoptVerifiedRecovery,requireReviewedRecoverySource,ReviewedRecoveryError} from '@/lib/video-provider/migration/reviewed-recovery';
 import {FailedImportRetryError,prepareFailedImportRetry} from '@/lib/video-provider/migration/failed-import-retry';
 import {openArchiveImportSource,resolveMigrationArchiveRoot} from '@/lib/video-provider/migration/archive-source';
+import {readLedgerReservationState} from '@/lib/video-provider/migration/reservation-state';
 export const runtime='nodejs';
 export const maxDuration=300;
 const respond=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -26,11 +27,19 @@ export async function POST(request:NextRequest){
  try{
   const raw=await request.text();if(Buffer.byteLength(raw)>4096)return respond({error:'Source request too large'},413);
   const body=JSON.parse(raw);mode=body.mode;
-  if(!['import','poll','inspect-playback','inspect-reservation','prepare-recovery','import-recovery','poll-recovery','adopt-recovery','prepare-retry','retry-import'].includes(mode)||!body.source||typeof body.source!=='object')throw new Error();
+  if(!['import','poll','inspect-playback','inspect-reservation','prepare-recovery','import-recovery','poll-recovery','adopt-recovery','prepare-retry','retry-import','reservation-state'].includes(mode)||!body.source||typeof body.source!=='object')throw new Error();
   [source]=archivedSourcesFromManifests([{assets:[{...body.source,status:'archived'}]}]);
   if(!source || source.sizeBytes>1024**3)throw new Error();
  }catch{return respond({error:'One verified source up to 1 GiB is required'},400);}
  try{
+  if(mode==='reservation-state'){
+   const record=await createImportLedger(createServiceClient()).find(source.assetId);
+   try{
+    return respond({reservationState:readLedgerReservationState(record,source)});
+   }catch(error){
+    return respond({error:error instanceof Error?error.message:'Reservation state unavailable'},409);
+   }
+  }
   if(mode==='prepare-retry'){
    const db=createServiceClient();
    const prepared=await prepareFailedImportRetry(db,source);

@@ -19,6 +19,14 @@ const source={assetId:'2499b6b6-314f-4251-b119-fbb6445a48a5',playbackId:'old-pla
 const request=(body:unknown)=>new NextRequest('https://staging.example/api/migration/frameworks/import',{method:'POST',body:JSON.stringify(body)});
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('VERCEL_ENV','preview');vi.stubEnv('VIDEO_PROVIDER','frameworks');vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://zxpobpucayevlrzdxhmr.supabase.co');auth.mockResolvedValue({address:'admin'});run.mockResolvedValue({sourceId:source.assetId,state:'processing',action:'created'});remote.mockReturnValue({verify:()=>{},read:()=>{}});prepareRetry.mockResolvedValue({action:'reset'});archiveOpen.mockResolvedValue({verify:async()=>{},read:async()=>new Uint8Array(),close:async()=>{}});});afterEach(()=>vi.unstubAllEnvs());
 describe('isolated admin import boundary',()=>{
+ it('returns ledger reservation state without fetching source bytes',async()=>{
+  find.mockResolvedValue({livepeer_asset_id:source.assetId,state:'failed',livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes});
+  expect((await POST(request({mode:'reservation-state',source}))).status).toBe(200);
+  expect((await (await POST(request({mode:'reservation-state',source}))).json()).reservationState).toBe('failed');
+  find.mockResolvedValue(null);
+  expect((await (await POST(request({mode:'reservation-state',source}))).json()).reservationState).toBe('missing');
+  expect(run).not.toHaveBeenCalled();expect(remote).not.toHaveBeenCalled();
+ });
  it('prepares failed retries without touching ready imports',async()=>{
   const response=await POST(request({mode:'prepare-retry',source}));expect(response.status).toBe(200);
   expect(prepareRetry).toHaveBeenCalled();expect(run).not.toHaveBeenCalled();
