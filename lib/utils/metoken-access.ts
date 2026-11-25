@@ -79,7 +79,26 @@ export async function checkMeTokenAccess(params: {
     return { allowed: true, reason: "creator_bypass" };
   }
 
-  const required = parseEther(String(requiredAmount ?? 0));
+  let requiresPositiveBalance = false;
+  let required: bigint;
+
+  if (requiredAmount === null || requiredAmount === undefined) {
+    requiresPositiveBalance = true;
+    required = BigInt(0);
+  } else {
+    try {
+      required = parseEther(String(requiredAmount));
+    } catch {
+      return { allowed: false, reason: "insufficient_balance" };
+    }
+    if (required < BigInt(0)) {
+      return { allowed: false, reason: "insufficient_balance" };
+    }
+    if (required === BigInt(0)) {
+      requiresPositiveBalance = true;
+    }
+  }
+
   const meToken = await getMeTokenByOwner(normalizedCreator);
 
   if (!meToken?.address) {
@@ -119,7 +138,9 @@ export async function checkMeTokenAccess(params: {
     }
   }
 
-  const allowed = maxBalance >= required;
+  const allowed = requiresPositiveBalance
+    ? maxBalance > BigInt(0)
+    : maxBalance >= required;
 
   return {
     allowed,
@@ -132,7 +153,7 @@ export async function checkMeTokenAccess(params: {
 
 export function isMeTokenGateActive(
   requiresMetoken?: boolean | null,
-  metokenPrice?: number | string | null,
+  _metokenPrice?: number | string | null,
 ): boolean {
-  return Boolean(requiresMetoken) && metokenPrice !== null && metokenPrice !== undefined;
+  return Boolean(requiresMetoken);
 }

@@ -11,7 +11,10 @@ vi.mock('@/lib/video-provider/frameworks/playback-alias', () => ({ resolveFramew
 import { resolveFrameworksPlaybackAlias } from '@/lib/video-provider/frameworks/playback-alias';
 vi.mock('@/services/streams', () => ({ getStreamByPlaybackId: vi.fn() }));
 vi.mock('@/lib/auth/require-wallet', () => ({ requireWalletAuth: vi.fn(), WalletAuthError: class extends Error { constructor(public status: number, message: string) { super(message); } } }));
-vi.mock('@/lib/utils/metoken-access', () => ({ checkMeTokenAccess: vi.fn(), isMeTokenGateActive: (required: boolean, price: number) => required || Number(price) > 0 }));
+vi.mock('@/lib/utils/metoken-access', () => ({
+  checkMeTokenAccess: vi.fn(),
+  isMeTokenGateActive: (required?: boolean | null) => Boolean(required),
+}));
 vi.mock('@/lib/utils/linked-identity', () => ({ resolveVerifiedViewerAddresses: vi.fn(async address => [address]) }));
 vi.mock('@livepeer/core/crypto', () => ({ signAccessJwt: vi.fn(async () => 'legacy-token') }));
 vi.mock('@/lib/sdk/supabase/service', () => ({
@@ -64,6 +67,33 @@ describe('provider-aware viewer signing', () => {
     vi.mocked(requireWalletAuth).mockRejectedValue(new WalletAuthError(401, 'Missing wallet auth headers'));
     expect((await handleSignJwt(request())).status).toBe(403);
     expect(checkMeTokenAccess).not.toHaveBeenCalled();
+  });
+  it.each([
+    { label: 'null price', price: null },
+    { label: 'zero price', price: 0 },
+    { label: 'positive price', price: 2 },
+  ] as const)('denies anonymous JWT mint when requires_metoken is true ($label)', async ({ price }) => {
+    vi.mocked(getStreamByPlaybackId).mockResolvedValue({
+      creator_id: '0xcreator',
+      requires_metoken: true,
+      metoken_price: price,
+    } as NonNullable<Awaited<ReturnType<typeof getStreamByPlaybackId>>>);
+    vi.mocked(requireWalletAuth).mockRejectedValue(new WalletAuthError(401, 'Missing wallet auth headers'));
+    const response = await handleSignJwt(request());
+    expect(response.status).toBe(403);
+    expect((await response.json()).token).toBeUndefined();
+    expect(checkMeTokenAccess).not.toHaveBeenCalled();
+  });
+  it('mints an anonymous JWT only for ungated playback', async () => {
+    vi.mocked(getStreamByPlaybackId).mockResolvedValue({
+      creator_id: '0xcreator',
+      requires_metoken: false,
+      metoken_price: null,
+    } as NonNullable<Awaited<ReturnType<typeof getStreamByPlaybackId>>>);
+    const response = await handleSignJwt(request());
+    expect(response.status).toBe(200);
+    const claims = jwt.verify((await response.json()).token, pair.publicKey, { algorithms: ['ES256'], audience: 'pb-1' });
+    expect(claims).toMatchObject({ sub: 'anonymous' });
   });
   it('does not sign unknown or draft FrameWorks VOD identifiers', async () => {
     vi.mocked(getStreamByPlaybackId).mockResolvedValue(null);

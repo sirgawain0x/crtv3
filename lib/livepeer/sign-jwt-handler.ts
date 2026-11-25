@@ -87,7 +87,10 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
     }
 
     const gatedStream = resource;
-    const requiredAmount = gatedStream.metoken_price ?? 0;
+    const requiredAmount =
+      gatedStream.metoken_price === undefined
+        ? null
+        : gatedStream.metoken_price;
 
     if (!gatedStream.creator_id) {
       return NextResponse.json(
@@ -115,7 +118,7 @@ export async function handleSignJwt(req: NextRequest): Promise<NextResponse> {
             connectWallet: missingHeaders,
             signingRequired: signingRejected,
             creatorAddress: gatedStream.creator_id,
-            required: String(requiredAmount),
+            required: requiredAmount == null ? null : String(requiredAmount),
             message: missingHeaders
               ? "Connect your wallet to verify MeToken balance"
               : err.message,
