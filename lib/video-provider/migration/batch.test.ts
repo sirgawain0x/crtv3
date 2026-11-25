@@ -8,14 +8,35 @@ const two:ArchivedSource={...one,assetId:'22222222-2222-4222-8222-222222222222'}
 const ready=(source:ArchivedSource)=>({outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}});
 it('prepares and retries failed sources when retryFailedImports is enabled',async()=>{
  const modes:string[]=[];
- const request=vi.fn(async(mode:MigrationMode)=>{
+ const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
   modes.push(mode);
+  if(mode==='poll')return {outcome:{state:'failed' as const,sourceId:source.assetId,action:'unchanged' as const}};
   if(mode==='prepare-retry')return {};
   if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
-  return {outcome:{state:'ready' as const,sourceId:one.assetId,action:'created' as const}};
+  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
  });
  await runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
- expect(modes).toEqual(['prepare-retry','retry-import','inspect-playback']);
+ expect(modes).toEqual(['poll','prepare-retry','retry-import','inspect-playback']);
+});
+it('skips ready and in-flight sources in a mixed retry batch',async()=>{
+ const modes:string[]=[];
+ let twoPolls=0;
+ const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
+  modes.push(`${mode}:${source.assetId}`);
+  if(mode==='poll'){
+    if(source===one)return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}};
+    if(source===two){twoPolls+=1;return {outcome:{state:(twoPolls>1?'ready':'processing') as 'ready'|'processing',sourceId:source.assetId,action:'polled' as const}};}
+    return {outcome:{state:'failed' as const,sourceId:source.assetId,action:'unchanged' as const}};
+  }
+  if(mode==='prepare-retry')return {};
+  if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
+  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
+ });
+ const third:ArchivedSource={...one,assetId:'33333333-3333-4333-8333-333333333333'};
+ const result=await runVerifiedImportBatch({sources:[one,two,third],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
+ expect(result.completed).toEqual([one.assetId,two.assetId,third.assetId]);
+ expect(modes.filter(line=>line.startsWith('prepare-retry'))).toHaveLength(1);
+ expect(modes).toContain(`poll:${third.assetId}`);
 });
 it('uploads sequentially while earlier sources process, then verifies every source',async()=>{
  let polled=false;
