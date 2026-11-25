@@ -44,3 +44,8 @@ export function frameworksApiToken(): string | undefined {
 export function isFrameworksConfigured(): boolean {
   return Boolean(frameworksApiToken() && frameworksGraphqlUrl());
 }
+
+/** Native FrameWorks replays stay off until independent access is verified. */
+export function frameworksReplayEnabled(): boolean {
+  return process.env.FRAMEWORKS_NATIVE_REPLAY_ENABLED === "true";
+}

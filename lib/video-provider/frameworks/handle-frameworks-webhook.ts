@@ -1,3 +1,4 @@
+import { frameworksReplayEnabled } from "@/lib/video-provider/config";
 import {createHash} from 'node:crypto';
 import {getVideoProvider} from '../index';
 import {isVideoAssetId} from '../asset-id';
@@ -12,6 +13,7 @@ function string(data:Record<string,unknown>,key:string):string|undefined {
 }
 export async function handleFrameworksWebhookEvent(event:FrameworksWebhookEvent):Promise<'processed'|'duplicate'|'ignored'> {
  if(!event || typeof event.id!=='string' || !event.id.trim() || event.id.length>200 || typeof event.type!=='string') throw new Error('Invalid webhook identity');
+ if(event.type==='recording.ready' && !frameworksReplayEnabled())return 'ignored';
  if(!businessTypes.has(event.type))return 'ignored';
  if(!event.created_at || !Number.isFinite(Date.parse(event.created_at)) || !event.data || typeof event.data!=='object' || Array.isArray(event.data))throw new FrameworksWebhookRetryableError('Business event is missing source timestamp or data');
  let streamId=string(event.data,'streamId');let artifact:ReadyWebhookArtifact|undefined;

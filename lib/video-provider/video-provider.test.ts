@@ -199,6 +199,7 @@ describe("frameworks provider", () => {
   });
 
   it("setRecording surfaces updateStream ValidationError", async () => {
+    vi.stubEnv("FRAMEWORKS_NATIVE_REPLAY_ENABLED", "true");
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,

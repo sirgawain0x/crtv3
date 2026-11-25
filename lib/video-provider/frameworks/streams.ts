@@ -1,3 +1,4 @@
+import { frameworksReplayEnabled } from "@/lib/video-provider/config";
 import type {
   CreateClipParams,
   CreateClipResult,
@@ -394,7 +395,7 @@ export const frameworksStreams = {
     const data = await frameworksGraphqlRequest<CreateStreamMutation>(CREATE_STREAM, {
       input: {
         name: params.name,
-        record: params.record,
+        record: frameworksReplayEnabled() ? params.record : false,
       },
     });
     const result = data.createStream;
@@ -440,6 +441,7 @@ export const frameworksStreams = {
   },
 
   setRecording: async (streamId: string, record: boolean): Promise<void> => {
+    if (record && !frameworksReplayEnabled()) throw new Error("FrameWorks replay recording is temporarily unavailable");
     const data = await frameworksGraphqlRequest<UpdateStreamMutation>(UPDATE_STREAM, {
       id: streamId,
       input: { record },
