@@ -21,6 +21,8 @@ export async function runVerifiedImportBatch(input:{
   const completed=new Set<string>();
   const pending:ArchivedSource[]=[];
   const polls=new Map<string,number>();
+  /** At most one prepare-retry + retry-import cycle after a recorded failure per source. */
+  const failureRetried=new Set<string>();
   let requested=false;
   const report=(source:ArchivedSource,phase:BatchProgress['phase'])=>input.report({completed:completed.size,total:input.sources.length,sourceId:source.assetId,phase});
   const request=async(mode:MigrationMode,source:ArchivedSource)=>{
@@ -50,9 +52,19 @@ export async function runVerifiedImportBatch(input:{
     if(result.outcome.state!=='processing')throw new Error(`Source ${source.assetId} needs reconciliation or more processing time; no creation retry was attempted`);
     return false;
   };
+  const stopRepeatedFailure=(source:ArchivedSource):never=>{
+    throw new Error(`Batch stopped at source ${source.assetId}: provider failure recorded again after retry`);
+  };
+  const markFailureRetried=(source:ArchivedSource)=>{
+    failureRetried.add(source.assetId);
+    polls.set(source.assetId,0);
+  };
   const retryAfterRecordedFailure=async(source:ArchivedSource)=>{
+    if(failureRetried.has(source.assetId))stopRepeatedFailure(source);
     await request('prepare-retry',source);
-    return request('retry-import',source);
+    const retried=await request('retry-import',source);
+    markFailureRetried(source);
+    return retried;
   };
   const startImport=async(source:ArchivedSource)=>{
     if(input.retryFailedImports){
@@ -74,8 +86,11 @@ export async function runVerifiedImportBatch(input:{
       }
       if(state==='prepared')return request('retry-import',source);
       if(state==='missing'||state==='failed'){
+        if(failureRetried.has(source.assetId))stopRepeatedFailure(source);
         await request('prepare-retry',source);
-        return request('retry-import',source);
+        const retried=await request('retry-import',source);
+        markFailureRetried(source);
+        return retried;
       }
       throw new Error(`Source ${source.assetId} is in state ${state as ImportState}; no retry route`);
     }
