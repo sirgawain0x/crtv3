@@ -54,6 +54,37 @@ it('prepare-retries when a pending poll records failed and continues the batch',
  expect(modes).toContain(`prepare-retry:${one.assetId}`);
  expect(modes).toContain(`prepare-retry:${two.assetId}`);
 });
+it('allows one failure retry after a missing source first import records failed',async()=>{
+ const modes:string[]=[];
+ const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
+  modes.push(`${mode}:${source.assetId}`);
+  if(mode==='inspect-import')return inspectImport('missing');
+  if(mode==='poll' && source===one)return {outcome:{state:'failed' as const,sourceId:source.assetId,action:'polled' as const}};
+  if(mode==='prepare-retry')return {};
+  if(mode==='retry-import' && source===one)return {outcome:{state:(modes.filter(line=>line.startsWith(`retry-import:${one.assetId}`)).length>1?'ready':'processing') as 'ready'|'processing',sourceId:source.assetId,action:'created' as const}};
+  if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
+  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
+ });
+ const result=await runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
+ expect(result.completed).toEqual([one.assetId]);
+ expect(modes.filter(line=>line===`prepare-retry:${one.assetId}`)).toHaveLength(2);
+ expect(modes.filter(line=>line===`retry-import:${one.assetId}`)).toHaveLength(2);
+});
+it('stops when a ledger failed source records failure again after its retry budget is used',async()=>{
+ const modes:string[]=[];
+ const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
+  modes.push(`${mode}:${source.assetId}`);
+  if(mode==='inspect-import')return inspectImport('failed');
+  if(mode==='poll' && source===one)return {outcome:{state:'failed' as const,sourceId:source.assetId,action:'polled' as const}};
+  if(mode==='prepare-retry')return {};
+  if(mode==='retry-import')return {outcome:{state:'processing' as const,sourceId:source.assetId,action:'created' as const}};
+  if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
+  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
+ });
+ await expect(runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true})).rejects.toThrow(`Batch stopped at source ${one.assetId}: provider failure recorded again after retry`);
+ expect(modes.filter(line=>line===`prepare-retry:${one.assetId}`)).toHaveLength(1);
+ expect(modes.filter(line=>line===`retry-import:${one.assetId}`)).toHaveLength(1);
+});
 it('stops when a second recorded failure happens after one poll-driven retry',async()=>{
  const modes:string[]=[];
  let onePolls=0;

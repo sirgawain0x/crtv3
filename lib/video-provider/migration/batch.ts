@@ -85,7 +85,11 @@ export async function runVerifiedImportBatch(input:{
         return polled;
       }
       if(state==='prepared')return request('retry-import',source);
-      if(state==='missing'||state==='failed'){
+      if(state==='missing'){
+        await request('prepare-retry',source);
+        return request('retry-import',source);
+      }
+      if(state==='failed'){
         if(failureRetried.has(source.assetId))stopRepeatedFailure(source);
         await request('prepare-retry',source);
         const retried=await request('retry-import',source);
