@@ -18,26 +18,17 @@ it('prepares and retries failed sources when retryFailedImports is enabled',asyn
  await runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
  expect(modes).toEqual(['poll','prepare-retry','retry-import','inspect-playback']);
 });
-it('continues a mixed retry batch when a ready source poll fails but playback verifies',async()=>{
- const modes:string[]=[];
+it('stops the batch when poll fails and does not prepare-retry later sources',async()=>{
+ const modes:MigrationMode[]=[];
  const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
-  modes.push(`${mode}:${source.assetId}`);
-  if(mode==='poll'){
-    if(source===one)throw new Error('Transient poll failure');
-    return {outcome:{state:'failed' as const,sourceId:source.assetId,action:'unchanged' as const}};
-  }
-  if(mode==='inspect-playback'){
-    if(source===one)return {diagnostic:{playableManifest:true}};
-    return {diagnostic:{playableManifest:true}};
-  }
-  if(mode==='prepare-retry')return {};
-  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
+  modes.push(mode);
+  if(mode==='poll' && source===one)throw new Error('Matching reservation required');
+  return {outcome:{state:'failed' as const,sourceId:source.assetId,action:'unchanged' as const}};
  });
  const third:ArchivedSource={...one,assetId:'33333333-3333-4333-8333-333333333333'};
- const result=await runVerifiedImportBatch({sources:[one,two,third],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
- expect(result.completed).toEqual([one.assetId,two.assetId,third.assetId]);
- expect(modes).not.toContain(`prepare-retry:${one.assetId}`);
- expect(modes.filter(line=>line.startsWith('prepare-retry'))).toHaveLength(2);
+ await expect(runVerifiedImportBatch({sources:[one,two,third],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true})).rejects.toThrow(`Batch stopped at source ${one.assetId}`);
+ expect(modes).toEqual(['poll']);
+ expect(request).toHaveBeenCalledTimes(1);
 });
 it('skips ready and in-flight sources in a mixed retry batch',async()=>{
  const modes:string[]=[];

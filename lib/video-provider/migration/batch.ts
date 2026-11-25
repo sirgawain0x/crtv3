@@ -5,9 +5,6 @@ import {ImportStoppedError} from './import-failure';
 export type MigrationMode='import'|'poll'|'inspect-playback'|'inspect-reservation'|'prepare-recovery'|'import-recovery'|'poll-recovery'|'adopt-recovery'|'prepare-retry'|'retry-import';
 export type BatchProgress={completed:number;total:number;sourceId:string;phase:'importing'|'processing'|'checking'|'ready'};
 type RequestResult={outcome?:ImportOutcome;diagnostic?:{playableManifest:boolean}};
-
-/** Retry-batch only: poll failed and playback could not confirm readiness; caller may skip this source. */
-export class RetryBatchSourceSkippedError extends Error {}
 /** Client orchestration only: every operation retains the existing signed-admin server boundary. */
 export async function runVerifiedImportBatch(input:{
   sources:ArchivedSource[];
@@ -25,15 +22,12 @@ export async function runVerifiedImportBatch(input:{
   const polls=new Map<string,number>();
   let requested=false;
   const report=(source:ArchivedSource,phase:BatchProgress['phase'])=>input.report({completed:completed.size,total:input.sources.length,sourceId:source.assetId,phase});
-  const callRequest=async(mode:MigrationMode,source:ArchivedSource)=>{
-    if(requested)await input.wait();
-    requested=true;
-    return input.request(mode,source);
-  };
   const request=async(mode:MigrationMode,source:ArchivedSource)=>{
     // All modes share the admin endpoint's 10/minute limit, including ready resumes.
     // The caller waits ten seconds between requests; never retry uncertain mutations.
-    try{return await callRequest(mode,source);}
+    if(requested)await input.wait();
+    requested=true;
+    try{return await input.request(mode,source);}
     catch(error){
       if(error instanceof ImportStoppedError){
         const stopped=new ImportStoppedError(error.failureCode);
@@ -57,16 +51,7 @@ export async function runVerifiedImportBatch(input:{
   };
   const startImport=async(source:ArchivedSource)=>{
     if(input.retryFailedImports){
-      let polled:RequestResult;
-      try{
-        polled=await callRequest('poll',source);
-      }catch(pollError){
-        const playback=await callRequest('inspect-playback',source).catch(()=>null);
-        if(playback?.diagnostic?.playableManifest===true){
-          return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}};
-        }
-        throw new RetryBatchSourceSkippedError(`Source ${source.assetId} poll failed; skipped without prepare-retry`,pollError instanceof Error?{cause:pollError}:undefined);
-      }
+      const polled=await request('poll',source);
       const state=polled.outcome?.state;
       if(state==='ready')return polled;
       if(state==='processing'||state==='importing'){
@@ -80,13 +65,8 @@ export async function runVerifiedImportBatch(input:{
   for(const source of input.sources){
     if(input.shouldStop?.())break;
     report(source,'importing');
-    try{
-      const result=await startImport(source);
-      if(!await accept(source,result))pending.push(source);
-    }catch(error){
-      if(input.retryFailedImports&&error instanceof RetryBatchSourceSkippedError)continue;
-      throw error;
-    }
+    const result=await startImport(source);
+    if(!await accept(source,result))pending.push(source);
   }
   // Uploads stay sequential; earlier assets may transcode while later sources transfer.
   while(pending.length&&!input.shouldStop?.()){
