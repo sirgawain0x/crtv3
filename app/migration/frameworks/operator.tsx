@@ -38,7 +38,7 @@ export default function MigrationOperator(){
     const response=await request(mode,source);
     if('outcome' in response)return {outcome:response.outcome};
     if('diagnostic' in response)return {diagnostic:{playableManifest:response.diagnostic.playableManifest===true}};
-    if('reservationState' in response)return {reservationState:response.reservationState};
+    if('import' in response)return {import:response.import};
     if(mode==='prepare-retry' && 'message' in response)return {};
     throw new Error('error' in response?response.error:'Unexpected migration batch response');
    },shouldStop:()=>stopRequested.current,

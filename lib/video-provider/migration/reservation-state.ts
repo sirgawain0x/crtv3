@@ -14,8 +14,8 @@ export function evidenceMatchesReservation(record: ImportRecord, source: Archive
     && record.source_bytes === source.sizeBytes;
 }
 
-/** Read-only ledger routing input for retry batches; never polls the provider or reads source bytes. */
-export function readLedgerReservationState(
+/** Read-only import ledger inspect for retry routing; never polls the provider or reads source bytes. */
+export function readImportInspectState(
   record: ImportRecord | null,
   source: ArchivedSource,
 ): LedgerReservationState {

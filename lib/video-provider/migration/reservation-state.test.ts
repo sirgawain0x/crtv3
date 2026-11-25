@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readLedgerReservationState } from './reservation-state';
+import { readImportInspectState } from './reservation-state';
 
 const source = {
   assetId: '51e1d8ff-d3ae-4f0a-918c-e0dfea796f1b',
@@ -8,11 +8,11 @@ const source = {
   sha256: 'a'.repeat(64),
 };
 
-describe('readLedgerReservationState', () => {
+describe('readImportInspectState', () => {
   it('returns missing without a row and routes known states', () => {
-    expect(readLedgerReservationState(null, source)).toBe('missing');
+    expect(readImportInspectState(null, source)).toBe('missing');
     for (const state of ['failed', 'prepared', 'processing', 'importing', 'ready'] as const) {
-      expect(readLedgerReservationState({
+      expect(readImportInspectState({
         livepeer_asset_id: source.assetId,
         livepeer_playback_id: source.playbackId,
         source_sha256: source.sha256,
@@ -25,7 +25,7 @@ describe('readLedgerReservationState', () => {
   });
 
   it('rejects ambiguous and mismatched evidence', () => {
-    expect(() => readLedgerReservationState({
+    expect(() => readImportInspectState({
       livepeer_asset_id: source.assetId,
       livepeer_playback_id: source.playbackId,
       source_sha256: source.sha256,
@@ -34,7 +34,7 @@ describe('readLedgerReservationState', () => {
       frameworks_asset_id: 'x',
       frameworks_playback_id: 'y',
     }, source)).toThrow(/reconciliation/);
-    expect(() => readLedgerReservationState({
+    expect(() => readImportInspectState({
       livepeer_asset_id: source.assetId,
       livepeer_playback_id: 'other',
       source_sha256: source.sha256,

@@ -8,7 +8,7 @@ export type MigrationImportResponse =
   | { outcome: ImportOutcome; recovery?: boolean; retry?: boolean }
   | { message: string; prepared?: { action: string } }
   | { diagnostic: Record<string, unknown> & { playableManifest?: boolean } }
-  | { reservationState: LedgerReservationState }
+  | { import: { state: LedgerReservationState } }
   | { error: string; failureCode?: ImportFailureCode };
 
 const importFailureCodes = ['policy-unconfirmed', 'provider-auth', 'provider-validation', 'provider-timeout', 'provider-unavailable'] as const satisfies readonly ImportFailureCode[];

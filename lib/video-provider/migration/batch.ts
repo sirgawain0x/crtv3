@@ -3,9 +3,9 @@ import type {ImportOutcome, ImportState} from './importer';
 import type {LedgerReservationState} from './reservation-state';
 import {ImportStoppedError} from './import-failure';
 
-export type MigrationMode='import'|'poll'|'inspect-playback'|'inspect-reservation'|'prepare-recovery'|'import-recovery'|'poll-recovery'|'adopt-recovery'|'prepare-retry'|'retry-import'|'reservation-state';
+export type MigrationMode='import'|'poll'|'inspect-playback'|'inspect-reservation'|'inspect-import'|'prepare-recovery'|'import-recovery'|'poll-recovery'|'adopt-recovery'|'prepare-retry'|'retry-import';
 export type BatchProgress={completed:number;total:number;sourceId:string;phase:'importing'|'processing'|'checking'|'ready'};
-type RequestResult={outcome?:ImportOutcome;diagnostic?:{playableManifest?:boolean};reservationState?:LedgerReservationState};
+type RequestResult={outcome?:ImportOutcome;diagnostic?:{playableManifest?:boolean};import?:{state:LedgerReservationState}};
 /** Client orchestration only: every operation retains the existing signed-admin server boundary. */
 export async function runVerifiedImportBatch(input:{
   sources:ArchivedSource[];
@@ -52,17 +52,21 @@ export async function runVerifiedImportBatch(input:{
   };
   const startImport=async(source:ArchivedSource)=>{
     if(input.retryFailedImports){
-      const probe=await request('reservation-state',source);
-      const state=probe.reservationState;
-      if(!state)throw new Error(`Source ${source.assetId} returned no reservation state`);
-      if(state==='ready'||state==='processing'||state==='importing'){
+      const probe=await request('inspect-import',source);
+      const state=probe.import?.state;
+      if(!state)throw new Error(`Source ${source.assetId} returned no import inspect state`);
+      if(state==='ready'){
+        return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}};
+      }
+      if(state==='processing'||state==='importing'){
         const polled=await request('poll',source);
         if(polled.outcome?.state==='importing'){
           return {outcome:{state:'processing' as const,sourceId:source.assetId,action:'polled' as const}};
         }
         return polled;
       }
-      if(state==='missing'||state==='prepared'||state==='failed'){
+      if(state==='prepared')return request('retry-import',source);
+      if(state==='missing'||state==='failed'){
         await request('prepare-retry',source);
         return request('retry-import',source);
       }

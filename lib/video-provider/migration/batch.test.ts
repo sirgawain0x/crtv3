@@ -1,113 +1,107 @@
 import {expect,it,vi} from 'vitest';
 import {runVerifiedImportBatch,type MigrationMode} from './batch';
+import type {LedgerReservationState} from './reservation-state';
+const inspectImport=(state:LedgerReservationState)=>({import:{state}});
 import type {ArchivedSource} from './archive';
 import {ImportStoppedError} from './import-failure';
 import {requestMigrationImport} from './import-request';
 const one:ArchivedSource={assetId:'11111111-1111-4111-8111-111111111111',playbackId:'old-one',sha256:'a'.repeat(64),sizeBytes:100};
 const two:ArchivedSource={...one,assetId:'22222222-2222-4222-8222-222222222222'};
 const ready=(source:ArchivedSource)=>({outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}});
+
 it('prepares and retries failed sources when retryFailedImports is enabled',async()=>{
  const modes:string[]=[];
- const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
+ const request=vi.fn(async(mode:MigrationMode)=>{
   modes.push(mode);
-  if(mode==='reservation-state')return {reservationState:'failed' as const};
+  if(mode==='inspect-import')return inspectImport('failed');
   if(mode==='prepare-retry')return {};
   if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
-  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
+  return {outcome:{state:'ready' as const,sourceId:one.assetId,action:'created' as const}};
  });
  await runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
- expect(modes).toEqual(['reservation-state','prepare-retry','retry-import','inspect-playback']);
+ expect(modes).toEqual(['inspect-import','prepare-retry','retry-import','inspect-playback']);
 });
 it('stops the batch when poll fails and does not prepare-retry later sources',async()=>{
  const modes:MigrationMode[]=[];
  const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
   modes.push(mode);
-  if(mode==='reservation-state')return {reservationState:(source===one?'processing':'failed') as const};
+  if(mode==='inspect-import')return inspectImport(source===one?'processing':'failed');
   if(mode==='poll' && source===one)throw new Error('Matching reservation required');
   if(mode==='prepare-retry')return {};
   return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
  });
  const third:ArchivedSource={...one,assetId:'33333333-3333-4333-8333-333333333333'};
  await expect(runVerifiedImportBatch({sources:[one,two,third],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true})).rejects.toThrow(`Batch stopped at source ${one.assetId}`);
- expect(modes).toEqual(['reservation-state','poll']);
+ expect(modes).toEqual(['inspect-import','poll']);
  expect(request).toHaveBeenCalledTimes(2);
 });
-it('routes missing, prepared, failed and ready sources in a mixed retry batch',async()=>{
+it('routes missing, failed, prepared, in-flight and ready sources in a mixed retry batch',async()=>{
  const modes:string[]=[];
  const readySrc:ArchivedSource={...one,assetId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'};
  const prepared:ArchivedSource={...one,assetId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'};
  const failed:ArchivedSource={...one,assetId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc'};
  const missing:ArchivedSource={...one,assetId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'};
+ const inflight:ArchivedSource={...one,assetId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'};
+ let inflightPolls=0;
  const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
   modes.push(`${mode}:${source.assetId}`);
-  if(mode==='reservation-state'){
-    if(source===readySrc)return {reservationState:'ready' as const};
-    if(source===prepared)return {reservationState:'prepared' as const};
-    if(source===failed)return {reservationState:'failed' as const};
-    return {reservationState:'missing' as const};
+  if(mode==='inspect-import'){
+    if(source===readySrc)return inspectImport('ready');
+    if(source===prepared)return inspectImport('prepared');
+    if(source===failed)return inspectImport('failed');
+    if(source===inflight)return inspectImport('importing');
+    return inspectImport('missing');
+  }
+  if(mode==='poll' && source===inflight){
+    inflightPolls+=1;
+    return {outcome:{state:(inflightPolls>1?'ready':'processing') as 'ready'|'processing',sourceId:source.assetId,action:'polled' as const}};
   }
   if(mode==='prepare-retry')return {};
   if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
   return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
  });
- const result=await runVerifiedImportBatch({sources:[readySrc,prepared,failed,missing],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
- expect(result.completed).toHaveLength(4);
- expect(modes.filter(line=>line.startsWith('prepare-retry'))).toEqual([
-  `prepare-retry:${prepared.assetId}`,
-  `prepare-retry:${failed.assetId}`,
-  `prepare-retry:${missing.assetId}`,
- ]);
+ const result=await runVerifiedImportBatch({sources:[readySrc,prepared,failed,missing,inflight],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
+ expect(result.completed).toHaveLength(5);
+ expect(modes.filter(line=>line.startsWith('prepare-retry'))).toEqual([`prepare-retry:${failed.assetId}`,`prepare-retry:${missing.assetId}`]);
  expect(modes).toContain(`retry-import:${prepared.assetId}`);
- expect(modes).toContain(`prepare-retry:${prepared.assetId}`);
+ expect(modes).not.toContain(`prepare-retry:${prepared.assetId}`);
+ expect(modes).not.toContain(`poll:${readySrc.assetId}`);
+ expect(modes).not.toContain(`retry-import:${readySrc.assetId}`);
+ expect(modes).toContain(`poll:${inflight.assetId}`);
 });
-it('reaches prepare-retry for missing and prepared sources without polling first',async()=>{
+it('routes missing through prepare-retry and prepared through retry-import without polling',async()=>{
  const modes:MigrationMode[]=[];
  const prepared:ArchivedSource={...one,assetId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'};
  const missing:ArchivedSource={...one,assetId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'};
  const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
   modes.push(mode);
-  if(mode==='reservation-state'){
-    return {reservationState:source===prepared?'prepared':'missing'};
-  }
+  if(mode==='inspect-import')return inspectImport(source===prepared?'prepared':'missing');
   if(mode==='prepare-retry')return {};
   if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
   return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
  });
  await runVerifiedImportBatch({sources:[prepared,missing],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
  expect(modes.filter(mode=>mode==='poll')).toHaveLength(0);
- expect(modes).toEqual(['reservation-state','prepare-retry','retry-import','inspect-playback','reservation-state','prepare-retry','retry-import','inspect-playback']);
+ expect(modes).toEqual(['inspect-import','retry-import','inspect-playback','inspect-import','prepare-retry','retry-import','inspect-playback']);
 });
-it('stops a retry batch when reservation-state fails unexpectedly',async()=>{
+it('stops a retry batch when inspect-import fails unexpectedly',async()=>{
  const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
-  if(mode==='reservation-state'&&source===one)throw new Error('Ledger read unavailable');
-  return {reservationState:'missing' as const};
+  if(mode==='inspect-import'&&source===one)throw new Error('Ledger read unavailable');
+  return inspectImport('missing');
  });
  await expect(runVerifiedImportBatch({sources:[one,two],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true})).rejects.toThrow(`Batch stopped at source ${one.assetId}`);
  expect(request).toHaveBeenCalledTimes(1);
 });
-it('skips ready and in-flight sources in a mixed retry batch',async()=>{
+it('leaves ready reservations untouched',async()=>{
  const modes:string[]=[];
- let twoPolls=0;
- const request=vi.fn(async(mode:MigrationMode,source:ArchivedSource)=>{
-  modes.push(`${mode}:${source.assetId}`);
-  if(mode==='reservation-state'){
-    if(source===one)return {reservationState:'ready' as const};
-    if(source===two)return {reservationState:'processing' as const};
-    return {reservationState:'failed' as const};
-  }
-  if(mode==='poll'){
-    if(source===one)return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'unchanged' as const}};
-    if(source===two){twoPolls+=1;return {outcome:{state:(twoPolls>1?'ready':'processing') as 'ready'|'processing',sourceId:source.assetId,action:'polled' as const}};}
-  }
-  if(mode==='prepare-retry')return {};
+ const request=vi.fn(async(mode:MigrationMode)=>{
+  modes.push(mode);
+  if(mode==='inspect-import')return inspectImport('ready');
   if(mode==='inspect-playback')return {diagnostic:{playableManifest:true}};
-  return {outcome:{state:'ready' as const,sourceId:source.assetId,action:'created' as const}};
+  return {};
  });
- const third:ArchivedSource={...one,assetId:'33333333-3333-4333-8333-333333333333'};
- const result=await runVerifiedImportBatch({sources:[one,two,third],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
- expect(result.completed).toEqual([one.assetId,two.assetId,third.assetId]);
- expect(modes.filter(line=>line.startsWith('prepare-retry'))).toHaveLength(1);
- expect(modes).toContain(`poll:${two.assetId}`);
+ await runVerifiedImportBatch({sources:[one],request,report:vi.fn(),wait:async()=>{},retryFailedImports:true});
+ expect(modes).toEqual(['inspect-import','inspect-playback']);
 });
 it('uploads sequentially while earlier sources process, then verifies every source',async()=>{
  let polled=false;
