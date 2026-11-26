@@ -11,6 +11,7 @@ import { useSmartAccountClient } from '@/lib/wallet/react';
 import { type Address, parseUnits, formatUnits, encodeFunctionData, erc20Abi } from 'viem';
 import { BASE_TOKENS } from '@/lib/sdk/alchemy/swap-service';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
+import { isUsdcGasDefaultEnabled } from '@/lib/wallet/usdc-gas';
 import { AlchemySwapWidget } from '@/components/wallet/swap/AlchemySwapWidget';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { logger } from '@/lib/utils/logger';
@@ -82,9 +83,12 @@ export function CreativeFinanceTab() {
                 args: [destinationAddress as Address, parsedAmount]
             });
 
-            // Everyone pays gas in USDC. Membership gas allowances are not
-            // wired yet; when they are, this asks for 'sponsored' for members.
-            const gasContext = getGasContext('usdc');
+            // Staged rollout: keep the previous behaviour (sponsored) until
+            // NEXT_PUBLIC_USDC_GAS_DEFAULT_FOR_ALL is on. When membership gas
+            // allowances are wired, this asks for 'sponsored' for members.
+            const gasContext = getGasContext(
+              isUsdcGasDefaultEnabled() ? 'usdc' : 'sponsored',
+            );
 
             const uoCallData = {
                 target: BASE_TOKENS.USDC as Address,

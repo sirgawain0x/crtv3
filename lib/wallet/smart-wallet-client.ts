@@ -7,6 +7,10 @@ import type { Address, Chain, Hash, Hex } from "viem";
 import { http, type Transport } from "viem";
 import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 import { limitGasCapabilities } from "./gas-policy";
+import {
+  buildDefaultUsdcGasContext,
+  shouldApplyDefaultGas,
+} from "./usdc-gas";
 
 const ALCHEMY_API_KEY = getAlchemyApiKey() ?? "";
 
@@ -169,9 +173,19 @@ export async function createCompatSmartAccountClient(
     chain,
     getAddress: () => scaAddress,
     sendCalls(args: Record<string, unknown>) {
+      // This is the boundary every send goes through, including direct
+      // `client.sendCalls(...)` callers that never touch a React hook. Absent
+      // `capabilities` means the caller expressed no gas choice, so the staged
+      // USDC default applies here. An explicitly supplied object — even `{}` —
+      // is respected as the caller's choice, which is how a caller opts to pay
+      // ETH. Base only; other chains keep their own behaviour.
+      const explicit = args.capabilities as Record<string, unknown> | undefined;
+      const capabilities = shouldApplyDefaultGas(explicit, chain.id)
+        ? mapSendCallsCapabilities(buildDefaultUsdcGasContext())
+        : limitGasCapabilities(explicit);
       return sendCalls({
         ...args,
-        capabilities: limitGasCapabilities(args.capabilities as Record<string, unknown> | undefined),
+        capabilities,
       });
     },
     async sendUserOperation(args: SendUserOperationArgs) {
@@ -185,8 +199,16 @@ export async function createCompatSmartAccountClient(
         value: uo.value ?? 0n,
       }));
 
+      // Same rule as sendCalls: an explicit context wins (including an explicit
+      // ETH choice); otherwise the staged USDC default applies on Base. The
+      // default never carries a permissions context — that only ever comes from
+      // the caller — so read it from `args.context`.
+      const context = shouldApplyDefaultGas(args.context, chain.id)
+        ? buildDefaultUsdcGasContext()
+        : args.context;
+
       const capabilities = mapSendCallsCapabilities(
-        args.context,
+        context,
         args.context?.permissions?.context,
       );
 

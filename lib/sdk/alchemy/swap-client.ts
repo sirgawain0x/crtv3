@@ -11,6 +11,7 @@ import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 import { resolveServerGas } from "@/lib/wallet/gas-policy";
 import { buildErc20PaymasterConfig } from "@/lib/wallet/usdc-gas";
+import { buildSwapQuoteRequest } from "./swap-quote";
 
 export const config = {
   /**
@@ -126,24 +127,7 @@ export async function executeSwap(params: {
   const swapClient = await getSwapClient();
   const accountAddress = await getSwapAccountAddress();
 
-  const quoteRequest = {
-    method: "wallet_requestQuote_v0" as const,
-    params: [
-      {
-        from: accountAddress,
-        chainId: "0x2105",
-        fromToken: params.fromToken,
-        toToken: params.toToken,
-        fromAmount: params.fromAmount,
-        minimumToAmount: params.minimumToAmount,
-        // Only ask the quote for a paymaster when one is actually configured;
-        // otherwise the platform wallet pays its own ETH.
-        ...(gas.paymaster
-          ? { capabilities: { paymaster: gas.paymaster } }
-          : {}),
-      },
-    ],
-  };
+  const quoteRequest = buildSwapQuoteRequest(params, gas, accountAddress);
 
   const response = await fetch(`https://api.g.alchemy.com/v2/${apiKey}`, {
     method: "POST",

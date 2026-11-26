@@ -59,6 +59,29 @@ export function isUsdcGasDefaultEnabled(): boolean {
   return process.env.NEXT_PUBLIC_USDC_GAS_DEFAULT_FOR_ALL === "true";
 }
 
+/**
+ * Base mainnet — the only chain where the USDC (ERC-20) paymaster policy is
+ * configured. Applying the default elsewhere would send a Base policy id to a
+ * network that has no such policy.
+ */
+export const USDC_GAS_CHAIN_ID = 8453;
+
+/**
+ * Whether the staged USDC default should be attached to a send.
+ *
+ * Only when the caller expressed **no** gas choice at all (`undefined`), and
+ * only on Base. Any explicit value — including an empty object, which is how a
+ * caller opts to pay ETH — always wins. The compat client calls this for both
+ * `sendCalls` and `sendUserOperation` so direct Wallet API callers get the same
+ * treatment as the React hook.
+ */
+export function shouldApplyDefaultGas(
+  explicitGasChoice: unknown,
+  chainId: number,
+): boolean {
+  return explicitGasChoice === undefined && chainId === USDC_GAS_CHAIN_ID;
+}
+
 /** Legacy capability shape used by the compat hook layer. */
 export type LegacyGasContext = {
   paymasterService: { policyId: string };
