@@ -21,6 +21,7 @@ import {
   type UserClaimStatus,
 } from "@/lib/predictions/claim-status";
 import type { ParsedPredictionDisplay } from "@/lib/predictions/parse-prediction-display";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 interface ClaimWinningsCardProps {
   questionId: string;
@@ -53,8 +54,8 @@ export function ClaimWinningsCard({
         chain: base,
         transport: fallback([
           http(
-            process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
-              ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+            getAlchemyApiKey()
+              ? `https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`
               : undefined
           ),
           http("https://mainnet.base.org"),

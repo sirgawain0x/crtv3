@@ -327,7 +327,7 @@ export class UnlockService {
           error
         );
         throw this.createError(
-          `RPC configuration error: Alchemy API key may be missing or invalid. Please check NEXT_PUBLIC_ALCHEMY_API_KEY environment variable.`,
+          `RPC configuration error: Alchemy API key may be missing or invalid. Please check the ALCHEMY_API_KEY (server) or NEXT_PUBLIC_ALCHEMY_API_KEY (browser) environment variable.`,
           "RPC_CONFIG_ERROR",
           {
             lockAddress,

@@ -31,6 +31,7 @@ import { shortenAddress } from "@/lib/utils/utils";
 import { logger } from "@/lib/utils/logger";
 import { useCreateCampaignSticker } from "@/lib/hooks/stickers/useCreateCampaignSticker";
 import { toast } from "sonner";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 const proposalSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -202,7 +203,7 @@ function Create() {
       const publicClient = createPublicClient({
         chain: base,
         transport: alchemy({
-          apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+          apiKey: getAlchemyApiKey() as string,
         }),
       });
       const block = await publicClient.getBlockNumber();

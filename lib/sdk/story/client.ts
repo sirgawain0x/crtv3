@@ -13,6 +13,7 @@ import { alchemy, base } from "@account-kit/infra";
 import { privateKeyToAccount } from "viem/accounts";
 import type { Address } from "viem";
 import { serverLogger } from '@/lib/utils/logger';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 
 /**
@@ -411,7 +412,7 @@ export function createBasePublicClient() {
   return createPublicClient({
     chain: base,
     transport: alchemy({
-      apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+      apiKey: getAlchemyApiKey() as string,
     }),
   });
 }
@@ -481,7 +482,7 @@ export function createBaseWalletClient(account: Address) {
   return createWalletClient({
     chain: base,
     transport: alchemy({
-      apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+      apiKey: getAlchemyApiKey() as string,
     }),
     account: account as any, // Type assertion for viem compatibility
   });

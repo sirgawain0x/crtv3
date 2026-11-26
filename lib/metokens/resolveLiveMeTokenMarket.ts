@@ -8,6 +8,7 @@ import {
   setCachedLiveMeTokenMarket,
   type LiveMeTokenMarket,
 } from '@/lib/metokens/liveMeTokenMarketCache';
+import { getAlchemyApiKey } from '@/lib/web3/alchemy-key';
 
 export type { LiveMeTokenMarket };
 
@@ -15,7 +16,8 @@ const ERC20_SUPPLY_ABI = parseAbi(['function totalSupply() view returns (uint256
 
 function buildPublicClient() {
   const rpcUrls: string[] = [];
-  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  // Server-only path: prefer the private key, fall back to the public one.
+  const apiKey = getAlchemyApiKey();
   const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
   const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
   if (apiKey) rpcUrls.push(`https://base-mainnet.g.alchemy.com/v2/${apiKey}`);

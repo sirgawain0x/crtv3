@@ -5,10 +5,12 @@
  * https://www.alchemy.com/docs/reference/lens-api-quickstart
  *
  * Alchemy’s docs emphasize Sepolia testnet; mainnet (232, GHO) uses the same
- * NEXT_PUBLIC_ALCHEMY_API_KEY when your app has Lens mainnet enabled, or public RPC.
+ * Alchemy key (server key on the server, public key in the browser) when your
+ * app has Lens mainnet enabled, or the public RPC.
  */
 import { chains as lensSdkChains } from "@lens-chain/sdk/viem";
 import type { Chain } from "viem";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 export type LensNetwork = "mainnet" | "testnet";
 
@@ -30,14 +32,14 @@ export function lensAlchemyRpcUrl(network: LensNetwork, apiKey: string): string 
 }
 
 /**
- * Resolves Lens Chain RPC URL (client-safe env vars only).
- * Priority: NEXT_PUBLIC_LENS_RPC_URL → NEXT_PUBLIC_ALCHEMY_API_KEY → public Lens RPC.
+ * Resolves Lens Chain RPC URL (server key on the server, public key in the browser).
+ * Priority: NEXT_PUBLIC_LENS_RPC_URL → Alchemy key → public Lens RPC.
  */
 export function resolveLensRpcUrl(network: LensNetwork = getLensNetwork()): string {
   const override = process.env.NEXT_PUBLIC_LENS_RPC_URL?.trim();
   if (override) return override;
 
-  const alchemyKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY?.trim();
+  const alchemyKey = getAlchemyApiKey();
   if (alchemyKey) return lensAlchemyRpcUrl(network, alchemyKey);
 
   const fallback = lensSdkChains[network].rpcUrls.default.http[0];

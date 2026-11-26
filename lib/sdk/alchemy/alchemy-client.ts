@@ -1,11 +1,9 @@
 import { Alchemy, Network } from "alchemy-sdk";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
-const apiKey = typeof window === "undefined"
-  ? process.env.ALCHEMY_API_KEY || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
-  : process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-
+// Server traffic uses the private key; the browser gets the public key.
 const settings = {
-  apiKey,
+  apiKey: getAlchemyApiKey(),
   network: Network.BASE_MAINNET,
 };
 

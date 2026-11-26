@@ -296,6 +296,11 @@ export function useSendUserOperation({
       setIsSendingUserOperation(true);
       setError(null);
       try {
+        // Gas defaults are applied at the compat client boundary
+        // (createCompatSmartAccountClient) so that every send path gets them —
+        // including callers of client.sendCalls/sendUserOperation that never
+        // go through this hook. Applying a second default here would double up
+        // on that logic and leave direct callers uncovered.
         const operation = await client.sendUserOperation(args);
         if (waitForTxn) {
           const receipt = await client.waitForUserOperationTransaction({

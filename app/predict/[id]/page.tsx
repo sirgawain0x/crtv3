@@ -17,6 +17,7 @@ import { getRealityEthContractAddress } from "@/lib/sdk/reality-eth/reality-eth-
 import { createPublicClient, http, fallback, formatEther } from "viem";
 import { baseMainnet } from "@/lib/utils/chains/base";
 import { logger } from "@/lib/utils/logger";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 
 interface PredictionDetailsPageProps {
@@ -52,8 +53,8 @@ export async function generateMetadata(
     const publicClient = createPublicClient({
       chain: baseMainnet,
       transport: fallback([
-        http(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
-          ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+        http(getAlchemyApiKey()
+          ? `https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`
           : undefined),
         http("https://mainnet.base.org"),
       ]),

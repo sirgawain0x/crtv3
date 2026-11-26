@@ -9,6 +9,7 @@ import {
 } from "@/lib/contracts/CampaignStickers";
 import { useSmartAccountClient, useSigner } from "@/lib/wallet/react";
 import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
+import { isUsdcGasDefaultEnabled } from "@/lib/wallet/usdc-gas";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { buildStickerClaimAuthMessage } from "@/lib/stickers/claimAuthMessage";
@@ -264,7 +265,13 @@ export function ClaimStickerButton({ proposalId }: ClaimStickerButtonProps) {
         })
       );
 
-      const gasContext = getGasContext("sponsored");
+      // Staged rollout: keep the previous behaviour (sponsored, i.e. ETH once
+      // sponsorship is off) until NEXT_PUBLIC_USDC_GAS_DEFAULT_FOR_ALL is on.
+      // The ERC-20 policy type and a real USDC charge are not verified yet, so
+      // claiming a sticker must not start charging USDC unconditionally.
+      const gasContext = getGasContext(
+        isUsdcGasDefaultEnabled() ? "usdc" : "sponsored",
+      );
       const operation = await client.sendUserOperation({
         uo: {
           target: CAMPAIGN_STICKERS_ADDRESS,

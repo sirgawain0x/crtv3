@@ -1,9 +1,10 @@
 import 'dotenv/config';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 async function main() {
     console.log('Testing Alchemy connectivity with Origin spoofing...');
 
-    const apiKey = process.env.ALCHEMY_API_KEY || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+    const apiKey = getAlchemyApiKey();
     if (!apiKey) {
         console.error('Error: API keys not found in environment');
         process.exit(1);

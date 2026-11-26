@@ -3,6 +3,7 @@ import { serverLogger } from "@/lib/utils/logger";
 import { limitGasCapabilities } from "@/lib/wallet/gas-policy";
 import { USDS_TOKEN_ADDRESSES } from "@/lib/contracts/USDSToken";
 import { GHO_TOKEN_ADDRESSES } from "@/lib/contracts/GHOToken";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 // Base chain token addresses
 export const BASE_TOKENS = {
@@ -399,6 +400,6 @@ Original error: ${result.error.message}`;
 
 // Export singleton instance
 export const alchemySwapService = new AlchemySwapService(
-  process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "",
+  getAlchemyApiKey() || "",
   process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID
 );

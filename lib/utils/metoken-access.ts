@@ -3,6 +3,9 @@ import { base } from "@account-kit/infra";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
 
+// Module-scope client: the transport must not throw when the API key is absent,
+// or every route importing this module fails to build ("Failed to collect
+// configuration").
 const publicClient = createPublicClient({
   chain: base,
   transport: getAlchemyTransport("base-mainnet"),

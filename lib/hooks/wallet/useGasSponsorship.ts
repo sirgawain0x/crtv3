@@ -13,21 +13,28 @@ import {
 import { resolveGasContextForMethod } from "@/lib/hooks/wallet/gasContextCore";
 
 interface GasSponsorshipContext {
-    paymasterService?: {
-        policyId: string;
-    };
-    erc20?: {
-        tokenAddress: string;
-    };
+  paymasterService?: {
+    policyId: string;
+  };
+  erc20?: {
+    tokenAddress: string;
+    maxTokenAmount?: bigint;
+    postOpSettings?: { autoApprove?: boolean };
+  };
+}
+
+function stripQuotes(value?: string): string | undefined {
+  const trimmed = value?.replace(/^["']|["']$/g, "").trim();
+  return trimmed || undefined;
 }
 
 export function useGasSponsorship() {
     const { isMember, isVerified, isLoading: isMembershipLoading } = useIsMember();
 
-    // Strip quotes from environment variables (they may have quotes in .env.local)
-    const SPONSORED_POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID?.replace(/^["']|["']$/g, '');
-    const USDC_POLICY_ID = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID?.replace(/^["']|["']$/g, '');
-    const STORY_POLICY_ID = process.env.NEXT_PUBLIC_STORY_POLICY_ID?.replace(/^["']|["']$/g, '');
+  const SPONSORED_POLICY_ID = stripQuotes(process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID);
+  // Separate policy: an ERC-20 ("any token") policy that charges the user in USDC.
+  const USDC_POLICY_ID = stripQuotes(process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID);
+  const STORY_POLICY_ID = stripQuotes(process.env.NEXT_PUBLIC_STORY_POLICY_ID);
 
     /**
      * Returns the appropriate UserOperation context based on membership status and target payment method.

@@ -1,25 +1,23 @@
 /**
- * Alchemy transport that never throws while being constructed.
+ * Single source of truth for the Alchemy key and transport.
  *
- * Scope of this module: **build safety only.** It exists because
- * `alchemy({ apiKey })` from `@account-kit/infra` validates its config with zod
- * and raises `ZodError: invalid_union` (one branch each for apiKey / jwt /
- * rpcUrl) when no credential is supplied. Several modules build an Alchemy
- * client at module scope, so an empty key throws during import and `next build`
- * dies with:
+ * Two jobs:
  *
- *   Failed to collect configuration for /api/internal/sign-jwt
- *
- * A missing key must degrade at runtime, never take the build down.
- *
- * It deliberately does NOT change which credential each call site uses: every
- * caller previously read `NEXT_PUBLIC_ALCHEMY_API_KEY`, and this helper keeps
- * reading exactly that. Preferring the server-only `ALCHEMY_API_KEY` on the
- * server is a separate behavioural change and is reviewed with the key split,
- * not here.
+ * 1. **Key split.** Server code prefers the private `ALCHEMY_API_KEY`; a browser
+ *    bundle can only ever see `NEXT_PUBLIC_*`, so the client uses
+ *    `NEXT_PUBLIC_ALCHEMY_API_KEY`. Never read either variable directly outside
+ *    this module.
+ * 2. **Build safety.** `alchemy()` validates its config with zod and raises
+ *    `ZodError: invalid_union` (one branch each for apiKey / jwt / rpcUrl) when
+ *    no credential is supplied. Several modules build an Alchemy client at
+ *    module scope, so an empty key used to throw during import and kill
+ *    `next build` ("Failed to collect configuration for …"). A missing key must
+ *    degrade at runtime, never take the build down.
  */
 
 import { alchemy, type AlchemyTransport } from "@account-kit/infra";
+
+const PUBLIC_KEY_ENV = "NEXT_PUBLIC_ALCHEMY_API_KEY";
 
 /** Public, rate-limited endpoints used only when no Alchemy key is configured. */
 export const PUBLIC_RPC_FALLBACKS: Record<string, string> = {
@@ -34,16 +32,51 @@ function clean(value?: string | null): string | undefined {
   return trimmed || undefined;
 }
 
+/** Server-only key. Returns undefined when it is not configured. */
+export function getServerAlchemyApiKey(): string | undefined {
+  return clean(process.env.ALCHEMY_API_KEY) ?? clean(process.env.BASE_ALCHEMY_API_KEY);
+}
+
+let warnedAboutPublicFallback = false;
+
 /**
- * The key these call sites have always used — the public one, in both runtimes.
+ * The key to use for Alchemy calls from the current runtime.
  *
- * Keeping the server and browser on the same variable is what makes this change
- * a pure no-op when a key is present. It also means the private
- * `ALCHEMY_API_KEY` is not referenced anywhere in this module, so it cannot be
- * inlined into a client bundle or rendered output.
+ * Browser: the public key only — a client bundle can never see the private one.
+ * Server: `ALCHEMY_API_KEY`, falling back to the public key so a deploy that
+ * has not set the private value keeps working (warned once).
  */
 export function getAlchemyApiKey(): string | undefined {
-  return clean(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY);
+  if (typeof window !== "undefined") {
+    return clean(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY);
+  }
+
+  const serverKey = getServerAlchemyApiKey();
+  if (serverKey) return serverKey;
+
+  const publicKey = clean(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY);
+  if (publicKey && !warnedAboutPublicFallback) {
+    warnedAboutPublicFallback = true;
+    console.warn(
+      `[alchemy] ALCHEMY_API_KEY is not set — falling back to ${PUBLIC_KEY_ENV}. ` +
+        "Set the server-only key so server traffic stops using the public key.",
+    );
+  }
+  return publicKey;
+}
+
+/** `true` when some Alchemy credential is available in this runtime. */
+export function isAlchemyConfigured(): boolean {
+  return Boolean(getAlchemyApiKey());
+}
+
+/**
+ * JSON-RPC endpoint for a given Alchemy network host, e.g. `base-mainnet`.
+ * Callers that need a wallet/bundler URL should build it from the same key.
+ */
+export function getAlchemyRpcUrl(network = "base-mainnet"): string | undefined {
+  const apiKey = getAlchemyApiKey();
+  return apiKey ? `https://${network}.g.alchemy.com/v2/${apiKey}` : undefined;
 }
 
 /**

@@ -5,9 +5,14 @@ import {
 import type { LocalAccount } from "viem/accounts";
 import type { Address, Chain, Hash, Hex } from "viem";
 import { http, type Transport } from "viem";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 import { limitGasCapabilities } from "./gas-policy";
+import {
+  buildDefaultUsdcGasContext,
+  shouldApplyDefaultGas,
+} from "./usdc-gas";
 
-const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ?? "";
+const ALCHEMY_API_KEY = getAlchemyApiKey() ?? "";
 
 export type UserOperationCall = {
   target: Address;
@@ -19,7 +24,12 @@ export type SendUserOperationArgs = {
   uo: UserOperationCall | UserOperationCall[];
   context?: {
     paymasterService?: { policyId: string };
-    erc20?: { tokenAddress: string };
+    erc20?: {
+      tokenAddress: string;
+      /** Ceiling the paymaster may charge in token base units. */
+      maxTokenAmount?: bigint;
+      postOpSettings?: { autoApprove?: boolean };
+    };
     permissions?: { context?: Hex };
   };
   overrides?: Record<string, unknown>;
@@ -101,28 +111,13 @@ export async function resolveScaAddress(
   return address;
 }
 
-function mapSendCallsCapabilities(
-  context?: SendUserOperationArgs["context"],
-  permissionsContext?: Hex,
-): Record<string, unknown> | undefined {
-  const policyId = context?.paymasterService?.policyId;
-  const tokenAddress = context?.erc20?.tokenAddress;
-
-  const capabilities: Record<string, unknown> = {};
-
-  if (policyId) {
-    capabilities.paymaster = {
-      policyId,
-      ...(tokenAddress ? { erc20: { tokenAddress } } : {}),
-    };
-  }
-
-  if (permissionsContext) {
-    capabilities.permissions = { context: permissionsContext };
-  }
-
-  return limitGasCapabilities(capabilities);
-}
+/**
+ * Re-exported so callers/tests have one name for the mapping. The
+ * implementation lives in ./send-calls-capabilities to keep it testable without
+ * loading this module (and therefore the Wallet API SDK).
+ */
+export { mapSendCallsCapabilities } from "./send-calls-capabilities";
+import { mapSendCallsCapabilities } from "./send-calls-capabilities";
 
 type WalletClientParams = {
   signer: LocalAccount;
@@ -159,9 +154,19 @@ export async function createCompatSmartAccountClient(
     chain,
     getAddress: () => scaAddress,
     sendCalls(args: Record<string, unknown>) {
+      // This is the boundary every send goes through, including direct
+      // `client.sendCalls(...)` callers that never touch a React hook. Absent
+      // `capabilities` means the caller expressed no gas choice, so the staged
+      // USDC default applies here. An explicitly supplied object — even `{}` —
+      // is respected as the caller's choice, which is how a caller opts to pay
+      // ETH. Base only; other chains keep their own behaviour.
+      const explicit = args.capabilities as Record<string, unknown> | undefined;
+      const capabilities = shouldApplyDefaultGas(explicit, chain.id)
+        ? mapSendCallsCapabilities(buildDefaultUsdcGasContext())
+        : limitGasCapabilities(explicit);
       return sendCalls({
         ...args,
-        capabilities: limitGasCapabilities(args.capabilities as Record<string, unknown> | undefined),
+        capabilities,
       });
     },
     async sendUserOperation(args: SendUserOperationArgs) {
@@ -175,8 +180,16 @@ export async function createCompatSmartAccountClient(
         value: uo.value ?? 0n,
       }));
 
+      // Same rule as sendCalls: an explicit context wins (including an explicit
+      // ETH choice); otherwise the staged USDC default applies on Base. The
+      // default never carries a permissions context — that only ever comes from
+      // the caller — so read it from `args.context`.
+      const context = shouldApplyDefaultGas(args.context, chain.id)
+        ? buildDefaultUsdcGasContext()
+        : args.context;
+
       const capabilities = mapSendCallsCapabilities(
-        args.context,
+        context,
         args.context?.permissions?.context,
       );
 

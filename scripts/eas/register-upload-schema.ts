@@ -9,11 +9,12 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { EAS_SCHEMA_REGISTRY_ADDRESS, EAS_UPLOAD_SCHEMA } from "@/lib/eas/config";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 dotenv.config({ path: ".env.local" });
 
 const PRIVATE_KEY = process.env.EAS_SCHEMA_REGISTRAR_PRIVATE_KEY;
-const ALCHEMY_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+const ALCHEMY_KEY = getAlchemyApiKey();
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 
@@ -43,7 +44,7 @@ function getSchemaUID(
 
 if (!PRIVATE_KEY || !ALCHEMY_KEY) {
   console.error(
-    "Missing env vars: EAS_SCHEMA_REGISTRAR_PRIVATE_KEY and NEXT_PUBLIC_ALCHEMY_API_KEY must be set in .env.local",
+    "Missing env vars: EAS_SCHEMA_REGISTRAR_PRIVATE_KEY and ALCHEMY_API_KEY must be set in .env.local",
   );
   process.exit(1);
 }

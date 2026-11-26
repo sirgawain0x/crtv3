@@ -9,6 +9,7 @@ import { generateAccessKey, validateAccessKey } from "@/lib/access-key";
 import { getSmartAccountClient } from "@account-kit/core";
 import { config } from "@/config";
 import { serverLogger } from "@/lib/utils/logger";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 // Import ERC1155 ABI
 const erc1155ABI = [
@@ -295,7 +296,7 @@ async function checkUserTokenBalances(
     const publicClient = createPublicClient({
       chain,
       transport: alchemy({
-        apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+        apiKey: getAlchemyApiKey() as string,
       }),
     });
 

@@ -17,6 +17,7 @@ import {
 } from "@/lib/contracts/CampaignStickers";
 import { useSmartAccountClient } from "@/lib/wallet/react";
 import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
+import { isUsdcGasDefaultEnabled } from "@/lib/wallet/usdc-gas";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { logger } from "@/lib/utils/logger";
@@ -131,7 +132,11 @@ export function useCreateCampaignSticker() {
           })
         );
 
-        const gasContext = getGasContext("sponsored");
+        // Staged rollout: keep the previous behaviour (sponsored, i.e. ETH once
+        // sponsorship is off) until NEXT_PUBLIC_USDC_GAS_DEFAULT_FOR_ALL is on.
+        const gasContext = getGasContext(
+          isUsdcGasDefaultEnabled() ? "usdc" : "sponsored",
+        );
         const operation = await client.sendUserOperation({
           uo: {
             target: CAMPAIGN_STICKERS_ADDRESS,

@@ -9,6 +9,7 @@ import { parseBundlerError } from '@/lib/utils/bundlerErrorParser';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 
 // Diamond Address (Hardcoded for Base as per previous files)
@@ -27,7 +28,7 @@ export function useContentCoin() {
         return createPublicClient({
             chain: base,
             transport: alchemy({
-                apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+                apiKey: getAlchemyApiKey() as string,
             }),
         });
     }, []);
