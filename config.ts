@@ -3,7 +3,7 @@ import {
   type AlchemyAccountsUIConfig,
   type CreateConfigProps,
 } from "@account-kit/react";
-import { alchemy, base } from "@account-kit/infra";
+import { base } from "@account-kit/infra";
 import { http } from "viem";
 import { QueryClient } from "@tanstack/react-query";
 import { modularAccountFactoryAddresses } from "./lib/utils/modularAccount";
@@ -11,6 +11,7 @@ import { storyChain, lensChain } from "@/lib/wallet/chains";
 import { SITE_TOPIC_LOGO } from "./context/context";
 import Image from "next/image";
 import React from "react";
+import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
 
 export { walletChains as chains, lensChain } from "@/lib/wallet/chains";
 
@@ -18,9 +19,7 @@ export { walletChains as chains, lensChain } from "@/lib/wallet/chains";
 const defaultChain = base;
 
 // Create transport
-const transport = alchemy({
-  apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-});
+const transport = getAlchemyTransport("base-mainnet");
 
 // Custom storage implementation with 30-day expiration to prevent auto-logout
 // Must be a function that returns the storage object (CreateStorageFn)

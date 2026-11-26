@@ -1,12 +1,11 @@
 import { createPublicClient, erc20Abi, formatEther, getAddress, parseEther } from "viem";
-import { alchemy, base } from "@account-kit/infra";
+import { base } from "@account-kit/infra";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: alchemy({
-    apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-  }),
+  transport: getAlchemyTransport("base-mainnet"),
 });
 
 export type MeTokenAccessDenyReason =
