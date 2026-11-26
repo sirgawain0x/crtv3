@@ -2,11 +2,12 @@
 import * as Player from '@livepeer/react/player';
 import { Src } from '@livepeer/react';
 import { PlayIcon, PauseIcon, MuteIcon, UnmuteIcon } from '@livepeer/react/assets';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useVideo } from '../../context/VideoContext';
 import './Player.css';
 import { safelyPauseVideo } from '@/lib/utils/video-controls';
 import { CreativeBrandOverlay } from './CreativeBrandOverlay';
+import { frameworksHlsDiagnostics } from '@/lib/video-provider/frameworks/hls-diagnostics';
 
 export const HeroPlayer: React.FC<{
   src: Src[] | null;
@@ -18,6 +19,9 @@ export const HeroPlayer: React.FC<{
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const playerId = useRef(Math.random().toString(36).substring(7)).current;
+  const hlsConfig = useMemo(() => typeof window !== 'undefined' &&
+    window.location.hostname === 'staging.tv.creativeplatform.xyz'
+    ? frameworksHlsDiagnostics(src ?? []) : undefined, [src]);
 
   useEffect(() => {
     resetFadeTimeout();
@@ -79,6 +83,7 @@ export const HeroPlayer: React.FC<{
         onTouchStart={handleControlInteraction}
       >
         <Player.Video 
+          hlsConfig={hlsConfig}
           title={title} 
           onPlay={handlePlay}
           className="h-full w-full"

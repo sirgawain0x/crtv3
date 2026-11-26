@@ -1,20 +1,23 @@
+import { resolveVideoProviderId } from '@/lib/video-provider/config';
 import { serverLogger } from '@/lib/utils/logger';
-import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
 import {
   hasLivepeerErrors,
   parseLivepeerViewMetricsBody,
   type ParsedViewMetrics,
 } from '@/lib/livepeer/parse-view-metrics';
-import {
-  hasLivepeerPrivateApiKey,
-  livepeerStudioApiBaseUrl,
-  resolveLivepeerStudioAuthToken,
-} from '@/lib/sdk/livepeer/studioAuth';
+import { getVideoProvider } from '@/lib/video-provider';
 
-export {
-  livepeerStudioApiBaseUrl,
-  resolveLivepeerStudioAuthToken,
-} from '@/lib/sdk/livepeer/studioAuth';
+export function livepeerStudioApiBaseUrl(): string {
+  return getVideoProvider().apiBaseUrl();
+}
+
+export function resolveLivepeerStudioAuthToken(): string | undefined {
+  return getVideoProvider().resolveAuthToken();
+}
+
+function hasLivepeerPrivateApiKey(): boolean {
+  return getVideoProvider().hasPrivateMetricsKey();
+}
 
 /** Bound hung Livepeer Studio requests so views fallback can proceed. */
 const LIVEPEER_FETCH_TIMEOUT_MS = 10_000;
@@ -257,7 +260,7 @@ async function fetchAllViewsViaHttp(
 async function fetchViewsViaSdk(
   playbackId: string,
 ): Promise<FetchAllViewsResult | null> {
-  const client = getFullLivepeer();
+  const client = getVideoProvider().getLivepeerSdkClient();
   if (!client) return null;
 
   try {
@@ -314,6 +317,7 @@ async function fetchViewsViaSdk(
 export const fetchAllViews = async (
   playbackId: string,
 ): Promise<FetchAllViewsResult> => {
+  if (resolveVideoProviderId() === 'frameworks') return {ok:false,reason:'not_configured',status:503};
   const token = resolveLivepeerStudioAuthToken();
 
   const sdkResult = token && hasLivepeerPrivateApiKey()

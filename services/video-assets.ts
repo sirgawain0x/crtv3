@@ -4,8 +4,17 @@
 import { createClient } from "@/lib/sdk/supabase/server";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { VideoAsset } from "@/lib/types/video-asset";
-import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import {
+  FrameWorksUploadsAssetsUnavailableError,
+  getVideoProvider,
+  requireVideoProviderForUploadsAndAssets,
+} from "@/lib/video-provider";
 import type { CollaboratorFormData } from "@/lib/types/splits";
+import type { WalletAuthArgs } from "@/lib/auth/require-wallet";
+import { resolveVideoProviderId } from "@/lib/video-provider/config";
+import { updateFrameworksVodAccess } from "@/lib/video-provider/frameworks/vod-access";
+import { filterVideoIdentity } from "@/lib/video-provider/identity-filter";
+import { isVideoAssetId } from "@/lib/video-provider/asset-id";
 
 export async function createVideoAsset(
   data: Omit<VideoAsset, "id" | "created_at" | "updated_at">,
@@ -421,11 +430,10 @@ export async function getVideoAssetByPlaybackId(playbackId: string): Promise<Vid
   // Cast supabase to any to resolve issue where missing Database types cause return to be inferred as 'never'
   const result = await executeWithTimeoutAndRetry<VideoAssetPlaybackData>(
     async () => {
-      return await (supabase as any)
+      return await filterVideoIdentity((supabase as any)
         .from('video_assets')
-        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title, story_ip_registered, story_ip_id')
-        .eq('playback_id', playbackId)
-        .maybeSingle();
+        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title, story_ip_registered, story_ip_id'),
+        'playback_id', playbackId).maybeSingle();
     },
     10000, // 10 second timeout
     2 // 2 retries
@@ -435,20 +443,16 @@ export async function getVideoAssetByPlaybackId(playbackId: string): Promise<Vid
 }
 
 export async function getVideoAssetByAssetId(assetId: string) {
-  // Validate UUID format
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-  if (!uuidRegex.test(assetId)) {
-    throw new Error(`Invalid asset ID: ${assetId}. Asset ID must be a valid UUID.`);
+  if (!isVideoAssetId(assetId)) {
+    throw new Error('Invalid video asset ID');
   }
 
   const supabase = await createClient();
 
-  const { data: result, error } = await supabase
+  const { data: result, error } = await filterVideoIdentity(supabase
     .from('video_assets')
-    .select('*')
-    .eq('asset_id', assetId)
-    .maybeSingle(); // Use maybeSingle() instead of single()
+    .select('*'), 'asset_id', assetId)
+    .maybeSingle(); // Ambiguous active/legacy aliases fail instead of choosing a different video.
 
   if (error) {
     throw new Error(`Failed to get video asset by asset ID: ${error.message}`);
@@ -555,11 +559,14 @@ export async function updateVideoAsset(
     splits_address?: string | null;
     creator_metoken_id?: string | null;
     livepeer_attestation_id?: string | null;
-  }
+  },
+  auth?: WalletAuthArgs
 ) {
   // Use service client to bypass RLS
   const supabase = createServiceClient();
 
+  const protectedVod = resolveVideoProviderId() === 'frameworks';
+  if (protectedVod) await updateFrameworksVodAccess(supabase, id, data, auth);
   const updateData: any = {
     updated_at: new Date().toISOString(),
   };
@@ -568,7 +575,7 @@ export async function updateVideoAsset(
   if (data.thumbnailUri !== undefined) {
     updateData.thumbnail_url = data.thumbnailUri;
   }
-  if (data.status !== undefined) {
+  if (!protectedVod && data.status !== undefined) {
     updateData.status = data.status;
   }
   if (data.title !== undefined) {
@@ -595,10 +602,10 @@ export async function updateVideoAsset(
   if (data.metadata_uri !== undefined) {
     updateData.metadata_uri = data.metadata_uri;
   }
-  if (data.requires_metoken !== undefined) {
+  if (!protectedVod && data.requires_metoken !== undefined) {
     updateData.requires_metoken = data.requires_metoken;
   }
-  if (data.metoken_price !== undefined) {
+  if (!protectedVod && data.metoken_price !== undefined) {
     updateData.metoken_price = data.metoken_price;
   }
   if (data.attributes !== undefined) {
@@ -797,13 +804,13 @@ export async function createMultistreamTarget({
   const targetName = name || `Target ${Date.now()}`;
 
   try {
-    const target = await fullLivepeer.stream.addMultistreamTarget(
+    const target = await getVideoProvider().streams.addMultistreamTarget(
       {
         profile,
         videoOnly,
         spec: { name: targetName, url },
       },
-      streamId
+      streamId,
     );
 
     if (!target) {
@@ -844,7 +851,9 @@ export async function listMultistreamTargets(
 
   try {
     // Fetch the stream to get its multistream targets
-    const stream = await fullLivepeer.stream.get(streamId);
+    const stream = (await getVideoProvider().streams.getWithMultistream(
+      streamId,
+    )) as { stream?: { multistream?: { targets?: unknown } } } | null;
 
     if (!stream || !stream.stream) {
       return { error: "Stream not found" };
@@ -881,7 +890,7 @@ export async function deleteMultistreamTarget({
 }: DeleteMultistreamTargetParams): Promise<DeleteMultistreamTargetResult> {
   if (!id) return { success: false, error: "Missing target ID" };
   try {
-    await fullLivepeer.multistream.delete(id);
+    await getVideoProvider().multistream.delete(id);
     return { success: true };
   } catch (e) {
     return { success: false, error: "Failed to delete multistream target" };
@@ -914,8 +923,13 @@ export async function deleteVideoAsset(assetId: string, creatorId: string) {
 
   // 2. Delete from Livepeer
   try {
-    await fullLivepeer.asset.delete(assetId);
-  } catch (error: any) {
+    await requireVideoProviderForUploadsAndAssets(
+      "video-assets.deleteVideoAsset",
+    ).assets.delete(assetId);
+  } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
+      throw error;
+    }
     console.error('Error deleting from Livepeer:', error);
     // Proceed to delete from DB even if Livepeer fails (e.g. if already deleted)
   }

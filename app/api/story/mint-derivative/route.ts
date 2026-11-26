@@ -14,7 +14,7 @@ import { getStreamByPlaybackId } from "@/services/streams";
 import { groveService } from "@/lib/sdk/grove/service";
 import type { Address } from "viem";
 import { serverLogger } from "@/lib/utils/logger";
-import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
+import { walletAuthHeadersToArgs, requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
       story_license_terms_id: parentLicenseTermsId,
       metadata_uri: metadataUpload.url,
       status: "minted",
-    });
+    }, walletAuthHeadersToArgs(Object.fromEntries(request.headers.entries())));
 
     return NextResponse.json({
       success: true,

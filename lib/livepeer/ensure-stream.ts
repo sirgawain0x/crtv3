@@ -1,3 +1,5 @@
+import { assertStreamProviderCompatibility } from "@/lib/video-provider/stream-provider-guard";
+import { resolveVideoProviderId } from "@/lib/video-provider/config";
 import {
   createLivepeerStream,
   getLivepeerStreamOrNull,
@@ -139,7 +141,9 @@ async function recreateLivepeerCredentials(
 export async function ensureLivepeerStreamForCreator(
   options: EnsureLivepeerStreamOptions,
 ): Promise<EnsureLivepeerStreamResult> {
-  if (!hasLivepeerPrivateApiKey()) {
+  const provider = resolveVideoProviderId();
+  assertStreamProviderCompatibility(provider, options.existing);
+  if (provider === "livepeer" && !hasLivepeerPrivateApiKey()) {
     throw new Error("MISSING_API_KEY");
   }
 

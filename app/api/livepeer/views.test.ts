@@ -15,6 +15,11 @@ describe('Livepeer view metrics helpers', () => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
+  it('does not use a public Livepeer fallback after the FrameWorks switch',async()=>{
+    vi.stubEnv('VIDEO_PROVIDER','frameworks');const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+    expect(await fetchAllViews('new-video')).toEqual({ok:false,reason:'not_configured',status:503});
+    expect(fetcher).not.toHaveBeenCalled();vi.unstubAllGlobals();
+  });
 
   it('prefers the full Livepeer API key', () => {
     vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');

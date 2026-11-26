@@ -1,6 +1,7 @@
 export type StreamProxyErrorCode =
   | "BOTID_DENIED"
   | "RATE_LIMITED"
+  | "STREAM_PROVIDER_MIGRATION_REQUIRED"
   | "MISSING_API_KEY"
   | "LIVEPEER_ERROR"
   | "INVALID_RESPONSE"
@@ -22,6 +23,7 @@ const USER_MESSAGES: Record<StreamProxyErrorCode, string> = {
   BOTID_DENIED:
     "Security check blocked this request. Refresh the page and try again, or contact support.",
   RATE_LIMITED: "Too many attempts. Wait a minute and try again.",
+  STREAM_PROVIDER_MIGRATION_REQUIRED: "This channel needs a streaming migration before it can go live. Its saved credentials have not been changed.",
   MISSING_API_KEY:
     "Streaming service is temporarily unavailable. Please try again later.",
   LIVEPEER_ERROR: "Could not create stream. Please try again.",
@@ -84,6 +86,10 @@ export async function parseStreamProxyFailure(
       "MISSING_API_KEY",
       res.status,
     );
+  }
+
+  if (code === "STREAM_PROVIDER_MIGRATION_REQUIRED") {
+    return new StreamProxyError(USER_MESSAGES.STREAM_PROVIDER_MIGRATION_REQUIRED, "STREAM_PROVIDER_MIGRATION_REQUIRED", res.status);
   }
 
   if (code === "LIVEPEER_ERROR" && errorText) {

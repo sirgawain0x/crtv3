@@ -3,6 +3,9 @@ import { Src } from "@livepeer/react";
 import { logger } from '@/lib/utils/logger';
 
 const MAX_429_RETRIES = 3;
+export class PlaybackAuthorizationError extends Error {
+  constructor(public status: number) { super('Playback wallet verification required'); this.name='PlaybackAuthorizationError'; }
+}
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -11,14 +14,19 @@ async function sleep(ms: number) {
 async function fetchPlaybackInfo(
   id: string,
   signal?: AbortSignal,
+  authHeaders?: Record<string, string>,
+  companionAddress?: string,
 ): Promise<Response> {
-  const internalUrl = `/api/internal/playback-info?playbackId=${id}`;
+  const query = new URLSearchParams({ playbackId: id });
+  if (companionAddress) query.set('companionAddress', companionAddress);
+  const internalUrl = `/api/internal/playback-info?${query}`;
 
   for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
     const response = await fetch(internalUrl, {
       signal,
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders,
       },
     });
 
@@ -29,10 +37,11 @@ async function fetchPlaybackInfo(
       logger.warn(
         `[getDetailPlaybackSource] Internal playback-info not found for ${id}; falling back to public route`,
       );
-      const publicResponse = await fetch(`/api/livepeer/playback-info?playbackId=${id}`, {
+      const publicResponse = await fetch(`/api/livepeer/playback-info?${query}`, {
         signal,
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders,
         },
       });
       if (publicResponse.status !== 429) {
@@ -63,14 +72,15 @@ async function fetchPlaybackInfo(
 
 export const getDetailPlaybackSource = async (
   id: string,
-  opts?: { signal?: AbortSignal }
+  opts?: { signal?: AbortSignal; authHeaders?: Record<string, string>; companionAddress?: string }
 ): Promise<Src[] | null> => {
   try {
     logger.debug("[getDetailPlaybackSource] Fetching for ID:", id);
 
-    const response = await fetchPlaybackInfo(id, opts?.signal);
+    const response = await fetchPlaybackInfo(id, opts?.signal, opts?.authHeaders, opts?.companionAddress);
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) throw new PlaybackAuthorizationError(response.status);
       if (response.status === 429) {
         logger.warn(
           "[getDetailPlaybackSource] Rate limit persisted for ID:",
@@ -99,7 +109,7 @@ export const getDetailPlaybackSource = async (
     });
 
     const src = getSrc(res) as Src[];
-    logger.debug("[getDetailPlaybackSource] Generated sources:", src);
+    // Playback URLs can carry bearer tokens; never log the sources.
 
     // Livepeer may return sources for an idle stream (meta.live === 0). If we
     // hand those to the player, the CDN rejects the session and the UI spins
@@ -123,6 +133,7 @@ export const getDetailPlaybackSource = async (
     }
     return src;
   } catch (error) {
+    if (error instanceof PlaybackAuthorizationError) throw error;
     const isAbortError =
       error instanceof DOMException && error.name === 'AbortError' ||
       (error instanceof Error && (

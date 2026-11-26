@@ -24,7 +24,7 @@ function buildMessage(address: string, timestamp: number): string {
 }
 
 /**
- * Signs platform-admin API requests for `/admin/creator-xmerch` only.
+ * Signs existing platform-admin API requests, including isolated migration operations.
  * Supports admin EOA or smart account without altering global `useWalletAuth` readiness.
  */
 export function usePlatformAdminWalletAuth(adminAuthAddress: string | null) {

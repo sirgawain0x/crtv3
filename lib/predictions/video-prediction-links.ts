@@ -1,3 +1,5 @@
+import { isVideoAssetId } from "@/lib/video-provider/asset-id";
+import { filterVideoIdentity, normalizeVideoIdentity } from "@/lib/video-provider/identity-filter";
 import { supabaseService } from "@/lib/sdk/supabase/service";
 
 /**
@@ -26,7 +28,7 @@ export function isVideoAssetUuid(value: string): boolean {
 const LINKS_LIMIT = 50;
 
 /**
- * Resolve the prediction markets linked to a video (Livepeer asset UUID).
+ * Resolve predictions through the stable video row, accepting active or legacy provider IDs.
  *
  * Shared by GET /api/predictions/by-video and the server-side
  * ActivePredictionsStripServer. The SSR component must NOT self-fetch the
@@ -37,26 +39,25 @@ export async function getVideoPredictionLinks(
   rawVideoAssetId: string,
 ): Promise<VideoPredictionLinksResult> {
   const raw = rawVideoAssetId.trim();
-  // Accept the Livepeer asset UUID used by /discover/[id] pages.
-  if (!isVideoAssetUuid(raw)) {
+  // Accept canonical provider IDs and old discover links.
+  if (!isVideoAssetId(raw)) {
     return {
       ok: false,
       status: 400,
       error:
-        "Valid videoAssetId (Livepeer asset UUID) query parameter is required",
+        "Valid videoAssetId query parameter is required",
     };
   }
-  const videoAssetId = raw.toLowerCase();
+  const videoAssetId = normalizeVideoIdentity(raw);
 
   if (!supabaseService) {
     return { ok: true, predictions: [] };
   }
 
-  // Resolve Livepeer UUID -> internal video_assets PK.
-  const { data: videoRow, error: videoLookupError } = await supabaseService
+  // Resolve the active or legacy provider identity to the stable video row.
+  const { data: videoRow, error: videoLookupError } = await filterVideoIdentity(supabaseService
     .from("video_assets")
-    .select("id")
-    .eq("asset_id", videoAssetId)
+    .select("id"), "asset_id", videoAssetId)
     .maybeSingle();
 
   if (videoLookupError) {
