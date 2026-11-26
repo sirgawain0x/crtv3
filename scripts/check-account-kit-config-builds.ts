@@ -9,7 +9,7 @@
  */
 import { getAlchemyTransport } from "../lib/web3/alchemy-key";
 
-console.log("key present:", Boolean(process.env.ALCHEMY_API_KEY || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY));
+console.log("public key present:", Boolean(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY));
 
 try {
   const { createConfig } = await import("@account-kit/core");
