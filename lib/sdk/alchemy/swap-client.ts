@@ -9,9 +9,17 @@ import {
 import { serverLogger } from "@/lib/utils/logger";
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
+import { resolveServerGas } from "@/lib/wallet/gas-policy";
+import { buildErc20PaymasterConfig } from "@/lib/wallet/usdc-gas";
 
 export const config = {
-  policyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID!,
+  /**
+   * @deprecated Gas for swaps is resolved per call by `resolveServerGas()` so
+   * the sponsorship switch is honoured. Kept for callers reading the raw value.
+   */
+  get policyId(): string | undefined {
+    return resolveServerGas().paymaster?.policyId;
+  },
 };
 
 function getClientParams() {
@@ -26,13 +34,16 @@ function getClientParams() {
     throw new Error("ALCHEMY_SWAP_PRIVATE_KEY is not configured");
   }
 
+  // The platform wallet signs these swaps, so the platform pays the gas.
+  // Sponsor only when sponsorship is explicitly enabled; otherwise no paymaster
+  // (the wallet pays ETH itself).
+  const gas = resolveServerGas({ erc20Config: buildErc20PaymasterConfig() });
+
   return {
     transport: alchemyWalletTransport({ apiKey }),
     chain: base,
     signer: privateKeyToAccount(privateKey as Hex),
-    paymaster: {
-      policyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID!,
-    },
+    ...(gas.paymaster ? { paymaster: gas.paymaster } : {}),
   };
 }
 
@@ -99,10 +110,10 @@ export async function executeSwap(params: {
   serverLogger.debug("Starting swap execution with params:", params);
 
   const apiKey = getAlchemyApiKey();
-  const policyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
   const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
+  const gas = resolveServerGas({ erc20Config: buildErc20PaymasterConfig() });
 
-  if (!apiKey || !policyId || !privateKey) {
+  if (!apiKey || !privateKey) {
     throw new Error("Swap environment variables are not fully configured");
   }
 
@@ -119,11 +130,11 @@ export async function executeSwap(params: {
         toToken: params.toToken,
         fromAmount: params.fromAmount,
         minimumToAmount: params.minimumToAmount,
-        capabilities: {
-          paymaster: {
-            policyId: config.policyId,
-          },
-        },
+        // Only ask the quote for a paymaster when one is actually configured;
+        // otherwise the platform wallet pays its own ETH.
+        ...(gas.paymaster
+          ? { capabilities: { paymaster: gas.paymaster } }
+          : {}),
       },
     ],
   };

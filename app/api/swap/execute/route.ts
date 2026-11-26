@@ -5,6 +5,7 @@ import { BASE_TOKENS, type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
+import { resolveServerGas } from "@/lib/wallet/gas-policy";
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -75,12 +76,15 @@ export async function POST(request: NextRequest) {
 
     // Check environment variables
     const apiKey = getAlchemyApiKey();
-    const policyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
     const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
+    // Gas is decided in one place. Swaps are signed by the platform wallet, so
+    // the platform pays — sponsored only when sponsorship is explicitly on.
+    const swapGas = resolveServerGas();
 
     serverLogger.debug('Environment check:', {
       hasApiKey: !!apiKey,
-      hasPolicyId: !!policyId,
+      gasMode: swapGas.mode,
+      gasReason: swapGas.reason,
       hasPrivateKey: !!privateKey,
     });
 
@@ -88,14 +92,6 @@ export async function POST(request: NextRequest) {
       serverLogger.error('Missing ALCHEMY_API_KEY');
       return NextResponse.json(
         { error: 'Alchemy API key not configured. Please set ALCHEMY_API_KEY on the server.' },
-        { status: 500 }
-      );
-    }
-
-    if (!policyId) {
-      serverLogger.error('Missing NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID');
-      return NextResponse.json(
-        { error: 'Alchemy paymaster policy ID not configured. Please set NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID environment variable.' },
         { status: 500 }
       );
     }

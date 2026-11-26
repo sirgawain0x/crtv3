@@ -4,6 +4,7 @@ import {
   isUsdcGasPaymentEnabled,
   limitGasCapabilities,
   resolveGasPaymentMode,
+  resolveServerGas,
 } from "./gas-policy";
 import { buildErc20PaymasterConfig, getMaxGasUsdc } from "./usdc-gas";
 
@@ -122,5 +123,49 @@ describe("USDC paymaster capability", () => {
   it("falls back to the default when the ceiling is malformed", () => {
     vi.stubEnv("NEXT_PUBLIC_GAS_MAX_USDC", "not-a-number");
     expect(getMaxGasUsdc()).toBe(1_000_000n);
+  });
+});
+
+describe("resolveServerGas (swaps, minting, transfers)", () => {
+  const policy = "12345678-1234-1234-1234-123456789abc";
+
+  it("attaches no paymaster by default, so the platform wallet pays ETH", () => {
+    vi.stubEnv("NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID", policy);
+    const gas = resolveServerGas();
+    expect(gas.mode).toBe("eth");
+    expect(gas.paymaster).toBeUndefined();
+  });
+
+  it("sponsors only when sponsorship is explicitly enabled", () => {
+    vi.stubEnv("NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID", policy);
+    vi.stubEnv("NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED", "true");
+    const gas = resolveServerGas();
+    expect(gas.mode).toBe("sponsored");
+    expect(gas.paymaster).toEqual({ policyId: policy });
+  });
+
+  it("pays in USDC only when the platform opts in", () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOKEN_POLICY_ID", policy);
+    vi.stubEnv("SERVER_GAS_MODE", "usdc");
+    const gas = resolveServerGas({
+      erc20Config: { tokenAddress: "0x8335", maxTokenAmount: 1_000_000n, postOpSettings: { autoApprove: true } },
+    });
+    expect(gas.mode).toBe("usdc");
+    expect(gas.paymaster).toMatchObject({
+      policyId: policy,
+      erc20: { tokenAddress: "0x8335", maxTokenAmount: 1_000_000n },
+    });
+  });
+
+  it("ignores SERVER_GAS_MODE=usdc while USDC gas is paused", () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOKEN_POLICY_ID", policy);
+    vi.stubEnv("SERVER_GAS_MODE", "usdc");
+    vi.stubEnv("NEXT_PUBLIC_USDC_GAS_PAYMENTS_ENABLED", "false");
+    expect(resolveServerGas().mode).toBe("eth");
+  });
+
+  it("does not sponsor when the policy id is missing", () => {
+    vi.stubEnv("NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED", "true");
+    expect(resolveServerGas().mode).toBe("eth");
   });
 });

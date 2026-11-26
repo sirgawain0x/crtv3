@@ -69,6 +69,61 @@ export type GasModeDecision = {
 };
 
 /**
+ * Gas for server-side operations signed by the platform's own wallet (swaps,
+ * minting, transfers).
+ *
+ * These never involve the user's wallet, so "the user pays in USDC" does not
+ * apply — whichever wallet signs pays. The rules are:
+ *
+ *   1. Sponsorship on (`NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED=true`) → sponsor.
+ *   2. `SERVER_GAS_MODE=usdc` + an ERC-20 policy configured → the platform
+ *      wallet pays its own USDC (it must hold USDC).
+ *   3. Otherwise → no paymaster; the platform wallet pays ETH.
+ *
+ * Default is (3), which is what stops platform-signed operations from quietly
+ * spending the sponsorship budget.
+ */
+export type ServerGasConfig = {
+  paymaster?: { policyId: string; erc20?: Record<string, unknown> };
+  mode: "sponsored" | "usdc" | "eth";
+  reason: string;
+};
+
+export function resolveServerGas(params?: {
+  erc20Config?: { tokenAddress: string; maxTokenAmount: bigint; postOpSettings: { autoApprove: true } };
+}): ServerGasConfig {
+  const sponsorshipPolicy = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID?.trim();
+  const usdcPolicy = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID?.trim();
+
+  if (isGasSponsorshipEnabled() && sponsorshipPolicy) {
+    return {
+      mode: "sponsored",
+      reason: "sponsorship enabled",
+      paymaster: { policyId: sponsorshipPolicy },
+    };
+  }
+
+  const wantsUsdc = (process.env.SERVER_GAS_MODE ?? "").trim().toLowerCase() === "usdc";
+  if (wantsUsdc && usdcPolicy && isUsdcGasPaymentEnabled()) {
+    return {
+      mode: "usdc",
+      reason: "SERVER_GAS_MODE=usdc",
+      paymaster: {
+        policyId: usdcPolicy,
+        ...(params?.erc20Config ? { erc20: params.erc20Config } : {}),
+      },
+    };
+  }
+
+  return {
+    mode: "eth",
+    reason: isGasSponsorshipEnabled()
+      ? "no sponsorship policy configured"
+      : "sponsorship disabled — platform wallet pays ETH",
+  };
+}
+
+/**
  * Resolve the mode to use for one send.
  *
  * `requested` is a hint, not a grant: sponsorship still needs the master switch
