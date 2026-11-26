@@ -6,7 +6,7 @@ import {
   resolveGasPaymentMode,
   resolveServerGas,
 } from "./gas-policy";
-import { buildErc20PaymasterConfig, getMaxGasUsdc } from "./usdc-gas";
+import { buildErc20PaymasterConfig, buildDefaultUsdcGasContext, getMaxGasUsdc } from "./usdc-gas";
 
 const policyId = "12345678-1234-1234-1234-123456789abc";
 
@@ -167,5 +167,33 @@ describe("resolveServerGas (swaps, minting, transfers)", () => {
   it("does not sponsor when the policy id is missing", () => {
     vi.stubEnv("NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED", "true");
     expect(resolveServerGas().mode).toBe("eth");
+  });
+});
+
+describe("buildDefaultUsdcGasContext (the 'everything pays USDC' rollout)", () => {
+  it("attaches nothing until the rollout flag is on", () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOKEN_POLICY_ID", policyId);
+    expect(buildDefaultUsdcGasContext()).toBeUndefined();
+  });
+
+  it("attaches the USDC policy with a spend cap once enabled", () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOKEN_POLICY_ID", policyId);
+    vi.stubEnv("NEXT_PUBLIC_USDC_GAS_DEFAULT_FOR_ALL", "true");
+    const context = buildDefaultUsdcGasContext();
+    expect(context?.paymasterService.policyId).toBe(policyId);
+    expect(context?.erc20.maxTokenAmount).toBe(1_000_000n);
+    expect(context?.erc20.postOpSettings).toEqual({ autoApprove: true });
+  });
+
+  it("respects the USDC kill switch", () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOKEN_POLICY_ID", policyId);
+    vi.stubEnv("NEXT_PUBLIC_USDC_GAS_DEFAULT_FOR_ALL", "true");
+    vi.stubEnv("NEXT_PUBLIC_USDC_GAS_PAYMENTS_ENABLED", "false");
+    expect(buildDefaultUsdcGasContext()).toBeUndefined();
+  });
+
+  it("stays off when no ERC-20 policy is configured", () => {
+    vi.stubEnv("NEXT_PUBLIC_USDC_GAS_DEFAULT_FOR_ALL", "true");
+    expect(buildDefaultUsdcGasContext()).toBeUndefined();
   });
 });

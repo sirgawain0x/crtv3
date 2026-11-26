@@ -11,6 +11,7 @@ import type { Address, Hex } from "viem";
 import { useWalletChain } from "./chain-context";
 import { useWalletClientContext } from "./wallet-context";
 import type { CompatSmartAccountClient, SendUserOperationArgs } from "./smart-wallet-client";
+import { buildDefaultUsdcGasContext } from "./usdc-gas";
 
 export type RequestQuoteV0Result = Awaited<ReturnType<typeof requestQuoteV0>>;
 
@@ -289,7 +290,14 @@ export function useSendUserOperation({
       setIsSendingUserOperation(true);
       setError(null);
       try {
-        const operation = await client.sendUserOperation(args);
+        // Every send through this shim goes to the Wallet APIs client, so gas
+        // is attachable in one place. Callers that pass a context (sponsored,
+        // USDC, permissions) keep it; everyone else gets the staged USDC
+        // default when the rollout flag is on, otherwise ETH as before.
+        const callArgs = args.context
+          ? args
+          : { ...args, context: buildDefaultUsdcGasContext() };
+        const operation = await client.sendUserOperation(callArgs);
         if (waitForTxn) {
           const receipt = await client.waitForUserOperationTransaction({
             hash: operation.hash,

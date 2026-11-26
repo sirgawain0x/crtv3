@@ -46,3 +46,40 @@ export function buildErc20PaymasterConfig(
     postOpSettings: { autoApprove: true },
   };
 }
+
+/**
+ * Whether USDC gas should be attached to operations that specify no gas context
+ * at all.
+ *
+ * Off by default so the switch is a deliberate, staged rollout: flipping it
+ * changes every send that previously fell through to ETH. Enable on staging,
+ * confirm a real send charges USDC, then enable in production.
+ */
+export function isUsdcGasDefaultEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_USDC_GAS_DEFAULT_FOR_ALL === "true";
+}
+
+/** Legacy capability shape used by the compat hook layer. */
+export type LegacyGasContext = {
+  paymasterService: { policyId: string };
+  erc20: Erc20PaymasterConfig;
+};
+
+/**
+ * Default gas context for send paths that pass none.
+ *
+ * Returns undefined when the rollout flag, the USDC kill switch, or the ERC-20
+ * policy id is missing — in which case the caller pays ETH exactly as before.
+ */
+export function buildDefaultUsdcGasContext(): LegacyGasContext | undefined {
+  if (!isUsdcGasDefaultEnabled()) return undefined;
+  if (process.env.NEXT_PUBLIC_USDC_GAS_PAYMENTS_ENABLED?.trim().toLowerCase() === "false") return undefined;
+
+  const policyId = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID?.replace(/^["']|["']$/g, "").trim();
+  if (!policyId) return undefined;
+
+  return {
+    paymasterService: { policyId },
+    erc20: buildErc20PaymasterConfig(),
+  };
+}
