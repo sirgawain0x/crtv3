@@ -111,32 +111,13 @@ export async function resolveScaAddress(
   return address;
 }
 
-function mapSendCallsCapabilities(
-  context?: SendUserOperationArgs["context"],
-  permissionsContext?: Hex,
-): Record<string, unknown> | undefined {
-  const policyId = context?.paymasterService?.policyId;
-  // Forward the whole erc20 block: dropping maxTokenAmount/postOpSettings makes
-  // the ERC-20 paymaster reject the operation or fall back to its own defaults.
-  const erc20 = context?.erc20;
-
-  const capabilities: Record<string, unknown> = {};
-
-  if (policyId) {
-    capabilities.paymaster = {
-      policyId,
-      ...(erc20 ? { erc20 } : {}),
-    };
-  }
-
-  if (permissionsContext) {
-    capabilities.permissions = { context: permissionsContext };
-  }
-
-  // Last stop before the paymaster: strip sponsorship or USDC gas that the
-  // current policy does not allow.
-  return limitGasCapabilities(capabilities);
-}
+/**
+ * Re-exported so callers/tests have one name for the mapping. The
+ * implementation lives in ./send-calls-capabilities to keep it testable without
+ * loading this module (and therefore the Wallet API SDK).
+ */
+export { mapSendCallsCapabilities } from "./send-calls-capabilities";
+import { mapSendCallsCapabilities } from "./send-calls-capabilities";
 
 type WalletClientParams = {
   signer: LocalAccount;

@@ -12,6 +12,7 @@ import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 import { resolveServerGas } from "@/lib/wallet/gas-policy";
 import { buildErc20PaymasterConfig } from "@/lib/wallet/usdc-gas";
 import { buildSwapQuoteRequest } from "./swap-quote";
+import { buildSwapSendCapabilities, submitSwapCalls, type SwapSendCallsArgs } from "./swap-send";
 
 export const config = {
   /**
@@ -38,6 +39,13 @@ function getClientParams() {
   // The platform wallet signs these swaps, so the platform pays the gas.
   // Sponsor only when sponsorship is explicitly enabled; otherwise no paymaster
   // (the wallet pays ETH itself).
+  //
+  // Note: this client-level `paymaster` option only ever carries policy ids —
+  // createSmartWalletClient's type is `{ policyId?, policyIds? }` and drops an
+  // `erc20` block, so the USDC settings would be silently lost. The real
+  // capability is passed on each sendCalls (see swap-send.ts). Keeping this for
+  // the sponsored case is harmless because the per-send capability takes
+  // priority, but do not rely on it for ERC-20.
   const gas = resolveServerGas({ erc20Config: buildErc20PaymasterConfig() });
 
   return {
@@ -49,10 +57,7 @@ function getClientParams() {
 }
 
 type SwapWalletClient = {
-  sendCalls: (args: {
-    account: Address;
-    calls: Array<{ to: Address; data: Hex; value: bigint }>;
-  }) => Promise<{ id: string }>;
+  sendCalls: (args: SwapSendCallsArgs) => Promise<{ id: string }>;
   waitForCallsStatus: (args: { id: string }) => Promise<{
     status?: string;
     receipts?: Array<{ transactionHash?: string }>;
@@ -161,33 +166,25 @@ export async function executeSwap(params: {
 
   const quote = quoteResponse.result;
   const calls = (quote as { calls?: Array<{ to: string; data: string; value: string }> }).calls;
-  let txHash: Hex | null = null;
+
+  // The ERC-20 paymaster settings must travel with every send. Passing them at
+  // client construction is not enough: the SDK keeps only policy ids, so an
+  // ERC-20 policy would arrive without tokenAddress/maxTokenAmount.
+  const sendCapabilities = buildSwapSendCapabilities(gas);
+
+  let txHash: Hex;
 
   if (calls && Array.isArray(calls) && calls.length > 0) {
-    for (let i = 0; i < calls.length; i++) {
-      const call = calls[i];
-      const isLast = i === calls.length - 1;
-
-      const { id } = await swapClient.sendCalls({
-        account: accountAddress,
-        calls: [
-          {
-            to: call.to as Address,
-            data: appendBuilderCode(call.data as Hex),
-            value: BigInt(call.value || "0"),
-          },
-        ],
-      });
-
-      const status = await swapClient.waitForCallsStatus({ id });
-      if (status.status === "reverted") {
-        throw new Error(`Transaction reverted for call ${i + 1}`);
-      }
-      const receipt = status.receipts?.[0]?.transactionHash;
-      if (isLast && receipt) {
-        txHash = receipt as Hex;
-      }
-    }
+    txHash = await submitSwapCalls(
+      swapClient,
+      accountAddress,
+      calls.map((call) => ({
+        to: call.to as Address,
+        data: call.data as Hex,
+        value: BigInt(call.value || "0"),
+      })),
+      sendCapabilities,
+    );
   } else {
     const quoteData = (quote as { data?: { target?: string; sender?: string; callData?: string; value?: string } }).data;
     if (!quoteData) {
@@ -196,28 +193,13 @@ export async function executeSwap(params: {
 
     const target = (quoteData.target || quoteData.sender || accountAddress) as Address;
     const callData = quoteData.callData as Hex;
-    const value = BigInt(quoteData.value || "0");
 
-    const { id } = await swapClient.sendCalls({
-      account: accountAddress,
-      calls: [
-        {
-          to: target,
-          data: appendBuilderCode(callData),
-          value,
-        },
-      ],
-    });
-
-    const status = await swapClient.waitForCallsStatus({ id });
-    if (status.status === "reverted") {
-      throw new Error("Transaction reverted for legacy swap call");
-    }
-    txHash = (status.receipts?.[0]?.transactionHash as Hex) ?? null;
-  }
-
-  if (!txHash) {
-    throw new Error("Failed to get transaction hash from swap execution");
+    txHash = await submitSwapCalls(
+      swapClient,
+      accountAddress,
+      [{ to: target, data: callData, value: BigInt(quoteData.value || "0") }],
+      sendCapabilities,
+    );
   }
 
   return {
