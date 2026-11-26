@@ -14,7 +14,6 @@
  */
 
 import { alchemy, type AlchemyTransport } from "@account-kit/infra";
-import { http, type Transport } from "viem";
 
 /** Public, rate-limited endpoints used only when no Alchemy key is configured. */
 export const PUBLIC_RPC_FALLBACKS: Record<string, string> = {
@@ -40,9 +39,23 @@ export function getAlchemyApiKey(): string | undefined {
   return clean(process.env.ALCHEMY_API_KEY) ?? clean(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY);
 }
 
-/** Alchemy transport when a key exists, otherwise a public HTTP fallback. */
-export function getAlchemyTransport(network = "base-mainnet"): Transport | AlchemyTransport {
+/**
+ * Always returns a real `AlchemyTransport` — with the key when configured,
+ * otherwise pointed at a public RPC via the `rpcUrl` branch of the same config
+ * union.
+ *
+ * Do NOT return a bare viem `http()` transport as the fallback: Account Kit's
+ * `createConfig` requires an AlchemyTransport and dereferences `.config`,
+ * failing at build time with
+ *   TypeError: Cannot read properties of undefined (reading 'chainAgnosticUrl')
+ * (or a zod "Invalid input" from the same validation). Staying on `alchemy()`
+ * for both branches keeps every caller — viem clients and Account Kit configs —
+ * working whether or not a key is present.
+ */
+export function getAlchemyTransport(network = "base-mainnet"): AlchemyTransport {
   const apiKey = getAlchemyApiKey();
   if (apiKey) return alchemy({ apiKey });
-  return http(PUBLIC_RPC_FALLBACKS[network] ?? PUBLIC_RPC_FALLBACKS["base-mainnet"]);
+  return alchemy({
+    rpcUrl: PUBLIC_RPC_FALLBACKS[network] ?? PUBLIC_RPC_FALLBACKS["base-mainnet"],
+  });
 }
