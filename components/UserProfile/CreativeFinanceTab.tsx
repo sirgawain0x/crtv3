@@ -82,10 +82,9 @@ export function CreativeFinanceTab() {
                 args: [destinationAddress as Address, parsedAmount]
             });
 
-            // Get Gas Context (assume USDC sponsorship or similar)
-            const gasContext = getGasContext('sponsored'); // Or 'usdc' depending on policy. Using 'sponsored' for now as bank transfers might be sponsored.
-            // Re-reading user request: "Swaps work just like any other Smart Wallet transaction... sponsor gas... or pay...". 
-            // I'll stick to a default context or allow fallback.
+            // Everyone pays gas in USDC. Membership gas allowances are not
+            // wired yet; when they are, this asks for 'sponsored' for members.
+            const gasContext = getGasContext('usdc');
 
             const uoCallData = {
                 target: BASE_TOKENS.USDC as Address,

@@ -2,7 +2,12 @@ import { unlockService } from "@/lib/sdk/unlock/services";
 
 export type TradeGasSponsorshipContext = {
   paymasterService?: { policyId: string };
-  erc20?: { tokenAddress: string };
+  erc20?: {
+    tokenAddress: string;
+    /** Ceiling the paymaster may charge, in token base units. */
+    maxTokenAmount?: bigint;
+    postOpSettings?: { autoApprove?: boolean };
+  };
 };
 
 export type TradeGasContextResult = {

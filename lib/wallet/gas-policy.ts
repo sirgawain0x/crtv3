@@ -1,13 +1,51 @@
-/** App-side circuit breakers. Alchemy policy limits must also be enforced at the provider. */
+/**
+ * Who pays gas, decided in one place.
+ *
+ * Current product rule: **everyone pays gas in USDC.** Free gas is off by
+ * default and only returns behind an explicit opt-in plus a membership check,
+ * because unrestricted sponsorship bills the app owner for every user
+ * operation (it ran at ~$70-80 before this switch).
+ *
+ * These flags are app-side circuit breakers only. The real spend control is the
+ * Alchemy Gas Manager policy (ERC-20 policy type + spend caps). A modified
+ * client can always ask for sponsorship; the paymaster must refuse it.
+ */
+
+export type GasPaymentMode = "usdc" | "sponsored" | "eth";
+
+function envFlag(value: string | undefined, defaultValue: boolean): boolean {
+  const normalized = value?.trim().replace(/^["']|["']$/g, "").toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return defaultValue;
+}
+
+/**
+ * Free gas for members. Off unless explicitly enabled.
+ *
+ * Keep this false while the product charges everyone in USDC. When membership
+ * gas allowances ship, this becomes the master switch in front of the per-user
+ * monthly budget.
+ */
 export function isGasSponsorshipEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED === "true";
+  return envFlag(process.env.NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED, false);
 }
 
+/**
+ * Users pay gas in USDC. **On by default** — the flag now only exists so gas
+ * can be paused in an emergency (`NEXT_PUBLIC_USDC_GAS_PAYMENTS_ENABLED=false`).
+ */
 export function isUsdcGasPaymentEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_USDC_GAS_PAYMENTS_ENABLED === "true";
+  return envFlag(process.env.NEXT_PUBLIC_USDC_GAS_PAYMENTS_ENABLED, true);
 }
 
-/** Handles both legacy paymasterService and Wallet API paymaster capabilities. */
+/**
+ * Strips the paymaster capabilities a mode is not allowed to use.
+ *
+ * Handles both the legacy `paymasterService` key and the Wallet API `paymaster`
+ * capability; a request is treated as user-paid when it carries `erc20`
+ * anywhere, because that is what tells Alchemy to charge the user's USDC.
+ */
 export function limitGasCapabilities(
   capabilities?: Record<string, unknown>,
 ): Record<string, unknown> | undefined {
@@ -22,4 +60,116 @@ export function limitGasCapabilities(
     delete result.erc20;
   }
   return Object.keys(result).length ? result : undefined;
+}
+
+export type GasModeDecision = {
+  mode: GasPaymentMode;
+  isSponsored: boolean;
+  reason: string;
+};
+
+/**
+ * Gas for server-side operations signed by the platform's own wallet (swaps,
+ * minting, transfers).
+ *
+ * These never involve the user's wallet, so "the user pays in USDC" does not
+ * apply — whichever wallet signs pays. The rules are:
+ *
+ *   1. Sponsorship on (`NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED=true`) → sponsor.
+ *   2. `SERVER_GAS_MODE=usdc` + an ERC-20 policy configured → the platform
+ *      wallet pays its own USDC (it must hold USDC).
+ *   3. Otherwise → no paymaster; the platform wallet pays ETH.
+ *
+ * Default is (3), which is what stops platform-signed operations from quietly
+ * spending the sponsorship budget.
+ */
+export type ServerGasConfig = {
+  paymaster?: { policyId: string; erc20?: Record<string, unknown> };
+  mode: "sponsored" | "usdc" | "eth";
+  reason: string;
+};
+
+export function resolveServerGas(params?: {
+  erc20Config?: { tokenAddress: string; maxTokenAmount: bigint; postOpSettings: { autoApprove: true } };
+}): ServerGasConfig {
+  const sponsorshipPolicy = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID?.trim();
+  const usdcPolicy = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID?.trim();
+
+  if (isGasSponsorshipEnabled() && sponsorshipPolicy) {
+    return {
+      mode: "sponsored",
+      reason: "sponsorship enabled",
+      paymaster: { policyId: sponsorshipPolicy },
+    };
+  }
+
+  const wantsUsdc = (process.env.SERVER_GAS_MODE ?? "").trim().toLowerCase() === "usdc";
+  if (wantsUsdc && usdcPolicy && isUsdcGasPaymentEnabled()) {
+    return {
+      mode: "usdc",
+      reason: "SERVER_GAS_MODE=usdc",
+      paymaster: {
+        policyId: usdcPolicy,
+        ...(params?.erc20Config ? { erc20: params.erc20Config } : {}),
+      },
+    };
+  }
+
+  return {
+    mode: "eth",
+    reason: isGasSponsorshipEnabled()
+      ? "no sponsorship policy configured"
+      : "sponsorship disabled — platform wallet pays ETH",
+  };
+}
+
+/**
+ * Resolve the mode to use for one send.
+ *
+ * `requested` is a hint, not a grant: sponsorship still needs the master switch
+ * and membership. Anything else falls back to USDC, then to ETH when no USDC
+ * policy is configured.
+ */
+export function resolveGasPaymentMode(params: {
+  requested?: GasPaymentMode;
+  isMember?: boolean;
+  hasSponsoredPolicy?: boolean;
+  hasUsdcPolicy?: boolean;
+}): GasModeDecision {
+  const { requested = "usdc", isMember = false, hasSponsoredPolicy = false, hasUsdcPolicy = false } = params;
+
+  if (requested === "eth") {
+    return { mode: "eth", isSponsored: false, reason: "explicit ETH request" };
+  }
+
+  if (requested === "sponsored") {
+    if (!isGasSponsorshipEnabled()) {
+      return {
+        mode: hasUsdcPolicy ? "usdc" : "eth",
+        isSponsored: false,
+        reason: "sponsorship disabled by NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED",
+      };
+    }
+    if (!isMember) {
+      return {
+        mode: hasUsdcPolicy ? "usdc" : "eth",
+        isSponsored: false,
+        reason: "sponsorship requires an active membership",
+      };
+    }
+    if (!hasSponsoredPolicy) {
+      return { mode: "eth", isSponsored: false, reason: "no sponsorship policy configured" };
+    }
+    return { mode: "sponsored", isSponsored: true, reason: "member sponsorship" };
+  }
+
+  if (isUsdcGasPaymentEnabled() && hasUsdcPolicy) {
+    return { mode: "usdc", isSponsored: false, reason: "user pays gas in USDC" };
+  }
+
+  return {
+    mode: "eth",
+    isSponsored: false,
+    reason: isUsdcGasPaymentEnabled() ? "no USDC gas policy configured" : "USDC gas payments disabled",
+  };
 }

@@ -4,10 +4,11 @@ import { baseMainnet } from "@/lib/utils/chains/base";
 import { privateKeyToAccount } from "viem/accounts";
 import { serverLogger } from "@/lib/utils/logger";
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 // Alchemy SDK configuration
 const alchemyConfig = {
-  apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY!,
+  apiKey: getAlchemyApiKey()!,
   network: Network.BASE_MAINNET,
 };
 
@@ -168,7 +169,7 @@ export class AlchemyMeTokenService {
     // Create Viem clients for blockchain interactions
     this.publicClient = createPublicClient({
       chain: baseMainnet,
-      transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`, {
+      transport: http(`https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`, {
         fetchOptions: {
           headers: {
             "Accept-Encoding": "gzip",
@@ -184,7 +185,7 @@ export class AlchemyMeTokenService {
       this.walletClient = createWalletClient({
         account,
         chain: baseMainnet,
-        transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`, {
+        transport: http(`https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`, {
           fetchOptions: {
             headers: {
               "Accept-Encoding": "gzip",

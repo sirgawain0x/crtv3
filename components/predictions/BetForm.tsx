@@ -40,6 +40,7 @@ import {
   resolveSelectedAnswerHex,
   type StakeStats,
 } from "@/lib/predictions/stake-stats";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 
 const betSchema = z.object({
@@ -159,8 +160,8 @@ export function BetForm({
       const publicClient = createPublicClient({
         chain: base,
         transport: fallback([
-          http(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
-            ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+          http(getAlchemyApiKey()
+            ? `https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`
             : undefined),
           http("https://mainnet.base.org"),
         ]),

@@ -6,8 +6,9 @@
  */
 
 import { serverLogger } from "@/lib/utils/logger";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
-const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+const ALCHEMY_API_KEY = getAlchemyApiKey();
 
 interface FormatSignatureParams {
   from: string; // The address that signed

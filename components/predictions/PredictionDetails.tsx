@@ -33,6 +33,7 @@ import { EvidenceSubmissionModal } from "./EvidenceSubmissionModal";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { Collapsible } from "@/components/ui/collapsible";
 import { shortenAddress } from "@/lib/utils/utils";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 interface PredictionDetailsProps {
   questionId: string;
@@ -82,8 +83,8 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         chain: base,
         transport: fallback([
           http(
-            process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
-              ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+            getAlchemyApiKey()
+              ? `https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`
               : undefined
           ),
           http("https://mainnet.base.org"),

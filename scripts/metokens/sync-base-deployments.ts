@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 /**
  * Validate deployments/metokens/base.json against on-chain state.
  *
@@ -44,7 +45,7 @@ function normalizeAddress(address: string): string {
 }
 
 function getRpcUrl(): string {
-  const key = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ?? process.env.ALCHEMY_API_KEY;
+  const key = getAlchemyApiKey() ?? process.env.ALCHEMY_API_KEY;
   return key
     ? `https://base-mainnet.g.alchemy.com/v2/${key}`
     : 'https://mainnet.base.org';

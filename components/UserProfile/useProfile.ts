@@ -7,6 +7,7 @@ import Unlock from "@/lib/contracts/Unlock.json";
 import { toast } from "sonner";
 import type { ProfileState } from "../../lib/types/profile";
 import { logger } from '@/lib/utils/logger';
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 
 
 const contractAddress = "0xf7c4cd399395d80f9d61fde833849106775269c6";
@@ -60,7 +61,7 @@ export function useProfile(account: Account | null) {
   const publicClient = createPublicClient({
     chain: baseMainnet,
     transport: http(
-      `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+      `https://base-mainnet.g.alchemy.com/v2/${getAlchemyApiKey()}`
     ),
   });
 

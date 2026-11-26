@@ -5,9 +5,10 @@ import {
 import type { LocalAccount } from "viem/accounts";
 import type { Address, Chain, Hash, Hex } from "viem";
 import { http, type Transport } from "viem";
+import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
 import { limitGasCapabilities } from "./gas-policy";
 
-const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ?? "";
+const ALCHEMY_API_KEY = getAlchemyApiKey() ?? "";
 
 export type UserOperationCall = {
   target: Address;
@@ -19,7 +20,12 @@ export type SendUserOperationArgs = {
   uo: UserOperationCall | UserOperationCall[];
   context?: {
     paymasterService?: { policyId: string };
-    erc20?: { tokenAddress: string };
+    erc20?: {
+      tokenAddress: string;
+      /** Ceiling the paymaster may charge in token base units. */
+      maxTokenAmount?: bigint;
+      postOpSettings?: { autoApprove?: boolean };
+    };
     permissions?: { context?: Hex };
   };
   overrides?: Record<string, unknown>;
@@ -106,14 +112,16 @@ function mapSendCallsCapabilities(
   permissionsContext?: Hex,
 ): Record<string, unknown> | undefined {
   const policyId = context?.paymasterService?.policyId;
-  const tokenAddress = context?.erc20?.tokenAddress;
+  // Forward the whole erc20 block: dropping maxTokenAmount/postOpSettings makes
+  // the ERC-20 paymaster reject the operation or fall back to its own defaults.
+  const erc20 = context?.erc20;
 
   const capabilities: Record<string, unknown> = {};
 
   if (policyId) {
     capabilities.paymaster = {
       policyId,
-      ...(tokenAddress ? { erc20: { tokenAddress } } : {}),
+      ...(erc20 ? { erc20 } : {}),
     };
   }
 
@@ -121,6 +129,8 @@ function mapSendCallsCapabilities(
     capabilities.permissions = { context: permissionsContext };
   }
 
+  // Last stop before the paymaster: strip sponsorship or USDC gas that the
+  // current policy does not allow.
   return limitGasCapabilities(capabilities);
 }
 
