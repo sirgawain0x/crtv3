@@ -10,6 +10,9 @@
  * key to every visitor and makes rotation a redeploy.
  */
 
+import { alchemy } from "@account-kit/infra";
+import { http, type Transport } from "viem";
+
 const PUBLIC_KEY_ENV = "NEXT_PUBLIC_ALCHEMY_API_KEY";
 
 function clean(value?: string | null): string | undefined {
@@ -63,4 +66,35 @@ export function isAlchemyConfigured(): boolean {
 export function getAlchemyRpcUrl(network = "base-mainnet"): string | undefined {
   const apiKey = getAlchemyApiKey();
   return apiKey ? `https://${network}.g.alchemy.com/v2/${apiKey}` : undefined;
+}
+
+/**
+ * Public fallbacks, used when no Alchemy key is configured.
+ *
+ * These are deliberately rate-limited public endpoints: fine as a degraded
+ * fallback, not as a production path.
+ */
+export const PUBLIC_RPC_FALLBACKS: Record<string, string> = {
+  "base-mainnet": "https://mainnet.base.org",
+  "base-sepolia": "https://sepolia.base.org",
+  "story-mainnet": "https://mainnet.storyrpc.io",
+  "story-testnet": "https://aeneid.storyrpc.io",
+};
+
+/**
+ * A viem `Transport` that never throws while being constructed.
+ *
+ * `alchemy({ apiKey })` from `@account-kit/infra` validates its config with zod
+ * at call time and throws `invalid_union` when the key is empty. Because most
+ * call sites build their client at module scope, a missing env var therefore
+ * fails `next build` with "Failed to collect configuration for <route>" rather
+ * than degrading at runtime — a missing key should never take the build down.
+ *
+ * Use this instead of `alchemy({ apiKey: ... })` anywhere the key comes from the
+ * environment.
+ */
+export function getAlchemyTransport(network = "base-mainnet"): Transport {
+  const apiKey = getAlchemyApiKey();
+  if (apiKey) return alchemy({ apiKey });
+  return http(PUBLIC_RPC_FALLBACKS[network] ?? PUBLIC_RPC_FALLBACKS["base-mainnet"]);
 }

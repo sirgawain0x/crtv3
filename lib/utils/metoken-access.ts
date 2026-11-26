@@ -1,13 +1,14 @@
 import { createPublicClient, erc20Abi, formatEther, getAddress, parseEther } from "viem";
-import { alchemy, base } from "@account-kit/infra";
+import { base } from "@account-kit/infra";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
-import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
+import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
 
+// Module-scope client: the transport must not throw when the API key is absent,
+// or every route importing this module fails to build ("Failed to collect
+// configuration").
 const publicClient = createPublicClient({
   chain: base,
-  transport: alchemy({
-    apiKey: getAlchemyApiKey() as string,
-  }),
+  transport: getAlchemyTransport("base-mainnet"),
 });
 
 export type MeTokenAccessDenyReason =

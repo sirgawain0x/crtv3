@@ -1,14 +1,12 @@
 import { createPublicClient, getAddress } from "viem";
-import { alchemy, base } from "@account-kit/infra";
+import { base } from "@account-kit/infra";
 import { logger } from '@/lib/utils/logger';
-import { getAlchemyApiKey } from "@/lib/web3/alchemy-key";
+import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
 
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: alchemy({
-    apiKey: getAlchemyApiKey() as string,
-  }),
+  transport: getAlchemyTransport("base-mainnet"),
 });
 
 /**
