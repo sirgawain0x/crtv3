@@ -19,10 +19,7 @@ export { walletChains as chains, lensChain } from "@/lib/wallet/chains";
 const defaultChain = base;
 
 // Create transport
-// NOTE: this Account Kit config is no longer mounted (app/providers.tsx uses
-// PrivyProvider). The cast keeps the legacy `createConfig` shape satisfied now
-// that the transport falls back to a plain HTTP transport when no key is set.
-const transport = getAlchemyTransport("base-mainnet") as never;
+const transport = getAlchemyTransport("base-mainnet");
 
 // Custom storage implementation with 30-day expiration to prevent auto-logout
 // Must be a function that returns the storage object (CreateStorageFn)
@@ -157,6 +154,6 @@ export const config = createConfig(
         sponsorUserOperations: false,
       },
     },
-  } as unknown as CreateConfigProps,
+  } as CreateConfigProps,
   uiConfig
 );

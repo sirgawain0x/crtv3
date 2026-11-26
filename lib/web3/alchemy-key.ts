@@ -1,19 +1,31 @@
 /**
- * Single source of truth for the Alchemy API key.
+ * Single source of truth for the Alchemy key and transport.
  *
- * The server (route handlers, server components, scripts) uses the private
- * `ALCHEMY_API_KEY`. A browser bundle can only ever see `NEXT_PUBLIC_*` values,
- * so the client falls back to `NEXT_PUBLIC_ALCHEMY_API_KEY`, which is kept
- * intentionally narrow: Base mainnet only, locked to the app's origins.
+ * Two jobs:
  *
- * Never read the public env var directly outside this module — that ships the
- * key to every visitor and makes rotation a redeploy.
+ * 1. **Key split.** Server code prefers the private `ALCHEMY_API_KEY`; a browser
+ *    bundle can only ever see `NEXT_PUBLIC_*`, so the client uses
+ *    `NEXT_PUBLIC_ALCHEMY_API_KEY`. Never read either variable directly outside
+ *    this module.
+ * 2. **Build safety.** `alchemy()` validates its config with zod and raises
+ *    `ZodError: invalid_union` (one branch each for apiKey / jwt / rpcUrl) when
+ *    no credential is supplied. Several modules build an Alchemy client at
+ *    module scope, so an empty key used to throw during import and kill
+ *    `next build` ("Failed to collect configuration for …"). A missing key must
+ *    degrade at runtime, never take the build down.
  */
 
-import { alchemy } from "@account-kit/infra";
-import { http, type Transport } from "viem";
+import { alchemy, type AlchemyTransport } from "@account-kit/infra";
 
 const PUBLIC_KEY_ENV = "NEXT_PUBLIC_ALCHEMY_API_KEY";
+
+/** Public, rate-limited endpoints used only when no Alchemy key is configured. */
+export const PUBLIC_RPC_FALLBACKS: Record<string, string> = {
+  "base-mainnet": "https://mainnet.base.org",
+  "base-sepolia": "https://sepolia.base.org",
+  "story-mainnet": "https://mainnet.storyrpc.io",
+  "story-testnet": "https://aeneid.storyrpc.io",
+};
 
 function clean(value?: string | null): string | undefined {
   const trimmed = value?.trim().replace(/^["']|["']$/g, "");
@@ -30,8 +42,9 @@ let warnedAboutPublicFallback = false;
 /**
  * The key to use for Alchemy calls from the current runtime.
  *
+ * Browser: the public key only — a client bundle can never see the private one.
  * Server: `ALCHEMY_API_KEY`, falling back to the public key so a deploy that
- * has not set the private value yet keeps working. Browser: the public key.
+ * has not set the private value keeps working (warned once).
  */
 export function getAlchemyApiKey(): string | undefined {
   if (typeof window !== "undefined") {
@@ -44,8 +57,6 @@ export function getAlchemyApiKey(): string | undefined {
   const publicKey = clean(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY);
   if (publicKey && !warnedAboutPublicFallback) {
     warnedAboutPublicFallback = true;
-    // Plain console here: this module is bundled for the browser too, and the
-    // server logger must not be pulled into client chunks.
     console.warn(
       `[alchemy] ALCHEMY_API_KEY is not set — falling back to ${PUBLIC_KEY_ENV}. ` +
         "Set the server-only key so server traffic stops using the public key.",
@@ -69,32 +80,22 @@ export function getAlchemyRpcUrl(network = "base-mainnet"): string | undefined {
 }
 
 /**
- * Public fallbacks, used when no Alchemy key is configured.
+ * Always returns a real `AlchemyTransport` — with the key when configured,
+ * otherwise pointed at a public RPC via the `rpcUrl` branch of the same config
+ * union.
  *
- * These are deliberately rate-limited public endpoints: fine as a degraded
- * fallback, not as a production path.
+ * Do NOT return a bare viem `http()` transport as the fallback: Account Kit's
+ * `createConfig` requires an AlchemyTransport and dereferences `.config`,
+ * failing at build time with
+ *   TypeError: Cannot read properties of undefined (reading 'chainAgnosticUrl')
+ * (or a zod "Invalid input" from the same validation). Staying on `alchemy()`
+ * for both branches keeps every caller — viem clients and Account Kit configs —
+ * working whether or not a key is present.
  */
-export const PUBLIC_RPC_FALLBACKS: Record<string, string> = {
-  "base-mainnet": "https://mainnet.base.org",
-  "base-sepolia": "https://sepolia.base.org",
-  "story-mainnet": "https://mainnet.storyrpc.io",
-  "story-testnet": "https://aeneid.storyrpc.io",
-};
-
-/**
- * A viem `Transport` that never throws while being constructed.
- *
- * `alchemy({ apiKey })` from `@account-kit/infra` validates its config with zod
- * at call time and throws `invalid_union` when the key is empty. Because most
- * call sites build their client at module scope, a missing env var therefore
- * fails `next build` with "Failed to collect configuration for <route>" rather
- * than degrading at runtime — a missing key should never take the build down.
- *
- * Use this instead of `alchemy({ apiKey: ... })` anywhere the key comes from the
- * environment.
- */
-export function getAlchemyTransport(network = "base-mainnet"): Transport {
+export function getAlchemyTransport(network = "base-mainnet"): AlchemyTransport {
   const apiKey = getAlchemyApiKey();
   if (apiKey) return alchemy({ apiKey });
-  return http(PUBLIC_RPC_FALLBACKS[network] ?? PUBLIC_RPC_FALLBACKS["base-mainnet"]);
+  return alchemy({
+    rpcUrl: PUBLIC_RPC_FALLBACKS[network] ?? PUBLIC_RPC_FALLBACKS["base-mainnet"],
+  });
 }

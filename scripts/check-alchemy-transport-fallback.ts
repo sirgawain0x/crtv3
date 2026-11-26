@@ -1,26 +1,14 @@
 /**
- * Reproduces the production build failure mode: routes throw while Next collects
- * page data because a module-scope Alchemy transport is constructed with an
- * empty API key. Run with the key unset.
+ * Regression check for the production build failure: importing modules that
+ * build an Alchemy client at module scope must not throw when the API key is
+ * absent. Run with ALCHEMY_API_KEY / NEXT_PUBLIC_ALCHEMY_API_KEY unset.
  */
-import { getAlchemyTransport, getAlchemyApiKey } from "../lib/web3/alchemy-key";
+import { getAlchemyApiKey, getAlchemyTransport } from "../lib/web3/alchemy-key";
 
-const key = getAlchemyApiKey();
-console.log("key present:", Boolean(key));
+console.log("key present:", Boolean(getAlchemyApiKey()));
+getAlchemyTransport("base-mainnet");
+console.log("getAlchemyTransport OK");
 
-try {
-  const transport = getAlchemyTransport("base-mainnet");
-  console.log("getAlchemyTransport OK, type =", transport.type ?? "(no type field)");
-} catch (error) {
-  console.error("getAlchemyTransport THREW:", error);
-  process.exit(1);
-}
-
-// The module that broke /api/internal/sign-jwt. Importing it must not throw.
-try {
-  await import("../lib/utils/metoken-access");
-  console.log("metoken-access module-scope init OK");
-} catch (error) {
-  console.error("metoken-access THREW at import:", error);
-  process.exit(1);
-}
+// The module that broke /api/internal/sign-jwt.
+await import("../lib/utils/metoken-access");
+console.log("metoken-access module-scope init OK");
