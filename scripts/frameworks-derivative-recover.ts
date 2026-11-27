@@ -138,7 +138,7 @@ async function main() {
   );
 
   // The provider endpoint the run would use, and the QA project the plan is bound to.
-  const providerHost = new URL(frameworksGraphqlUrl()).hostname;
+  const providerEndpoint = frameworksGraphqlUrl();
   const tokenForTargets = process.env.FRAMEWORKS_API_TOKEN?.trim();
   const providerTokenSha256 = tokenForTargets
     ? createHash('sha256').update(tokenForTargets).digest('hex')
@@ -148,7 +148,7 @@ async function main() {
   if (qaUrlForTargets) {
     assertPlanTargets(plan, {
       supabaseOrigin: qaUrlForTargets,
-      providerHost,
+      providerEndpoint,
       providerTokenSha256,
     });
     targetsVerified = true;
@@ -161,7 +161,7 @@ async function main() {
     plannedTargets: plan.targets,
     actualTargets: {
       supabaseOrigin: qaUrlForTargets ?? null,
-      providerHost,
+      providerEndpoint,
       providerTokenSha256: providerTokenSha256 ? `${providerTokenSha256.slice(0, 12)}…` : null,
     },
     targetsVerified,
@@ -182,7 +182,7 @@ async function main() {
   const key = process.env.FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Migration database credentials are required to execute');
   // Refuse a correctly approved plan executed against a different database or provider.
-  assertPlanTargets(plan, { supabaseOrigin: url, providerHost, providerTokenSha256 });
+  assertPlanTargets(plan, { supabaseOrigin: url, providerEndpoint, providerTokenSha256 });
   const db = createClient(url, key, { auth: { persistSession: false } });
 
   switch (stage) {

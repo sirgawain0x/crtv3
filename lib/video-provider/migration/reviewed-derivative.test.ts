@@ -57,7 +57,7 @@ const plan = {
   reason: '10-bit AV1 is not ingested by the provider; H.264 derivative decodes clean',
   targets: {
     supabaseOrigin: 'https://qaprojectref123.supabase.co',
-    providerHost: 'bridge.frameworks.network',
+    providerEndpoint: 'https://bridge.frameworks.network/graphql',
     providerTokenSha256: 'a'.repeat(64),
   },
 };
@@ -684,7 +684,7 @@ describe('reviewed derivative — execution target binding', () => {
   const commitment = 'a'.repeat(64);
   const actual = {
     supabaseOrigin: 'https://qaprojectref123.supabase.co',
-    providerHost: 'bridge.frameworks.network',
+    providerEndpoint: 'https://bridge.frameworks.network/graphql',
     providerTokenSha256: commitment,
   };
 
@@ -712,9 +712,40 @@ describe('reviewed derivative — execution target binding', () => {
       .toThrow(/not an acceptable HTTPS origin/);
   });
 
+  it('refuses a plain-HTTP provider endpoint that shares the hostname', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, providerEndpoint: 'http://bridge.frameworks.network/graphql' }))
+      .toThrow(/not an acceptable HTTPS endpoint/);
+  });
+
+  it('refuses a provider endpoint on an unexpected port', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, providerEndpoint: 'https://bridge.frameworks.network:8443/graphql' }))
+      .toThrow(/not an acceptable HTTPS endpoint/);
+  });
+
+  it('refuses a provider endpoint carrying userinfo', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, providerEndpoint: 'https://user:pass@bridge.frameworks.network/graphql' }))
+      .toThrow(/not an acceptable HTTPS endpoint/);
+  });
+
+  it('refuses a different provider path on the approved host', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, providerEndpoint: 'https://bridge.frameworks.network/other' }))
+      .toThrow(/Provider endpoint does not match/);
+  });
+
   it('refuses a different provider host', () => {
-    expect(() => assertPlanTargets(plan, { ...actual, providerHost: 'bridge.example.com' }))
-      .toThrow(/Provider host does not match/);
+    expect(() => assertPlanTargets(plan, { ...actual, providerEndpoint: 'https://bridge.example.com/graphql' }))
+      .toThrow(/Provider endpoint does not match/);
+  });
+
+  it('normalises a trailing slash on the endpoint', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, providerEndpoint: 'https://bridge.frameworks.network/graphql/' }))
+      .not.toThrow();
+  });
+
+  it('reports an unavailable account identity rather than a mismatch', () => {
+    const withAccount = { ...plan, targets: { ...plan.targets, providerAccountId: 'acct_123' } };
+    expect(() => assertPlanTargets(withAccount, actual))
+      .toThrow(/account identity is unavailable/);
   });
 
   it('refuses a different credential commitment', () => {

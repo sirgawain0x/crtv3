@@ -68,14 +68,15 @@ export type ReviewedDerivativePlan = {
  */
 export type ReviewedDerivativeTargets = {
   supabaseOrigin: string;
-  providerHost: string;
+  /** Complete endpoint, not a hostname: the bearer token must never travel over plain HTTP. */
+  providerEndpoint: string;
   providerAccountId?: string;
   providerTokenSha256?: string;
 };
 
 export type ExecutionTargets = {
   supabaseOrigin: string;
-  providerHost: string;
+  providerEndpoint: string;
   providerAccountId?: string;
   providerTokenSha256?: string;
 };
@@ -129,11 +130,27 @@ export function parseSupabaseOrigin(value: unknown): string | null {
   }
 }
 
-function parseProviderHost(value: unknown): string | null {
+/**
+ * Strict provider endpoint: https only, no userinfo, no port other than 443, no
+ * query or fragment, and a real path. Trailing slashes are normalized so an
+ * approved `/graphql` matches `/graphql/`.
+ */
+export function parseProviderEndpoint(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const v = value.trim().toLowerCase();
-  if (v.length === 0 || isPlaceholder(v)) return null;
-  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v) ? v : null;
+  const raw = value.trim();
+  if (raw.length === 0 || isPlaceholder(raw)) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return null;
+    if (url.username || url.password) return null;
+    if (url.port && url.port !== '443') return null;
+    if (url.search || url.hash) return null;
+    const path = url.pathname.replace(/\/+$/, '');
+    if (!path) return null;
+    return `${url.origin.toLowerCase()}${path}`;
+  } catch {
+    return null;
+  }
 }
 
 function hasProviderAccountBinding(targets: ReviewedDerivativeTargets): boolean {
@@ -148,7 +165,7 @@ function hasValidTargets(targets: unknown): targets is ReviewedDerivativeTargets
   const t = targets as ReviewedDerivativeTargets;
   return (
     parseSupabaseOrigin(t.supabaseOrigin) !== null &&
-    parseProviderHost(t.providerHost) !== null &&
+    parseProviderEndpoint(t.providerEndpoint) !== null &&
     hasProviderAccountBinding(t)
   );
 }
@@ -347,20 +364,25 @@ export function assertPlanTargets(plan: ReviewedDerivativePlan, actual: Executio
     throw new ReviewedDerivativeError('QA database origin does not match the reviewed plan');
   }
 
-  const plannedHost = parseProviderHost(plan.targets.providerHost);
-  const actualHost = parseProviderHost(actual.providerHost);
-  if (!actualHost) {
-    throw new ReviewedDerivativeError('Execution provider host is not valid');
+  const plannedEndpoint = parseProviderEndpoint(plan.targets.providerEndpoint);
+  const actualEndpoint = parseProviderEndpoint(actual.providerEndpoint);
+  if (!actualEndpoint) {
+    throw new ReviewedDerivativeError('Execution provider endpoint is not an acceptable HTTPS endpoint');
   }
-  if (plannedHost !== actualHost) {
-    throw new ReviewedDerivativeError('Provider host does not match the reviewed plan');
+  if (plannedEndpoint !== actualEndpoint) {
+    throw new ReviewedDerivativeError('Provider endpoint does not match the reviewed plan');
   }
 
   // The host binds the endpoint; only an account identifier or a credential
   // commitment can bind the account behind the token.
   const plannedAccount = plan.targets.providerAccountId?.trim();
   if (plannedAccount) {
-    if (!actual.providerAccountId || actual.providerAccountId.trim() !== plannedAccount) {
+    if (!actual.providerAccountId) {
+      throw new ReviewedDerivativeError(
+        'FrameWorks account identity is unavailable; bind the plan by credential commitment instead',
+      );
+    }
+    if (actual.providerAccountId.trim() !== plannedAccount) {
       throw new ReviewedDerivativeError('FrameWorks account does not match the reviewed plan');
     }
   }
