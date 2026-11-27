@@ -52,9 +52,13 @@ describe.sequential('derivative recovery migration', () => {
       `SELECT state,recovery_kind,derivative_sha256,adopted_at FROM frameworks_import_recoveries WHERE livepeer_asset_id=$1`,
       [legacySource],
     );
-    expect(row.rows).toEqual([
-      { state: 'ready', recovery_kind: 'legacy', derivative_sha256: null, adopted_at: expect.any(String) },
-    ]);
+    // pglite returns timestamptz as a Date and int8 as a number; the assertions
+    // stay driver-agnostic so this passes under both pglite and node-postgres.
+    expect(row.rows).toHaveLength(1);
+    expect(row.rows[0]).toMatchObject({
+      state: 'ready', recovery_kind: 'legacy', derivative_sha256: null,
+    });
+    expect(row.rows[0].adopted_at).toBeTruthy();
   });
 
   it('still lets a legacy recovery become ready without derivative evidence', async () => {
@@ -97,10 +101,10 @@ describe.sequential('derivative recovery migration', () => {
     expect(row.rows[0]).toMatchObject({
       recovery_kind: 'derivative',
       derivative_sha256: derivativeSha,
-      derivative_bytes: '630109556',
       state: 'prepared',
       original_asset_id: 'orig-asset',
     });
+    expect(Number(row.rows[0].derivative_bytes)).toBe(630109556);
   });
 
   it('rejects evidence that does not match the quarantined attempt', async () => {
@@ -141,7 +145,7 @@ describe.sequential('derivative recovery migration', () => {
       `SELECT adopted_at FROM frameworks_import_recoveries WHERE livepeer_asset_id=$1`,
       [derivativeSource],
     );
-    expect(recovery.rows[0].adopted_at).toEqual(expect.any(String));
+    expect(recovery.rows[0].adopted_at).toBeTruthy();
   });
 
   it('refuses to adopt a legacy recovery through the derivative RPC', async () => {
