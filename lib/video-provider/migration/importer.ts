@@ -11,6 +11,9 @@ export type ImportRecord = {
   provider_failure_phase?: string | null; provider_failure_reason?: string | null;
   /** Present only on frameworks_import_recoveries rows: the re-encoded replacement. */
   derivative_sha256?: string | null; derivative_bytes?: number | null; derivative_origin?: string | null;
+  /** 'legacy' for the pre-transfer flow, 'derivative' for a reviewed re-encode. */
+  recovery_kind?: 'legacy' | 'derivative' | null;
+  adopted_at?: string | null;
 };
 export interface ImportLedger {
   find(sourceId: string): Promise<ImportRecord | null>;

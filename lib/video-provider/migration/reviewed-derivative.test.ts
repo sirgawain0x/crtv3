@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
+import type { ImportProvider } from './importer';
 
 const m = vi.hoisted(() => ({
   original: vi.fn(),
@@ -6,10 +8,14 @@ const m = vi.hoisted(() => ({
   asset: vi.fn(),
   secure: vi.fn(),
   inspect: vi.fn(),
+  transition: vi.fn(),
 }));
 
 vi.mock('./supabase-ledger', () => ({
-  createImportLedger: (_db: unknown, table?: string) => ({ find: table ? m.recovered : m.original }),
+  createImportLedger: (_db: unknown, table?: string) => ({
+    find: table ? m.recovered : m.original,
+    transition: m.transition,
+  }),
 }));
 vi.mock('../frameworks/assets', () => ({ frameworksAssets: { get: m.asset } }));
 vi.mock('../frameworks/vod-policy', () => ({ secureFrameworksVod: m.secure }));
@@ -19,8 +25,10 @@ import {
   ReviewedDerivativeError,
   adoptReviewedDerivative,
   approvedDerivativePlans,
+  confirmReviewedDerivativeReady,
   findReviewedDerivativePlan,
   prepareReviewedDerivativeRecovery,
+  uploadReviewedDerivative,
 } from './reviewed-derivative';
 
 const SHA = (c: string) => c.repeat(64);
@@ -75,6 +83,7 @@ beforeEach(() => {
   m.asset.mockResolvedValue({ id: 'new-asset', playbackId: 'new-play', status: { phase: 'ready' } });
   m.secure.mockResolvedValue(undefined);
   m.inspect.mockResolvedValue({ playableManifest: true });
+  m.transition.mockResolvedValue(true);
 });
 
 describe('reviewed derivative — plan authorization', () => {
@@ -233,5 +242,132 @@ describe('reviewed derivative — legacy recovery compatibility', () => {
     );
     expect(rpc).toHaveBeenCalledWith('prepare_reviewed_frameworks_recovery', { p_reviewer: '0xabc' });
     expect(rpc).not.toHaveBeenCalledWith('prepare_reviewed_derivative_recovery', expect.anything());
+  });
+});
+
+describe('reviewed derivative — verified upload binding', () => {
+  // Non-uniform bytes: with a repeating value, reordering halves would not change
+  // the digest and the binding test would pass for the wrong reason.
+  const data = Uint8Array.from({ length: 1024 }, (_, i) => i % 251);
+  const dataSha = createHash('sha256').update(data).digest('hex');
+  const uploadPlan = { ...plan, derivativeSha256: dataSha, derivativeBytes: data.byteLength };
+
+  const makeProvider = (options: { parts?: Array<{ partNumber: number; url: string }>; phase?: string } = {}) => {
+    const parts = options.parts ?? [{ partNumber: 1, url: 'u1' }, { partNumber: 2, url: 'u2' }];
+    return {
+      createProtectedUpload: vi.fn(async () => ({
+        assetId: 'new-asset', playbackId: 'new-play', uploadId: 'up1', partSize: 512, parts,
+      })),
+      uploadPart: vi.fn(async () => 'etag-1'),
+      complete: vi.fn(async () => ({ assetId: 'new-asset', playbackId: 'new-play' })),
+      inspect: vi.fn(async () => ({ assetId: 'new-asset', playbackId: 'new-play', phase: options.phase ?? 'ready' })),
+      confirmProtection: vi.fn(async () => undefined),
+    } as unknown as ImportProvider;
+  };
+
+  it('refuses a local file whose size differs before any provider call', async () => {
+    const provider = makeProvider();
+    await expect(uploadReviewedDerivative(db, source, data.subarray(0, 512), plans([uploadPlan]), provider))
+      .rejects.toThrow(/size does not match/);
+    expect(provider.createProtectedUpload).not.toHaveBeenCalled();
+  });
+
+  it('refuses a local file whose hash differs before any provider call', async () => {
+    const provider = makeProvider();
+    const tampered = Uint8Array.from({ length: 1024 }, (_, i) => (i * 7) % 251);
+    await expect(uploadReviewedDerivative(db, source, tampered, plans([uploadPlan]), provider))
+      .rejects.toThrow(/hash does not match/);
+    expect(provider.createProtectedUpload).not.toHaveBeenCalled();
+  });
+
+  it('refuses a provider session that reuses the original attempt identity', async () => {
+    const provider = makeProvider();
+    (provider.createProtectedUpload as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce({
+      assetId: 'orig-asset', playbackId: 'new-play', uploadId: 'up1', partSize: 512,
+      parts: [{ partNumber: 1, url: 'u1' }, { partNumber: 2, url: 'u2' }],
+    });
+    await expect(uploadReviewedDerivative(db, source, data, plans([uploadPlan]), provider))
+      .rejects.toThrow(/reuses the original/);
+  });
+
+  it('refuses to complete when the transferred bytes hash differently', async () => {
+    // Provider returns parts out of order, so the bytes are hashed in a different
+    // order than they appear in the reviewed file.
+    const provider = makeProvider({ parts: [{ partNumber: 2, url: 'u2' }, { partNumber: 1, url: 'u1' }] });
+    await expect(uploadReviewedDerivative(db, source, data, plans([uploadPlan]), provider))
+      .rejects.toThrow(/Transferred bytes do not match/);
+    expect(provider.complete).not.toHaveBeenCalled();
+    expect(m.transition).not.toHaveBeenCalled();
+  });
+
+  it('uploads, verifies, binds the provider identity and protects it', async () => {
+    const provider = makeProvider();
+    const result = await uploadReviewedDerivative(db, source, data, plans([uploadPlan]), provider);
+
+    expect(result).toEqual({ assetId: 'new-asset', playbackId: 'new-play' });
+    expect(provider.uploadPart).toHaveBeenCalledTimes(2);
+    expect(provider.complete).toHaveBeenCalledWith('up1', [
+      { partNumber: 1, etag: 'etag-1' }, { partNumber: 2, etag: 'etag-1' },
+    ]);
+    expect(m.transition).toHaveBeenCalledWith(source.assetId, 'prepared', 'processing',
+      { assetId: 'new-asset', playbackId: 'new-play' });
+    expect(provider.confirmProtection).toHaveBeenCalledWith('new-asset', 'new-play');
+  });
+
+  it('does not claim a binding when the ledger refuses the transition', async () => {
+    const provider = makeProvider();
+    m.transition.mockResolvedValue(false);
+    await expect(uploadReviewedDerivative(db, source, data, plans([uploadPlan]), provider))
+      .rejects.toThrow(/Could not bind the verified upload/);
+  });
+});
+
+describe('reviewed derivative — ready confirmation', () => {
+  const providerFor = (phase: string) => ({
+    createProtectedUpload: vi.fn(),
+    uploadPart: vi.fn(),
+    complete: vi.fn(),
+    inspect: vi.fn(async () => ({ assetId: 'new-asset', playbackId: 'new-play', phase })),
+    confirmProtection: vi.fn(),
+  } as unknown as ImportProvider);
+
+  beforeEach(() => {
+    m.recovered.mockResolvedValue({ ...recoveredRow, state: 'processing', adopted_at: null });
+  });
+
+  it('marks the recovery ready once the provider reports ready', async () => {
+    await confirmReviewedDerivativeReady(db, source, plans([plan]), { provider: providerFor('ready'), delayMs: 0 });
+    expect(m.transition).toHaveBeenCalledWith(source.assetId, 'processing', 'ready');
+  });
+
+  it('surfaces a provider-side failure immediately', async () => {
+    await expect(confirmReviewedDerivativeReady(db, source, plans([plan]), { provider: providerFor('failed'), delayMs: 0 }))
+      .rejects.toThrow(/failed provider processing/);
+    expect(m.transition).not.toHaveBeenCalled();
+  });
+
+  it('gives up rather than waiting forever', async () => {
+    await expect(confirmReviewedDerivativeReady(db, source, plans([plan]), {
+      provider: providerFor('processing'), attempts: 2, delayMs: 0,
+    })).rejects.toThrow(/did not become ready/);
+  });
+});
+
+describe('reviewed derivative — already adopted', () => {
+  it('reports success when the adoption already landed', async () => {
+    m.original.mockResolvedValue({ state: 'ready', frameworks_asset_id: 'new-asset', frameworks_playback_id: 'new-play' });
+    m.recovered.mockResolvedValue({ ...recoveredRow, adopted_at: '2026-11-26T01:00:00Z' });
+
+    await expect(adoptReviewedDerivative(db, source, plans([plan]))).resolves.toBeUndefined();
+    expect(rpc).not.toHaveBeenCalled();
+    expect(m.inspect).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a mismatched adopted record as success', async () => {
+    m.original.mockResolvedValue({ state: 'ready', frameworks_asset_id: 'some-other-asset', frameworks_playback_id: 'new-play' });
+    m.recovered.mockResolvedValue({ ...recoveredRow, adopted_at: '2026-11-26T01:00:00Z' });
+
+    await expect(adoptReviewedDerivative(db, source, plans([plan])))
+      .rejects.toThrow(/not in a recoverable state/);
   });
 });

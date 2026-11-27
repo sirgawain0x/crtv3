@@ -5,11 +5,14 @@
  * Scope, deliberately narrow:
  *
  * - A substitution is only possible from a **reviewed plan** checked into this
- *   directory, so the approval (`approvedBy`, `reason`, hashes, sizes) is
- *   reviewable in a diff. `candidate` plans are recorded but never actionable.
- * - The plan binds the **original archive evidence** (source identity, sha256,
- *   bytes) to the **derivative** (its own sha256/bytes) so both identities are
- *   recoverable after adoption.
+ *   directory, so approval (`approvedBy`, `reason`, hashes, sizes) is reviewable
+ *   in a diff. `candidate` plans are recorded but never actionable.
+ * - Every step re-verifies the bytes. The plan's hash is not copied into the
+ *   database and compared back to itself: `uploadReviewedDerivative` hashes the
+ *   local file *before* the transfer and hashes the bytes *as they are sent*, and
+ *   refuses to complete the upload unless the digest matches the reviewed
+ *   derivative. The provider identities it returns are the ones bound to that
+ *   verified attempt.
  * - The original attempt is never reset, deleted or overwritten. It stays
  *   quarantined and protected; adoption only changes which provider identity the
  *   import row points at.
@@ -18,16 +21,20 @@
  *
  * This path is separate from `reviewed-recovery.ts`, which remains pinned to its
  * single forensically reviewed pre-transfer attempt. That legacy flow and its
- * RPCs are untouched, so existing recoveries keep working.
+ * RPCs are untouched, and legacy recovery rows keep working: derivative evidence
+ * is only required for rows marked `recovery_kind = 'derivative'`.
  */
 
+import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ArchivedSource } from './archive';
 import { createImportLedger } from './supabase-ledger';
-import { frameworksAssets } from '../frameworks/assets';
-import { secureFrameworksVod } from '../frameworks/vod-policy';
-import { inspectMigrationPlayback } from './inspect-playback';
+import type { ImportProvider } from './importer';
 import plansFile from './reviewed-derivative-plans.json';
+
+// Provider and playback modules are imported lazily inside the steps that need
+// them: reading a plan (and a CLI dry run) must not pull the server-only
+// provider graph.
 
 /** Fixed local checks only; provider and database messages are never surfaced raw. */
 export class ReviewedDerivativeError extends Error {}
@@ -46,8 +53,14 @@ export type ReviewedDerivativePlan = {
   reason: string;
 };
 
+type OriginalRecord = {
+  state?: string | null;
+  frameworks_asset_id?: string | null;
+  frameworks_playback_id?: string | null;
+} | null | undefined;
+
 const SHA256 = /^[0-9a-f]{64}$/;
-const ORIGINAL_RECOVERABLE_STATES = new Set(['failed', 'ambiguous']);
+const RECOVERABLE_STATES = new Set(['failed', 'ambiguous']);
 
 function isPlan(value: unknown): value is ReviewedDerivativePlan {
   if (!value || typeof value !== 'object') return false;
@@ -78,14 +91,13 @@ export function approvedDerivativePlans(raw: unknown = plansFile): ReviewedDeriv
 }
 
 /**
- * The single reviewed plan for this archived source, or a refusal.
+ * Identity and evidence checks only — deliberately no state gate.
  *
- * Every mismatch is a hard error: the caller cannot proceed on a near-match,
- * because adoption rewrites which bytes the app will serve.
+ * Split out so adoption can recognise an already-adopted recovery (whose
+ * original row is now `ready`) before the recoverable-state gate is applied.
  */
-export function findReviewedDerivativePlan(
+export function resolveReviewedDerivativePlan(
   source: ArchivedSource,
-  original: Pick<{ state?: string; frameworks_asset_id?: string | null; frameworks_playback_id?: string | null }, 'state' | 'frameworks_asset_id' | 'frameworks_playback_id'> | null | undefined,
   raw: unknown = plansFile,
 ): ReviewedDerivativePlan {
   const plan = approvedDerivativePlans(raw).find((p) => p.livepeerAssetId === source.assetId);
@@ -103,15 +115,30 @@ export function findReviewedDerivativePlan(
   if (plan.derivativeSha256 === plan.originalSha256) {
     throw new ReviewedDerivativeError('Derivative evidence duplicates the original bytes');
   }
+  return plan;
+}
+
+/** Only a quarantined attempt may be substituted. */
+export function assertRecoverableOriginal(original: OriginalRecord): void {
   if (!original) {
     throw new ReviewedDerivativeError('Original import evidence is missing');
   }
-  if (!ORIGINAL_RECOVERABLE_STATES.has(String(original.state))) {
+  if (!RECOVERABLE_STATES.has(String(original.state))) {
     throw new ReviewedDerivativeError('Original import is not in a recoverable state');
   }
   if (!original.frameworks_asset_id || !original.frameworks_playback_id) {
     throw new ReviewedDerivativeError('Original attempt identity is not retained');
   }
+}
+
+/** Plan lookup for a substitution that is still pending (prepare / upload). */
+export function findReviewedDerivativePlan(
+  source: ArchivedSource,
+  original: OriginalRecord,
+  raw: unknown = plansFile,
+): ReviewedDerivativePlan {
+  const plan = resolveReviewedDerivativePlan(source, raw);
+  assertRecoverableOriginal(original);
   return plan;
 }
 
@@ -129,6 +156,7 @@ export async function prepareReviewedDerivativeRecovery(
 
   // Preservation: re-assert protection on the quarantined original before any
   // new attempt exists, so the failed bytes stay retrievable for the record.
+  const { secureFrameworksVod } = await import('../frameworks/vod-policy');
   await secureFrameworksVod(original!.frameworks_asset_id!, original!.frameworks_playback_id!);
 
   const { error } = await db.rpc('prepare_reviewed_derivative_recovery', {
@@ -146,20 +174,148 @@ export async function prepareReviewedDerivativeRecovery(
   }
 }
 
+export type DerivativeUploadResult = { assetId: string; playbackId: string };
+
+/**
+ * Upload the derivative through the protected multipart path, hashing the bytes
+ * on the way out.
+ *
+ * The digest comparison before completion is the binding step: the provider
+ * artifact cannot exist unless the transferred bytes matched the reviewed
+ * derivative, so a later adoption is not merely comparing a stored value to the
+ * plan it came from.
+ */
+export async function uploadReviewedDerivative(
+  db: SupabaseClient,
+  source: ArchivedSource,
+  derivativeBytes: Uint8Array,
+  raw: unknown = plansFile,
+  providerOverride?: ImportProvider,
+): Promise<DerivativeUploadResult> {
+  const provider = providerOverride ?? (await import('./frameworks-import-provider')).createFrameworksImportProvider();
+  const original = await createImportLedger(db).find(source.assetId);
+  const plan = findReviewedDerivativePlan(source, original, raw);
+
+  // 1. The local file must be the reviewed derivative before anything is sent.
+  if (derivativeBytes.byteLength !== plan.derivativeBytes) {
+    throw new ReviewedDerivativeError('Derivative file size does not match the reviewed plan');
+  }
+  if (createHash('sha256').update(derivativeBytes).digest('hex') !== plan.derivativeSha256) {
+    throw new ReviewedDerivativeError('Derivative file hash does not match the reviewed plan');
+  }
+
+  // 2. Protected upload session for the derivative's own byte count.
+  const upload = await provider.createProtectedUpload({
+    assetId: source.assetId,
+    playbackId: source.playbackId,
+    sha256: plan.derivativeSha256,
+    sizeBytes: plan.derivativeBytes,
+  });
+  if (!upload.assetId || !upload.playbackId || !upload.uploadId || !upload.partSize ||
+      upload.partSize <= 0 ||
+      upload.parts.length !== Math.ceil(plan.derivativeBytes / upload.partSize)) {
+    throw new ReviewedDerivativeError('Provider returned an invalid upload session');
+  }
+  if (upload.assetId === original!.frameworks_asset_id ||
+      upload.playbackId === original!.frameworks_playback_id) {
+    throw new ReviewedDerivativeError('Replacement reuses the original attempt identity');
+  }
+
+  // 3. Transfer, hashing exactly the bytes that are sent.
+  const transferred = createHash('sha256');
+  const completed: Array<{ partNumber: number; etag: string }> = [];
+  for (const part of upload.parts) {
+    const start = (part.partNumber - 1) * upload.partSize;
+    const chunk = derivativeBytes.subarray(start, start + upload.partSize);
+    transferred.update(chunk);
+    const etag = await provider.uploadPart(part.url, chunk);
+    if (!etag.trim()) {
+      throw new ReviewedDerivativeError('Upload part returned no ETag');
+    }
+    completed.push({ partNumber: part.partNumber, etag });
+  }
+  if (transferred.digest('hex') !== plan.derivativeSha256) {
+    throw new ReviewedDerivativeError('Transferred bytes do not match the reviewed derivative');
+  }
+
+  // 4. Only now may the upload be completed.
+  const target = await provider.complete(upload.uploadId, completed);
+  if (target.assetId !== upload.assetId || target.playbackId !== upload.playbackId) {
+    throw new ReviewedDerivativeError('Completion returned a different provider identity');
+  }
+
+  const recorded = await createImportLedger(db, 'frameworks_import_recoveries')
+    .transition(source.assetId, 'prepared', 'processing', target);
+  if (!recorded) {
+    throw new ReviewedDerivativeError('Could not bind the verified upload to the reviewed recovery');
+  }
+
+  await provider.confirmProtection(target.assetId, target.playbackId);
+  return target;
+}
+
+/**
+ * Poll the provider until the replacement is `ready`, then mark the recovery row
+ * ready. A provider-side failure is reported immediately rather than waited out.
+ */
+export async function confirmReviewedDerivativeReady(
+  db: SupabaseClient,
+  source: ArchivedSource,
+  raw: unknown = plansFile,
+  options: { attempts?: number; delayMs?: number; provider?: ImportProvider } = {},
+): Promise<void> {
+  const { attempts = 12, delayMs = 5000, provider: providerOverride } = options;
+  const provider = providerOverride ?? (await import('./frameworks-import-provider')).createFrameworksImportProvider();
+  const plan = resolveReviewedDerivativePlan(source, raw);
+  const ledger = createImportLedger(db, 'frameworks_import_recoveries');
+  const recovered = await ledger.find(source.assetId);
+  if (!recovered || !recovered.frameworks_asset_id) {
+    throw new ReviewedDerivativeError('No replacement upload is recorded');
+  }
+  if (recovered.derivative_sha256 !== plan.derivativeSha256 ||
+      recovered.derivative_bytes !== plan.derivativeBytes) {
+    throw new ReviewedDerivativeError('Recovery derivative evidence differs');
+  }
+  if (recovered.state === 'ready') return;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const asset = await provider.inspect(recovered.frameworks_asset_id);
+    const phase = asset?.phase?.toLowerCase();
+    if (phase === 'failed') {
+      throw new ReviewedDerivativeError('The replacement failed provider processing');
+    }
+    if (phase === 'ready') {
+      const marked = await ledger.transition(source.assetId, 'processing', 'ready');
+      if (!marked) {
+        throw new ReviewedDerivativeError('Could not mark the replacement ready');
+      }
+      return;
+    }
+    if (delayMs > 0 && attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new ReviewedDerivativeError('The replacement did not become ready in time');
+}
+
 /**
  * Adopt the replacement only after it is ready, protected and playable.
  * The original attempt's identity and evidence are left intact.
+ *
+ * An already-adopted recovery reports success: the original ledger row is
+ * `ready` by then, so the recoverable-state gate must not run before the
+ * adoption check or a retry after a lost response would report a false failure.
  */
 export async function adoptReviewedDerivative(
   db: SupabaseClient,
   source: ArchivedSource,
   raw: unknown = plansFile,
 ): Promise<void> {
+  const plan = resolveReviewedDerivativePlan(source, raw);
   const original = await createImportLedger(db).find(source.assetId);
-  const plan = findReviewedDerivativePlan(source, original, raw);
 
   const recovered = await createImportLedger(db, 'frameworks_import_recoveries').find(source.assetId);
-  if (!recovered || recovered.state !== 'ready' || !recovered.frameworks_asset_id || !recovered.frameworks_playback_id) {
+  if (!recovered) {
     throw new ReviewedDerivativeError('A ready replacement is required before adoption');
   }
   // Both identities must match the review: the archived original and the
@@ -173,12 +329,28 @@ export async function adoptReviewedDerivative(
       recovered.derivative_bytes !== plan.derivativeBytes) {
     throw new ReviewedDerivativeError('Recovery derivative evidence differs');
   }
+
+  // Already adopted, same replacement on both rows: success, not a conflict.
+  if (recovered.adopted_at &&
+      original?.state === 'ready' &&
+      original.frameworks_asset_id === recovered.frameworks_asset_id &&
+      original.frameworks_playback_id === recovered.frameworks_playback_id) {
+    return;
+  }
+
+  assertRecoverableOriginal(original);
+
+  if (recovered.state !== 'ready' ||
+      !recovered.frameworks_asset_id || !recovered.frameworks_playback_id) {
+    throw new ReviewedDerivativeError('A ready replacement is required before adoption');
+  }
   // The replacement must not reuse the original attempt's identity.
   if (recovered.frameworks_asset_id === original!.frameworks_asset_id ||
       recovered.frameworks_playback_id === original!.frameworks_playback_id) {
     throw new ReviewedDerivativeError('Replacement reuses the original attempt identity');
   }
 
+  const { frameworksAssets } = await import('../frameworks/assets');
   const replacement = await frameworksAssets.get(recovered.frameworks_asset_id);
   if (!replacement || replacement.id !== recovered.frameworks_asset_id ||
       replacement.playbackId !== recovered.frameworks_playback_id ||
@@ -186,7 +358,9 @@ export async function adoptReviewedDerivative(
     throw new ReviewedDerivativeError('Replacement is not provider-ready');
   }
 
+  const { secureFrameworksVod } = await import('../frameworks/vod-policy');
   await secureFrameworksVod(recovered.frameworks_asset_id, recovered.frameworks_playback_id);
+  const { inspectMigrationPlayback } = await import('./inspect-playback');
   const inspected = await inspectMigrationPlayback(
     recovered.frameworks_playback_id,
     fetch,

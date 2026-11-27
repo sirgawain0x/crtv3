@@ -16,22 +16,37 @@
 ALTER TABLE public.frameworks_import_recoveries
   ADD COLUMN IF NOT EXISTS derivative_sha256 text,
   ADD COLUMN IF NOT EXISTS derivative_bytes bigint,
-  ADD COLUMN IF NOT EXISTS derivative_origin text;
+  ADD COLUMN IF NOT EXISTS derivative_origin text,
+  -- Existing rows (including any already 'ready') are legacy by definition: they
+  -- were created by the pre-transfer flow, which never records derivative fields.
+  ADD COLUMN IF NOT EXISTS recovery_kind text NOT NULL DEFAULT 'legacy';
+
+DO $$ BEGIN
+  ALTER TABLE public.frameworks_import_recoveries ADD CONSTRAINT recovery_kind_domain
+    CHECK (recovery_kind IN ('legacy','derivative'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.frameworks_import_recoveries ADD CONSTRAINT recovery_derivative_evidence
     CHECK (derivative_sha256 IS NULL OR (derivative_sha256 ~ '^[0-9a-f]{64}$' AND derivative_bytes > 0));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Derivative evidence is required only for derivative recoveries. A legacy row
+-- may become ready without it, exactly as it could before this migration, so this
+-- constraint validates against an existing ready legacy row instead of failing.
 DO $$ BEGIN
   ALTER TABLE public.frameworks_import_recoveries ADD CONSTRAINT recovery_ready_needs_derivative
-    CHECK (state <> 'ready' OR (derivative_sha256 IS NOT NULL AND derivative_bytes > 0));
+    CHECK (state <> 'ready' OR recovery_kind <> 'derivative'
+           OR (derivative_sha256 IS NOT NULL AND derivative_bytes > 0));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.frameworks_import_recoveries ADD CONSTRAINT recovery_derivative_differs
     CHECK (derivative_sha256 IS NULL OR derivative_sha256 <> source_sha256);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+COMMENT ON COLUMN public.frameworks_import_recoveries.recovery_kind IS
+  'legacy = pre-transfer reviewed recovery (no derivative); derivative = reviewed re-encode substitution. Existing rows default to legacy.';
 
 COMMENT ON COLUMN public.frameworks_import_recoveries.derivative_sha256 IS
   'SHA-256 of the re-encoded replacement actually uploaded. Distinct from source_sha256, which is the archived original.';
@@ -50,7 +65,8 @@ BEGIN
  OR (OLD.adopted_at IS NOT NULL AND NEW.adopted_at IS DISTINCT FROM OLD.adopted_at)
  OR (OLD.derivative_sha256 IS NOT NULL AND NEW.derivative_sha256 IS DISTINCT FROM OLD.derivative_sha256)
  OR (OLD.derivative_bytes IS NOT NULL AND NEW.derivative_bytes IS DISTINCT FROM OLD.derivative_bytes)
- OR (OLD.derivative_origin IS NOT NULL AND NEW.derivative_origin IS DISTINCT FROM OLD.derivative_origin) THEN
+ OR (OLD.derivative_origin IS NOT NULL AND NEW.derivative_origin IS DISTINCT FROM OLD.derivative_origin)
+ OR (NEW.recovery_kind IS DISTINCT FROM OLD.recovery_kind) THEN
  RAISE EXCEPTION 'Recovery evidence is immutable'; END IF;
  RETURN NEW;
 END;
@@ -86,16 +102,23 @@ BEGIN
  OR v_source.frameworks_asset_id IS NULL OR v_source.frameworks_playback_id IS NULL
  THEN RAISE EXCEPTION 'Original attempt evidence differs or is not quarantined'; END IF;
 
+ -- A source that already has a reviewed pre-transfer recovery keeps it: this path
+ -- must not convert or overwrite that record.
+ IF EXISTS(SELECT 1 FROM public.frameworks_import_recoveries
+           WHERE livepeer_asset_id=p_source AND recovery_kind='legacy')
+ THEN RAISE EXCEPTION 'A legacy recovery already exists for this source'; END IF;
+
  INSERT INTO public.frameworks_import_recoveries(
   livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,original_asset_id,original_playback_id,
-  derivative_sha256,derivative_bytes,derivative_origin,reason,reviewed_by)
+  derivative_sha256,derivative_bytes,derivative_origin,recovery_kind,reason,reviewed_by)
  VALUES(v_source.livepeer_asset_id,v_source.livepeer_playback_id,v_source.source_sha256,v_source.source_bytes,
   v_source.frameworks_asset_id,v_source.frameworks_playback_id,
-  p_derivative_sha256,p_derivative_bytes,trim(p_derivative_origin),trim(p_reason),lower(trim(p_reviewer)))
+  p_derivative_sha256,p_derivative_bytes,trim(p_derivative_origin),'derivative',trim(p_reason),lower(trim(p_reviewer)))
  ON CONFLICT (livepeer_asset_id) DO UPDATE
   SET derivative_sha256=EXCLUDED.derivative_sha256,derivative_bytes=EXCLUDED.derivative_bytes,
       derivative_origin=EXCLUDED.derivative_origin,updated_at=now()
-  WHERE public.frameworks_import_recoveries.derivative_sha256 IS NULL
+  WHERE public.frameworks_import_recoveries.recovery_kind='derivative'
+    AND public.frameworks_import_recoveries.derivative_sha256 IS NULL
     AND public.frameworks_import_recoveries.state<>'ready';
 END;
 $$;
@@ -108,6 +131,8 @@ BEGIN
  SELECT * INTO v_source FROM public.frameworks_asset_imports WHERE livepeer_asset_id=p_source FOR UPDATE;
  SELECT * INTO STRICT v_recovery FROM public.frameworks_import_recoveries WHERE livepeer_asset_id=p_source FOR UPDATE;
 
+ IF v_recovery.recovery_kind<>'derivative' THEN
+  RAISE EXCEPTION 'Not a derivative recovery'; END IF;
  IF v_recovery.derivative_sha256 IS NULL OR v_recovery.derivative_bytes IS NULL THEN
   RAISE EXCEPTION 'Recovery has no derivative evidence'; END IF;
  IF v_recovery.state<>'ready' OR v_recovery.frameworks_asset_id IS NULL OR v_recovery.frameworks_playback_id IS NULL THEN
