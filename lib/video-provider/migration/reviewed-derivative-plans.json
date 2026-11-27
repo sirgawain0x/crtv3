@@ -1,0 +1,4 @@
+{
+  "_comment": "Reviewed derivative substitutions. A plan is only actionable when status is 'approved'. 'candidate' plans are recorded for review and are rejected by the loader. Never add an approved plan for bytes FrameWorks has not processed to ready.",
+  "plans": []
+}

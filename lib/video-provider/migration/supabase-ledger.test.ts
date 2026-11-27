@@ -8,7 +8,7 @@ describe('ledgerSelectColumns', () => {
     const recovery = ledgerSelectColumns('frameworks_import_recoveries');
     expect(recovery).not.toContain('provider_failure');
     expect(recovery.split(',').sort()).toEqual(
-      'livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id'
+      'livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id,derivative_sha256,derivative_bytes,derivative_origin'
         .split(',')
         .sort(),
     );

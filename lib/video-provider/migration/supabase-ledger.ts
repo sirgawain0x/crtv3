@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ArchivedSource } from './archive';
 import type { ImportLedger, ImportRecord, ImportState } from './importer';
 const importColumns='livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id,provider_failure_phase,provider_failure_reason';
-const recoveryColumns='livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id';
+const recoveryColumns='livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id,derivative_sha256,derivative_bytes,derivative_origin';
 
 /** Select lists must match each table's columns (failure context exists only on frameworks_asset_imports). */
 export function ledgerSelectColumns(table:'frameworks_asset_imports'|'frameworks_import_recoveries'):string {

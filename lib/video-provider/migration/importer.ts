@@ -9,6 +9,8 @@ export type ImportRecord = {
   livepeer_asset_id: string; livepeer_playback_id: string | null; source_sha256: string; source_bytes: number;
   state: ImportState; frameworks_asset_id: string | null; frameworks_playback_id: string | null;
   provider_failure_phase?: string | null; provider_failure_reason?: string | null;
+  /** Present only on frameworks_import_recoveries rows: the re-encoded replacement. */
+  derivative_sha256?: string | null; derivative_bytes?: number | null; derivative_origin?: string | null;
 };
 export interface ImportLedger {
   find(sourceId: string): Promise<ImportRecord | null>;
