@@ -143,6 +143,42 @@ export function findReviewedDerivativePlan(
 }
 
 /**
+ * Enforce that a supplied plan is the reviewed one.
+ *
+ * A caller may hand in a plan file (for review, diffing or CI), but it must match
+ * a checked-in `approved` record field for field. Anything else is an
+ * unreviewed substitution however it is labelled — an operator could otherwise
+ * mark a local JSON "approved" with any approver and any derivative hash.
+ */
+export function assertPlanMatchesReviewed(
+  suppliedPlans: unknown,
+  raw: unknown = plansFile,
+): ReviewedDerivativePlan[] {
+  const supplied = approvedDerivativePlans(suppliedPlans);
+  const reviewed = approvedDerivativePlans(raw);
+  if (!supplied.length) {
+    throw new ReviewedDerivativeError('Supplied plan file contains no approved plan');
+  }
+  const keys: Array<keyof ReviewedDerivativePlan> = [
+    'livepeerAssetId', 'originalPlaybackId', 'originalSha256', 'originalBytes',
+    'derivativeSha256', 'derivativeBytes', 'derivativeOrigin',
+    'approvedBy', 'approvedAt', 'reason',
+  ];
+  return supplied.map((plan) => {
+    const trusted = reviewed.find((r) => r.livepeerAssetId === plan.livepeerAssetId);
+    if (!trusted) {
+      throw new ReviewedDerivativeError('Supplied plan is not a reviewed plan for this source');
+    }
+    for (const key of keys) {
+      if (plan[key] !== trusted[key]) {
+        throw new ReviewedDerivativeError(`Supplied plan differs from the reviewed record (${key})`);
+      }
+    }
+    return trusted;
+  });
+}
+
+/**
  * Record the reviewed substitution and keep the original attempt protected.
  * Performs no upload, reset or deletion.
  */
@@ -204,50 +240,81 @@ export async function uploadReviewedDerivative(
     throw new ReviewedDerivativeError('Derivative file hash does not match the reviewed plan');
   }
 
-  // 2. Protected upload session for the derivative's own byte count.
-  const upload = await provider.createProtectedUpload({
-    assetId: source.assetId,
-    playbackId: source.playbackId,
-    sha256: plan.derivativeSha256,
-    sizeBytes: plan.derivativeBytes,
-  });
-  if (!upload.assetId || !upload.playbackId || !upload.uploadId || !upload.partSize ||
-      upload.partSize <= 0 ||
-      upload.parts.length !== Math.ceil(plan.derivativeBytes / upload.partSize)) {
-    throw new ReviewedDerivativeError('Provider returned an invalid upload session');
-  }
-  if (upload.assetId === original!.frameworks_asset_id ||
-      upload.playbackId === original!.frameworks_playback_id) {
-    throw new ReviewedDerivativeError('Replacement reuses the original attempt identity');
+  // 2. Claim the prepared recovery before creating anything at the provider. A
+  // crash, timeout or concurrent run must not be able to leave a completed
+  // artifact unrecorded and then produce a second one on the next attempt.
+  const recoveryLedger = createImportLedger(db, 'frameworks_import_recoveries');
+  const claimed = await recoveryLedger.transition(source.assetId, 'prepared', 'importing');
+  if (!claimed) {
+    throw new ReviewedDerivativeError('Recovery is not in prepared state; reconcile before uploading again');
   }
 
-  // 3. Transfer, hashing exactly the bytes that are sent.
-  const transferred = createHash('sha256');
-  const completed: Array<{ partNumber: number; etag: string }> = [];
-  for (const part of upload.parts) {
-    const start = (part.partNumber - 1) * upload.partSize;
-    const chunk = derivativeBytes.subarray(start, start + upload.partSize);
-    transferred.update(chunk);
-    const etag = await provider.uploadPart(part.url, chunk);
-    if (!etag.trim()) {
-      throw new ReviewedDerivativeError('Upload part returned no ETag');
+  // Any outcome we cannot prove is recorded becomes 'ambiguous' for reconciliation
+  // rather than inviting another upload.
+  const markUncertain = async () => {
+    try {
+      if (await recoveryLedger.transition(source.assetId, 'processing', 'ambiguous')) return;
+      await recoveryLedger.transition(source.assetId, 'importing', 'ambiguous');
+    } catch {
+      // Best effort; the caller still receives the original failure.
     }
-    completed.push({ partNumber: part.partNumber, etag });
-  }
-  if (transferred.digest('hex') !== plan.derivativeSha256) {
-    throw new ReviewedDerivativeError('Transferred bytes do not match the reviewed derivative');
-  }
+  };
 
-  // 4. Only now may the upload be completed.
-  const target = await provider.complete(upload.uploadId, completed);
-  if (target.assetId !== upload.assetId || target.playbackId !== upload.playbackId) {
-    throw new ReviewedDerivativeError('Completion returned a different provider identity');
-  }
+  let target: DerivativeUploadResult;
+  try {
+    // 3. Protected upload session for the derivative's own byte count.
+    const upload = await provider.createProtectedUpload({
+      assetId: source.assetId,
+      playbackId: source.playbackId,
+      sha256: plan.derivativeSha256,
+      sizeBytes: plan.derivativeBytes,
+    });
+    if (!upload.assetId || !upload.playbackId || !upload.uploadId || !upload.partSize ||
+        upload.partSize <= 0 ||
+        upload.parts.length !== Math.ceil(plan.derivativeBytes / upload.partSize)) {
+      throw new ReviewedDerivativeError('Provider returned an invalid upload session');
+    }
+    if (upload.assetId === original!.frameworks_asset_id ||
+        upload.playbackId === original!.frameworks_playback_id) {
+      throw new ReviewedDerivativeError('Replacement reuses the original attempt identity');
+    }
 
-  const recorded = await createImportLedger(db, 'frameworks_import_recoveries')
-    .transition(source.assetId, 'prepared', 'processing', target);
-  if (!recorded) {
-    throw new ReviewedDerivativeError('Could not bind the verified upload to the reviewed recovery');
+    // 4. Persist the provider target as soon as it is known, before transferring.
+    const bound = await recoveryLedger.transition(source.assetId, 'importing', 'processing', {
+      assetId: upload.assetId,
+      playbackId: upload.playbackId,
+    });
+    if (!bound) {
+      throw new ReviewedDerivativeError('Could not record the provider target; reconcile before retrying');
+    }
+
+    // 5. Transfer, hashing exactly the bytes that are sent.
+    const transferred = createHash('sha256');
+    const completed: Array<{ partNumber: number; etag: string }> = [];
+    for (const part of upload.parts) {
+      const start = (part.partNumber - 1) * upload.partSize;
+      const chunk = derivativeBytes.subarray(start, start + upload.partSize);
+      transferred.update(chunk);
+      const etag = await provider.uploadPart(part.url, chunk);
+      if (!etag.trim()) {
+        throw new ReviewedDerivativeError('Upload part returned no ETag');
+      }
+      completed.push({ partNumber: part.partNumber, etag });
+    }
+    if (transferred.digest('hex') !== plan.derivativeSha256) {
+      throw new ReviewedDerivativeError('Transferred bytes do not match the reviewed derivative');
+    }
+
+    // 6. Only now may the upload be completed.
+    const completedTarget = await provider.complete(upload.uploadId, completed);
+    if (completedTarget.assetId !== upload.assetId ||
+        completedTarget.playbackId !== upload.playbackId) {
+      throw new ReviewedDerivativeError('Completion returned a different provider identity');
+    }
+    target = completedTarget;
+  } catch (error) {
+    await markUncertain();
+    throw error;
   }
 
   await provider.confirmProtection(target.assetId, target.playbackId);
@@ -285,6 +352,12 @@ export async function confirmReviewedDerivativeReady(
       throw new ReviewedDerivativeError('The replacement failed provider processing');
     }
     if (phase === 'ready') {
+      // The provider must report the identities this recovery is bound to; a
+      // ready phase for a different asset is not this replacement.
+      if (asset?.assetId !== recovered.frameworks_asset_id ||
+          asset?.playbackId !== recovered.frameworks_playback_id) {
+        throw new ReviewedDerivativeError('Provider reported a different replacement identity');
+      }
       const marked = await ledger.transition(source.assetId, 'processing', 'ready');
       if (!marked) {
         throw new ReviewedDerivativeError('Could not mark the replacement ready');

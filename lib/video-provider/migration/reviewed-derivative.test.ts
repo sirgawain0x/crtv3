@@ -25,6 +25,7 @@ import {
   ReviewedDerivativeError,
   adoptReviewedDerivative,
   approvedDerivativePlans,
+  assertPlanMatchesReviewed,
   confirmReviewedDerivativeReady,
   findReviewedDerivativePlan,
   prepareReviewedDerivativeRecovery,
@@ -297,11 +298,26 @@ describe('reviewed derivative — verified upload binding', () => {
     await expect(uploadReviewedDerivative(db, source, data, plans([uploadPlan]), provider))
       .rejects.toThrow(/Transferred bytes do not match/);
     expect(provider.complete).not.toHaveBeenCalled();
-    expect(m.transition).not.toHaveBeenCalled();
+    // The claim is released into reconciliation rather than left claimable.
+    expect(m.transition).toHaveBeenCalledWith(source.assetId, 'processing', 'ambiguous');
   });
 
-  it('uploads, verifies, binds the provider identity and protects it', async () => {
+  it('uploads, verifies, claims the recovery and persists the target before transfer', async () => {
     const provider = makeProvider();
+    const order: string[] = [];
+    (provider.createProtectedUpload as unknown as { mockImplementation: (fn: () => Promise<unknown>) => void })
+      .mockImplementation(async () => {
+        order.push('createProtectedUpload');
+        return { assetId: 'new-asset', playbackId: 'new-play', uploadId: 'up1', partSize: 512,
+          parts: [{ partNumber: 1, url: 'u1' }, { partNumber: 2, url: 'u2' }] };
+      });
+    (provider.uploadPart as unknown as { mockImplementation: (fn: () => Promise<string>) => void })
+      .mockImplementation(async () => { order.push('uploadPart'); return 'etag-1'; });
+    m.transition.mockImplementation(async (_id: string, expected: string, next: string) => {
+      order.push(`${expected}->${next}`);
+      return true;
+    });
+
     const result = await uploadReviewedDerivative(db, source, data, plans([uploadPlan]), provider);
 
     expect(result).toEqual({ assetId: 'new-asset', playbackId: 'new-play' });
@@ -309,16 +325,37 @@ describe('reviewed derivative — verified upload binding', () => {
     expect(provider.complete).toHaveBeenCalledWith('up1', [
       { partNumber: 1, etag: 'etag-1' }, { partNumber: 2, etag: 'etag-1' },
     ]);
-    expect(m.transition).toHaveBeenCalledWith(source.assetId, 'prepared', 'processing',
+    // Claim first, then persist the provider target, and only then transfer.
+    expect(order).toEqual([
+      'prepared->importing',
+      'createProtectedUpload',
+      'importing->processing',
+      'uploadPart',
+      'uploadPart',
+    ]);
+    expect(m.transition).toHaveBeenCalledWith(source.assetId, 'importing', 'processing',
       { assetId: 'new-asset', playbackId: 'new-play' });
     expect(provider.confirmProtection).toHaveBeenCalledWith('new-asset', 'new-play');
   });
 
-  it('does not claim a binding when the ledger refuses the transition', async () => {
+  it('refuses to create a second upload when the recovery is already claimed', async () => {
     const provider = makeProvider();
     m.transition.mockResolvedValue(false);
     await expect(uploadReviewedDerivative(db, source, data, plans([uploadPlan]), provider))
-      .rejects.toThrow(/Could not bind the verified upload/);
+      .rejects.toThrow(/not in prepared state/);
+    expect(provider.createProtectedUpload).not.toHaveBeenCalled();
+    expect(provider.uploadPart).not.toHaveBeenCalled();
+  });
+
+  it('moves an uncertain outcome to ambiguous instead of inviting another upload', async () => {
+    const provider = makeProvider();
+    (provider.uploadPart as unknown as { mockRejectedValueOnce: (e: Error) => void })
+      .mockRejectedValueOnce(new Error('connection reset'));
+
+    await expect(uploadReviewedDerivative(db, source, data, plans([uploadPlan]), provider))
+      .rejects.toThrow(/connection reset/);
+    expect(m.transition).toHaveBeenCalledWith(source.assetId, 'processing', 'ambiguous');
+    expect(provider.complete).not.toHaveBeenCalled();
   });
 });
 
@@ -369,5 +406,92 @@ describe('reviewed derivative — already adopted', () => {
 
     await expect(adoptReviewedDerivative(db, source, plans([plan])))
       .rejects.toThrow(/not in a recoverable state/);
+  });
+});
+
+describe('reviewed derivative — a supplied plan cannot authorise a substitution', () => {
+  it('refuses a local plan that the repository has not reviewed', () => {
+    expect(() => assertPlanMatchesReviewed(plans([plan]), plans([])))
+      .toThrow(/not a reviewed plan/);
+  });
+
+  it('refuses a supplied approver that differs from the reviewed record', () => {
+    expect(() => assertPlanMatchesReviewed(plans([{ ...plan, approvedBy: '0xSomeoneElse' }]), plans([plan])))
+      .toThrow(/approvedBy/);
+  });
+
+  it('refuses a supplied derivative hash that differs from the reviewed record', () => {
+    expect(() => assertPlanMatchesReviewed(plans([{ ...plan, derivativeSha256: 'c'.repeat(64) }]), plans([plan])))
+      .toThrow(/derivativeSha256/);
+  });
+
+  it('refuses a supplied size that differs from the reviewed record', () => {
+    expect(() => assertPlanMatchesReviewed(plans([{ ...plan, derivativeBytes: 1 }]), plans([plan])))
+      .toThrow(/derivativeBytes/);
+  });
+
+  it('accepts an exact copy of the reviewed record', () => {
+    expect(assertPlanMatchesReviewed(plans([{ ...plan }]), plans([plan]))).toHaveLength(1);
+  });
+});
+
+describe('reviewed derivative — ready confirmation verifies provider identity', () => {
+  it('refuses to mark ready when the provider reports a different asset', async () => {
+    m.recovered.mockResolvedValue({ ...recoveredRow, state: 'processing', adopted_at: null });
+    const provider = {
+      createProtectedUpload: vi.fn(),
+      uploadPart: vi.fn(),
+      complete: vi.fn(),
+      inspect: vi.fn(async () => ({ assetId: 'other-asset', playbackId: 'new-play', phase: 'ready' })),
+      confirmProtection: vi.fn(),
+    } as unknown as ImportProvider;
+
+    await expect(confirmReviewedDerivativeReady(db, source, plans([plan]), { provider, delayMs: 0 }))
+      .rejects.toThrow(/different replacement identity/);
+    expect(m.transition).not.toHaveBeenCalled();
+  });
+});
+
+describe('reviewed derivative — state flow across the recovered steps', () => {
+  const flowData = Uint8Array.from({ length: 1024 }, (_, i) => (i * 13) % 251);
+  const flowSha = createHash('sha256').update(flowData).digest('hex');
+  const flowPlan = { ...plan, derivativeSha256: flowSha, derivativeBytes: flowData.byteLength };
+
+  const flowProvider = () => ({
+    createProtectedUpload: vi.fn(async () => ({
+      assetId: 'new-asset', playbackId: 'new-play', uploadId: 'up1', partSize: 512,
+      parts: [{ partNumber: 1, url: 'u1' }, { partNumber: 2, url: 'u2' }],
+    })),
+    uploadPart: vi.fn(async () => 'etag-1'),
+    complete: vi.fn(async () => ({ assetId: 'new-asset', playbackId: 'new-play' })),
+    inspect: vi.fn(async () => ({ assetId: 'new-asset', playbackId: 'new-play', phase: 'ready' })),
+    confirmProtection: vi.fn(async () => undefined),
+  } as unknown as ImportProvider);
+
+  it('uploads, confirms readiness and adopts, with the ledger state advancing once', async () => {
+    let recoveryState = 'prepared';
+    m.transition.mockImplementation(async (_id: string, expected: string, next: string) => {
+      if (recoveryState !== expected) return false;
+      recoveryState = next;
+      return true;
+    });
+    const recovered = () => ({
+      ...recoveredRow,
+      state: recoveryState,
+      derivative_sha256: flowPlan.derivativeSha256,
+      derivative_bytes: flowPlan.derivativeBytes,
+      adopted_at: null,
+    });
+    m.recovered.mockImplementation(async () => recovered());
+
+    await uploadReviewedDerivative(db, source, flowData, plans([flowPlan]), flowProvider());
+    expect(recoveryState).toBe('processing');
+
+    await confirmReviewedDerivativeReady(db, source, plans([flowPlan]), { provider: flowProvider(), delayMs: 0 });
+    expect(recoveryState).toBe('ready');
+
+    m.original.mockResolvedValue({ ...originalRow, state: 'failed' });
+    await adoptReviewedDerivative(db, source, plans([flowPlan]));
+    expect(rpc).toHaveBeenCalledWith('adopt_reviewed_derivative_recovery', { p_source: source.assetId });
   });
 });

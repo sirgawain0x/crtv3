@@ -6,7 +6,10 @@
  * plan, then the verified upload, then provider readiness, then adoption.
  *
  * Usage:
- *   --manifest PATH --source ID --plan PATH [--derivative PATH] --prepare|--upload|--ready|--adopt [--execute]
+ *   --manifest PATH --source ID [--plan PATH] --prepare|--upload|--ready|--adopt [--execute]
+ *
+ * Authorisation comes from the checked-in reviewed plans. A --plan file is
+ * optional and is only accepted when it matches a reviewed record exactly.
  *
  * Credentials come from FRAMEWORKS_MIGRATION_SUPABASE_URL and
  * FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY — never the app's implicit
@@ -17,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { archivedSourcesFromManifests } from '../lib/video-provider/migration/archive';
 import {
   adoptReviewedDerivative,
+  assertPlanMatchesReviewed,
   confirmReviewedDerivativeReady,
   prepareReviewedDerivativeRecovery,
   resolveReviewedDerivativePlan,
@@ -55,17 +59,23 @@ async function main() {
     }
   }
 
-  if (!manifestPath || !sourceId || !planPath || !stage) {
-    throw new Error('--manifest, --source, --plan and exactly one stage are required');
+  if (!manifestPath || !sourceId || !stage) {
+    throw new Error('--manifest, --source and exactly one stage are required (--plan is optional and only verified)');
   }
 
-  const plans = JSON.parse(await readFile(planPath, 'utf8'));
   const archive = archivedSourcesFromManifests([JSON.parse(await readFile(manifestPath, 'utf8'))]);
   const source = archive.find((row) => row.assetId === sourceId);
   if (!source) throw new Error('Source is not covered by the archive manifest');
 
-  // Refuse before any side effect if the plan does not cover this source exactly.
-  const plan = resolveReviewedDerivativePlan(source, plans);
+  // Execution is authorised by the checked-in reviewed plans, never by a local
+  // file. A supplied --plan is only accepted when it matches a reviewed record
+  // field for field, so an "approved" local JSON cannot authorize a substitution.
+  if (planPath) {
+    assertPlanMatchesReviewed(JSON.parse(await readFile(planPath, 'utf8')));
+  }
+
+  // Refuse before any side effect if the reviewed set does not cover this source.
+  const plan = resolveReviewedDerivativePlan(source);
 
   const summary = {
     stage,
@@ -90,18 +100,18 @@ async function main() {
 
   switch (stage) {
     case 'prepare':
-      await prepareReviewedDerivativeRecovery(db, source, plans);
+      await prepareReviewedDerivativeRecovery(db, source);
       break;
     case 'upload': {
       if (!derivativePath) throw new Error('--derivative PATH is required to upload');
-      await uploadReviewedDerivative(db, source, await readFile(derivativePath), plans);
+      await uploadReviewedDerivative(db, source, await readFile(derivativePath));
       break;
     }
     case 'ready':
-      await confirmReviewedDerivativeReady(db, source, plans);
+      await confirmReviewedDerivativeReady(db, source);
       break;
     case 'adopt':
-      await adoptReviewedDerivative(db, source, plans);
+      await adoptReviewedDerivative(db, source);
       break;
   }
 
