@@ -94,6 +94,8 @@ export async function handlePlaybackInfo(request: NextRequest): Promise<NextResp
           ? await resolveAuthorizedFrameworksHlsUrl(canonicalPlaybackId, viewerToken, fetch, {
               verifyDestination: process.env.FRAMEWORKS_PLAYBACK_PROBE === '1',
               logger: serverLogger,
+              // The requesting origin, so the probe reports the CORS answer that matters to Chrome.
+              origin: new URL(request.url).origin,
             })
           : undefined;
       } catch {
