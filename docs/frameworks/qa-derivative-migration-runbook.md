@@ -34,28 +34,82 @@ export FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY='…'
 
 ```bash
 set -euo pipefail
-QA_REF='zxpobpucayevlrzdxhmr'
 
-REST_HOST=$(printf '%s' "$FRAMEWORKS_MIGRATION_SUPABASE_URL" | sed -E 's#^https://([^/]+)/?$#\1#')
-[ "$REST_HOST" = "$QA_REF.supabase.co" ] || {
-  echo "STOP: REST URL host '$REST_HOST' is not $QA_REF.supabase.co"; exit 1; }
+# libpq honours connection parameters in the URI query string, so validating only the
+# authority is not enough: ?host=..., ?hostaddr=... or ?service=... silently move the
+# connection somewhere else after the check has passed.
+python3 - "$QA_DATABASE_URL" "$FRAMEWORKS_MIGRATION_SUPABASE_URL" <<'PY'
+import re, sys, urllib.parse
 
-DB_HOST=$(printf '%s' "$QA_DATABASE_URL" | sed -E 's#^postgres(ql)?://([^@]*@)?([^/:?]+).*#\3#')
-DB_USER=$(printf '%s' "$QA_DATABASE_URL" | sed -E 's#^postgres(ql)?://([^:@/]+).*#\2#')
+QA_REF = "zxpobpucayevlrzdxhmr"
+db_url, rest_url = sys.argv[1], sys.argv[2]
 
-if [ "$DB_HOST" = "db.$QA_REF.supabase.co" ]; then
-  echo "OK: direct connection to $QA_REF"
-elif printf '%s' "$DB_HOST" | grep -Eq '^aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com$' \
-     && [ "$DB_USER" = "postgres.$QA_REF" ]; then
-  echo "OK: pooler connection for $QA_REF ($DB_HOST)"
-else
-  echo "STOP: QA_DATABASE_URL does not target $QA_REF (host=$DB_HOST user=$DB_USER)"; exit 1
-fi
+def stop(msg):
+    print(f"STOP: {msg}")
+    sys.exit(1)
+
+rest = urllib.parse.urlsplit(rest_url)
+if rest.scheme != "https" or rest.hostname != f"{QA_REF}.supabase.co" \
+        or rest.port not in (None, 443) or rest.path not in ("", "/") \
+        or rest.query or rest.fragment or rest.username or rest.password:
+    stop(f"REST URL is not exactly https://{QA_REF}.supabase.co (got {rest_url!r})")
+
+u = urllib.parse.urlsplit(db_url)
+if u.scheme not in ("postgres", "postgresql"):
+    stop(f"database URL scheme is {u.scheme!r}")
+
+q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
+overrides = {"host", "hostaddr", "port", "user", "password", "dbname",
+             "service", "servicefile", "passfile", "options", "target_session_attrs"}
+hit = sorted(overrides & set(q))
+if hit:
+    stop(f"connection URI overrides the checked target via {hit}")
+unexpected = sorted(set(q) - {"sslmode"})
+if unexpected:
+    stop(f"unexpected connection parameters {unexpected}")
+sslmode = (q.get("sslmode") or [""])[0]
+if sslmode and sslmode not in ("require", "verify-ca", "verify-full"):
+    stop(f"sslmode {sslmode!r} weakens or disables transport verification")
+
+host = (u.hostname or "").lower()
+user = u.username or ""
+if user.startswith("postgres."):
+    user_ref = user.split(".", 1)[1]
+else:
+    user_ref = None
+
+if host == f"db.{QA_REF}.supabase.co":
+    if user not in ("postgres", f"postgres.{QA_REF}"):
+        stop(f"direct host with unexpected user {user!r}")
+    print(f"OK: direct connection to {QA_REF} as {user}")
+elif re.fullmatch(r"aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com", host) and user_ref == QA_REF:
+    print(f"OK: pooler connection to {QA_REF} via {host}")
+else:
+    stop(f"database URL does not target {QA_REF} (host={host!r} user={user!r})")
+PY
 ```
 
-Executed branches: direct ✓ · pooler ✓ · production REST ✗ · production DB ✗ · lookalike pooler host
-with a correct `postgres.<ref>` username ✗ · pooler host with another ref ✗ ·
-`pooler.supabase.com.evil.example` ✗ · `http://` REST ✗.
+The parser rejects target-overriding parameters outright (`host`, `hostaddr`, `port`, `user`, `password`,
+`dbname`, `service`, …), allows only `sslmode` in the query, and rejects anything weaker than
+`require`. Note the ordering honestly: a password-authenticated connection presents the credential
+*while* connecting, so this parse is the gate that stops it going elsewhere — the post-connect query
+below confirms what was actually reached:
+
+```bash
+# No credentials sent here: verify what is listening at the parsed host, then connect.
+DB_HOST=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.urlsplit(sys.argv[1]).hostname)' "$QA_DATABASE_URL")
+DB_PORT=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.urlsplit(sys.argv[1]).port or 5432)' "$QA_DATABASE_URL")
+openssl s_client -connect "$DB_HOST:$DB_PORT" -servername "$DB_HOST" </dev/null 2>/dev/null \
+  | openssl x509 -noout -checkhost "$DB_HOST"
+
+psql "$QA_DATABASE_URL" -Atc "select current_user, current_database()"
+```
+
+Executed branches (dummy credentials, asserting the reason and not only the exit code): direct ✓ ·
+direct as `postgres.<ref>` ✓ · pooler ✓ · `?sslmode=require` ✓ · `?host=` ✗ · `?hostaddr=` ✗ ·
+`?port=` ✗ · `?service=` ✗ · `?sslmode=disable` ✗ · production REST ✗ · production DB ✗ ·
+lookalike pooler host with a correct `postgres.<ref>` username ✗ · pooler host with another ref ✗ ·
+direct host with another ref's user ✗.
 
 ## 0.1 Verify the whole prerequisite, not three columns
 
@@ -322,9 +376,9 @@ substitution. Restore the step-1 dump instead and escalate.
 | part | status |
 |---|---|
 | Rollback block (§4) | **executed** against PGlite on top of both migrations: 11/11 assertions, including immutability after rollback |
-| Connection identity check (§0) | **executed** in 8 dummy-credential scenarios; production REST/DB, lookalike pooler host with a correct username, and `http://` all refused |
-| Prerequisite function hashes (§0.1 c) | produced by applying the reviewed prerequisite file to PGlite; `prosrc` is the text the file declares |
-| Prerequisite structural assertions (§0.1 a/b/d/e) | authored from that run; **not** run against QA |
+| Connection identity check (§0) | **executed** in 14 dummy-credential scenarios asserting the reason: direct/pooler/`sslmode=require` accepted; production REST and DB, lookalike pooler host, wrong ref, wrong user, and `?host=`/`?hostaddr=`/`?port=`/`?service=`/`?sslmode=disable` all refused |
+| Prerequisite function hashes (§0.1 c) | **matched QA** (reviewer-confirmed) |
+| Prerequisite structural assertions (§0.1 a/b/d/e) | reviewer confirmed 14 columns, 2 uniques and 1 foreign key; the constraint-definition, grant and trigger rows are **not yet reported** |
 | Verification queries (§3) | apply-side counts exercised on the same PGlite run (4 / 4 / 2 / trigger 1 / body updated) |
 | Backup commands (§1) | `pg_dump` **not executed** (needs QA credentials); the fail-closed guard was **executed** against four synthetic files — empty, missing-table and truncated all stopped, a complete dump passed |
 | `db push` / `migration repair` (§2, §4) | syntax checked against Supabase CLI 2.110.0, **not run** |
@@ -333,7 +387,8 @@ substitution. Restore the step-1 dump instead and escalate.
 ## 6. Stop conditions — halt and report if any is true
 
 1. The migration file hash differs from `16996e88…50b1b6`.
-2. §0 cannot prove both credentials target `zxpobpucayevlrzdxhmr`.
+2. §0 cannot prove both credentials target `zxpobpucayevlrzdxhmr`, or the database URI supplies
+   target-overriding parameters (`host`, `hostaddr`, `port`, `service`, …).
 3. Any §0.1 value differs from its expectation — including a function body hash — or fewer than 14
    columns, 1 state check, 2 reuse checks, 1 foreign key, 2 uniques.
 4. `fac7fe31…` is not `failed`, has lost its original provider ids, or already has a recovery row.
