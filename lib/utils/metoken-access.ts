@@ -1,13 +1,6 @@
-import { createPublicClient, erc20Abi, formatEther, getAddress, parseEther } from "viem";
-import { alchemy, base } from "@account-kit/infra";
+import { erc20Abi, formatEther, getAddress, parseEther } from "viem";
+import { getBasePublicClient } from "@/lib/chain/base-transport";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: alchemy({
-    apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-  }),
-});
 
 export type MeTokenAccessDenyReason =
   | "no_metoken"
@@ -124,7 +117,7 @@ export async function checkMeTokenAccess(params: {
   let maxBalance = BigInt(0);
   for (const viewer of normalizedViewers) {
     try {
-      const balance = await publicClient.readContract({
+      const balance = await getBasePublicClient().readContract({
         address: meToken.address as `0x${string}`,
         abi: erc20Abi,
         functionName: "balanceOf",
