@@ -1,5 +1,6 @@
 import { createModularAccountV2Client } from "@account-kit/smart-contracts";
 import { alchemy, base } from "@account-kit/infra";
+import { resolveAlchemyApiKey } from "@/lib/chain/base-transport";
 import { generatePrivateKey } from "viem/accounts";
 import { type Chain } from "viem";
 import { modularAccountFactoryAddresses } from "@/lib/utils/modularAccount";
@@ -23,13 +24,20 @@ interface CreateModularAccountClientParams {
  */
 export async function createModularAccountClient({
   chain = base,
-  apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+  apiKey: providedApiKey,
   privateKey = generatePrivateKey(),
 }: CreateModularAccountClientParams) {
+  const apiKey = providedApiKey ?? resolveAlchemyApiKey();
   // Get the factory address for the chain
   const factoryAddress = modularAccountFactoryAddresses[chain.id];
   if (!factoryAddress) {
     throw new Error(`No factory address found for chain ${chain.id}`);
+  }
+
+  if (!apiKey) {
+    throw new Error(
+      'An Alchemy API key is required to create a modular account client (set ALCHEMY_API_KEY or NEXT_PUBLIC_ALCHEMY_API_KEY)',
+    );
   }
 
   const accountClient = await createModularAccountV2Client({
