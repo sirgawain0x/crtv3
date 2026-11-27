@@ -120,13 +120,24 @@ DB_PORT=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.urlsplit(sys.ar
 openssl s_client -connect "$DB_HOST:$DB_PORT" -servername "$DB_HOST" </dev/null 2>/dev/null \
   | openssl x509 -noout -checkhost "$DB_HOST"
 
-# Proves the session psql actually got is TLS, rather than trusting the flag.
+# Two separate facts, both worth recording:
+#   1. the session carried TLS, and which version  -> pg_stat_ssl
+#   2. certificate and hostname verification happened -> this psql call SUCCEEDED
+#      under sslmode=verify-full; a verified connection is the proof, there is no
+#      server-side column for it.
+# Record the output below. Never record QA_DB_CONN or QA_DATABASE_URL: both contain
+# the password, and the URI is not evidence.
 psql "$QA_DB_CONN" -Atc "select current_user, current_database(), ssl, version
   from pg_stat_ssl where pid = pg_backend_pid()"
+
+URI_REQUIRES_VERIFY_FULL=false
+case "$QA_DB_CONN" in *'?sslmode=verify-full') URI_REQUIRES_VERIFY_FULL=true ;; esac
+printf 'pgsslmode=%s uri_requires_verify_full=%s\n' "$PGSSLMODE" "$URI_REQUIRES_VERIFY_FULL"
 ```
 
 A password-authenticated connection presents the credential while connecting, so the URI parse plus
-`verify-full` are the gate; the `pg_stat_ssl` row confirms what was reached.
+`verify-full` are the gate; the `pg_stat_ssl` row reports what was reached, while the successful
+`verify-full` connection is the record that the certificate chain and hostname were verified.
 
 Executed branches (dummy credentials, asserting the reason and not only the exit code): direct ✓ ·
 direct as `postgres.<ref>` ✓ · pooler ✓ · `?sslmode=require` ✓ · `?host=` ✗ · `?hostaddr=` ✗ ·
@@ -329,6 +340,10 @@ npx tsx scripts/frameworks-derivative-recover.ts --verify-schema
 
 `--verify-schema` proves the four columns only; (b)–(e) are checks it cannot make.
 
+**The run stops here.** This session's deliverable is a migrated, verified ledger. §4 rollback exists
+for a failed verification, not as a normal follow-on step, and no plan status change, `--prepare` or
+`--upload` belongs to this run.
+
 ## 4. Rollback
 
 Order matters twice: the trigger function is restored **before** the columns are dropped, because
@@ -399,6 +414,7 @@ substitution. Restore the step-1 dump instead and escalate.
 
 | part | status |
 |---|---|
+| Session TLS evidence (§0) | recorded as two facts: `ssl`/`version` from `pg_stat_ssl`, and a successful connection under `sslmode=verify-full` — the URI itself is never recorded |
 | Rollback block (§4) | **executed** against PGlite on top of both migrations: 11/11 assertions, including immutability after rollback |
 | Connection guard (§0) | **executed** in 12 dummy-credential scenarios asserting the reason and that the emitted string carries no query: direct and pooler with `verify-full` accepted; missing, empty, `require`, `verify-ca` and duplicated `sslmode`, `?host=` override, production REST/DB, lookalike pooler and a foreign user all refused |
 | Prerequisite (§0.1, all rows) | **matched live QA** — reviewer confirmed the three function bodies, 14 columns, 2 uniques, 1 foreign key, the state constraint, both reuse constraints, the ready-state constraint, `service_role` grants and the `BEFORE UPDATE` trigger |
