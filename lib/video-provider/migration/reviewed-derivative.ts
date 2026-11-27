@@ -373,8 +373,9 @@ export function assertPlanTargets(plan: ReviewedDerivativePlan, actual: Executio
     throw new ReviewedDerivativeError('Provider endpoint does not match the reviewed plan');
   }
 
-  // The host binds the endpoint; only an account identifier or a credential
-  // commitment can bind the account behind the token.
+  // The endpoint binds the destination. A credential commitment proves the exact
+  // token in use, which is not the same as proving the account: one account may
+  // hold several tokens, so only providerAccountId binds account identity.
   const plannedAccount = plan.targets.providerAccountId?.trim();
   if (plannedAccount) {
     if (!actual.providerAccountId) {

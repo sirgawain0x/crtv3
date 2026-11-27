@@ -51,7 +51,7 @@
           "recovery_row": "none",
           "recorded_original_evidence_matches": true
         },
-        "targets_note": "supabaseOrigin must be the full https origin (no userinfo, port, path or query). providerEndpoint must be the complete https endpoint including path - a hostname alone would let the bearer token travel over http or to an unexpected port. The account is bound by providerTokenSha256, the sha256 of the exact FRAMEWORKS_API_TOKEN approved."
+        "targets_note": "supabaseOrigin must be the full https origin (no userinfo, port, path or query). providerEndpoint must be the complete https endpoint including path - a hostname alone would let the bearer token travel over http or to an unexpected port. providerTokenSha256 commits to the exact FRAMEWORKS_API_TOKEN approved: it proves that credential is the one in use, NOT which account owns it (one account may hold several tokens). Account identity needs providerAccountId from a provider identity query, which does not exist yet."
       },
       "targets": {
         "supabaseOrigin": "PENDING-QA-SUPABASE-ORIGIN",
@@ -97,7 +97,7 @@
           "recorded_original_evidence_matches": true,
           "must_not_advance_while": "fac7fe31-599d-405e-90d1-b406b08d728a is the published mapping"
         },
-        "targets_note": "supabaseOrigin must be the full https origin (no userinfo, port, path or query). providerEndpoint must be the complete https endpoint including path - a hostname alone would let the bearer token travel over http or to an unexpected port. The account is bound by providerTokenSha256, the sha256 of the exact FRAMEWORKS_API_TOKEN approved."
+        "targets_note": "supabaseOrigin must be the full https origin (no userinfo, port, path or query). providerEndpoint must be the complete https endpoint including path - a hostname alone would let the bearer token travel over http or to an unexpected port. providerTokenSha256 commits to the exact FRAMEWORKS_API_TOKEN approved: it proves that credential is the one in use, NOT which account owns it (one account may hold several tokens). Account identity needs providerAccountId from a provider identity query, which does not exist yet."
       },
       "targets": {
         "supabaseOrigin": "PENDING-QA-SUPABASE-ORIGIN",
