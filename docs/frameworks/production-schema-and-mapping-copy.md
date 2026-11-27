@@ -302,6 +302,31 @@ snapshot, so a stale entry is refused rather than silently applied.
 select id, title, asset_id, playback_id, status from public.video_assets where id in (145,165,180) order by id;
 ```
 
+## §3.6 Staging proof — before the window, and it is not the production check
+
+Two different claims get confused here, so keep them apart:
+
+| claim | where it can be proven | what it does **not** prove |
+| --- | --- | --- |
+| the media plays and the webhook plumbing works | staging | anything about the production catalog |
+| the 25 production rows now point at FrameWorks and play | **production only** | nothing else can substitute |
+
+Staging is the cheap place to find out that signing, manifests, segments and webhook processing work, so
+a failure there never enters the window. It cannot stand in for the production check: preview playback of
+an archived or preview asset exercises a different catalog row.
+
+Before the window, against a **pinned staging deployment** (`npx vercel inspect <url> --json` → `id`,
+`meta.githubCommitSha`):
+
+| check | decisive signal |
+| --- | --- |
+| playback | signed-in playhead **advancing against wall-clock** on a FrameWorks-backed video — a poster or a `200` from metadata proves neither resolve, signing, manifest fetch nor segment delivery |
+| ingest | a real upload completes and appears with a FrameWorks identity |
+| webhook | an event is **delivered and processed** — a `200` from a signature-only route proves the gate answered, not that anything ran |
+
+Record the deployment id with each row. A staging pass is evidence about that deployment and that
+session; it retires the media/plumbing risk and nothing more.
+
 ## §4 Remap dry run — the gate
 
 ### Inputs, and where each one comes from
@@ -341,21 +366,22 @@ Any deviation means stop: 24 updates is a mapping that did not copy, 4 exception
 validator should have refused, and any blocker is an unexpected gap. `executable: true` licenses
 generating SQL — it is not evidence that anything was applied.
 
-## §5 Apply the reviewed remap SQL — the step that moves the 25
+## §5 Inside the #410 window — apply, then prove production
 
-The dry run in §4 reported `databaseWrites: 0`, which is the point of it: **nothing has moved yet.** This
-is the step that changes the catalog, and it belongs inside the #410 window.
+Order matters: the dry run's `databaseWrites: 0` means nothing has moved, and the apply is the step that
+changes the catalog. The gate before it is **25 updates, 3 exceptions, zero blockers** — any other number
+is a stop, not a judgement call.
 
 ```bash
 psql "$PROD_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 -f cutover-*/apply.sql
 ```
 
-Then confirm the 25 rows actually point at FrameWorks, rather than trusting the command's exit code:
+### 5.1 Confirm the row count
 
 ```sql
 select count(*) from public.video_assets
  where status in ('published','minted') and provider='frameworks'
-   and frameworks_asset_id is not null and frameworks_playback_id is not null;   -- expected: 25
+   and frameworks_asset_id is not null and frameworks_playback_id is not null;   -- 25
 ```
 
 ```sql
@@ -363,18 +389,20 @@ select count(*) from public.video_assets
 select id, asset_id, playback_id, provider, frameworks_asset_id from public.video_assets
  where status in ('published','minted')
    and (provider is distinct from 'frameworks' or frameworks_asset_id is null) order by id;
-select count(*) from public.frameworks_vod_access;
+select count(*) from public.frameworks_vod_access;   -- >= 25
 ```
 
-Then the checks that actually decide whether this worked:
+### 5.2 Prove it through the production catalog, after the switch
+
+A staging pass in §3.6 does not transfer here: it exercised a different catalog row. These two are the
+post-switch evidence, and neither has been run:
 
 | check | decisive signal |
 | --- | --- |
-| migrated playback | signed-in playhead **advancing against wall-clock** on one migrated video — not a poster, not a `200` from metadata |
-| ingest | a real upload completes and appears in the catalog with a FrameWorks identity |
-| webhook | a provider event is delivered and **processed** — a 200 from a signature-only route proves nothing |
+| remapped playback | open one of the 25 **through the production catalog** with `tv.creativeplatform.xyz` serving FrameWorks, and watch the playhead advance against wall-clock |
+| production ingest webhook | a test ingest on production is delivered **and processed** — confirm the receipt row and the resulting asset state, not a `200` from the endpoint |
 
-None of these three has been run. They need production/staging credentials and a live provider.
+If either fails after the switch, roll back first (§6) and report afterwards.
 
 ## §6 Rollback
 
