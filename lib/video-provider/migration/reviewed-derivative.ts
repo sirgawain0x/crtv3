@@ -131,6 +131,46 @@ export function assertRecoverableOriginal(original: OriginalRecord): void {
   }
 }
 
+/**
+ * A prepared recovery must still describe exactly the plan we are about to act on.
+ *
+ * The claim transition only compares source id and state, and the prepare RPC's
+ * ON CONFLICT branch can legitimately do nothing for an existing row — so without
+ * this check an upload could be created against stale evidence and only fail later.
+ */
+export function assertPreparedRecoveryMatchesPlan(
+  recovered: {
+    state?: string | null;
+    recovery_kind?: string | null;
+    livepeer_playback_id?: string | null;
+    source_sha256?: string | null;
+    source_bytes?: number | null;
+    derivative_sha256?: string | null;
+    derivative_bytes?: number | null;
+  } | null | undefined,
+  plan: ReviewedDerivativePlan,
+  source: ArchivedSource,
+): void {
+  if (!recovered) {
+    throw new ReviewedDerivativeError('No recovery is recorded; run the prepare stage first');
+  }
+  if (recovered.recovery_kind !== 'derivative') {
+    throw new ReviewedDerivativeError('Recovery is not a derivative recovery');
+  }
+  if (recovered.state !== 'prepared') {
+    throw new ReviewedDerivativeError('Recovery is not in prepared state; reconcile before uploading again');
+  }
+  if (recovered.livepeer_playback_id !== source.playbackId ||
+      recovered.source_sha256 !== source.sha256 ||
+      recovered.source_bytes !== source.sizeBytes) {
+    throw new ReviewedDerivativeError('Prepared recovery original evidence differs');
+  }
+  if (recovered.derivative_sha256 !== plan.derivativeSha256 ||
+      recovered.derivative_bytes !== plan.derivativeBytes) {
+    throw new ReviewedDerivativeError('Prepared recovery derivative evidence differs from the reviewed plan');
+  }
+}
+
 /** Plan lookup for a substitution that is still pending (prepare / upload). */
 export function findReviewedDerivativePlan(
   source: ArchivedSource,
@@ -208,6 +248,11 @@ export async function prepareReviewedDerivativeRecovery(
   if (error) {
     throw new ReviewedDerivativeError('Could not preserve the reviewed derivative evidence');
   }
+
+  // The RPC's ON CONFLICT branch may do nothing for an existing row; read it back
+  // so a reservation that differs from the reviewed plan is reported, not assumed.
+  const recorded = await createImportLedger(db, 'frameworks_import_recoveries').find(source.assetId);
+  assertPreparedRecoveryMatchesPlan(recorded, plan, source);
 }
 
 export type DerivativeUploadResult = { assetId: string; playbackId: string };
@@ -243,7 +288,9 @@ export async function uploadReviewedDerivative(
   // 2. Claim the prepared recovery before creating anything at the provider. A
   // crash, timeout or concurrent run must not be able to leave a completed
   // artifact unrecorded and then produce a second one on the next attempt.
+  // The recorded reservation must first match the plan being acted on.
   const recoveryLedger = createImportLedger(db, 'frameworks_import_recoveries');
+  assertPreparedRecoveryMatchesPlan(await recoveryLedger.find(source.assetId), plan, source);
   const claimed = await recoveryLedger.transition(source.assetId, 'prepared', 'importing');
   if (!claimed) {
     throw new ReviewedDerivativeError('Recovery is not in prepared state; reconcile before uploading again');

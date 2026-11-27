@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { archivedSourcesFromManifests } from '../lib/video-provider/migration/archive';
 import {
   adoptReviewedDerivative,
+  approvedDerivativePlans,
   assertPlanMatchesReviewed,
   confirmReviewedDerivativeReady,
   prepareReviewedDerivativeRecovery,
@@ -37,6 +38,7 @@ async function main() {
   let derivativePath: string | undefined;
   let stage: Stage | undefined;
   let execute = false;
+  let selfCheck = false;
 
   for (let i = 0; i < args.length; i++) {
     const value = () => {
@@ -50,6 +52,7 @@ async function main() {
       case '--plan': planPath = value(); break;
       case '--derivative': derivativePath = value(); break;
       case '--execute': execute = true; break;
+      case '--self-check': selfCheck = true; break;
       case '--prepare': stage = 'prepare'; break;
       case '--upload': stage = 'upload'; break;
       case '--ready': stage = 'ready'; break;
@@ -57,6 +60,24 @@ async function main() {
       default:
         throw new Error('Unknown option. Use --manifest PATH --source ID --plan PATH [--derivative PATH] --prepare|--upload|--ready|--adopt [--execute]');
     }
+  }
+
+  // Load the modules the adopt stage needs, without touching the provider or the
+  // database. `server-only` throws in a plain Node process, so this check exists
+  // to prove the executable path loads outside Next.js before anyone relies on it.
+  if (selfCheck) {
+    const { inspectMigrationPlayback } = await import('../lib/video-provider/migration/inspect-playback');
+    const { createFrameworksImportProvider } = await import('../lib/video-provider/migration/frameworks-import-provider');
+    const provider = createFrameworksImportProvider();
+    console.log(JSON.stringify({
+      selfCheck: 'ok',
+      adoptPathLoaded: typeof inspectMigrationPlayback === 'function',
+      providerAdapterLoaded: typeof provider.createProtectedUpload === 'function',
+      approvedPlans: approvedDerivativePlans().length,
+      providerRequests: 0,
+      databaseWrites: 0,
+    }));
+    return;
   }
 
   if (!manifestPath || !sourceId || !stage) {

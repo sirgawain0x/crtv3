@@ -120,6 +120,14 @@ BEGIN
   WHERE public.frameworks_import_recoveries.recovery_kind='derivative'
     AND public.frameworks_import_recoveries.derivative_sha256 IS NULL
     AND public.frameworks_import_recoveries.state<>'ready';
+
+ -- The ON CONFLICT branch above may legitimately do nothing; report a reservation
+ -- that does not match the requested plan instead of returning success silently.
+ PERFORM 1 FROM public.frameworks_import_recoveries
+  WHERE livepeer_asset_id=p_source AND recovery_kind='derivative'
+    AND derivative_sha256=p_derivative_sha256 AND derivative_bytes=p_derivative_bytes
+    AND source_sha256=p_original_sha256 AND source_bytes=p_original_bytes;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Recovery evidence does not match the requested plan'; END IF;
 END;
 $$;
 

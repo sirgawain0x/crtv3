@@ -150,6 +150,16 @@ describe('reviewed derivative — evidence mismatch', () => {
 });
 
 describe('reviewed derivative — original attempt states', () => {
+  beforeEach(() => {
+    // prepare now reads the reservation back and verifies it against the plan.
+    m.recovered.mockResolvedValue({
+      ...recoveredRow,
+      state: 'prepared',
+      recovery_kind: 'derivative',
+      adopted_at: null,
+    });
+  });
+
   it('accepts a failed import', async () => {
     m.original.mockResolvedValue({ ...originalRow, state: 'failed' });
     await expect(prepareReviewedDerivativeRecovery(db, source, plans([plan]))).resolves.toBeUndefined();
@@ -252,6 +262,19 @@ describe('reviewed derivative — verified upload binding', () => {
   const data = Uint8Array.from({ length: 1024 }, (_, i) => i % 251);
   const dataSha = createHash('sha256').update(data).digest('hex');
   const uploadPlan = { ...plan, derivativeSha256: dataSha, derivativeBytes: data.byteLength };
+
+  const preparedRow = {
+    ...recoveredRow,
+    state: 'prepared',
+    recovery_kind: 'derivative',
+    derivative_sha256: uploadPlan.derivativeSha256,
+    derivative_bytes: uploadPlan.derivativeBytes,
+    adopted_at: null,
+  };
+
+  beforeEach(() => {
+    m.recovered.mockResolvedValue(preparedRow);
+  });
 
   const makeProvider = (options: { parts?: Array<{ partNumber: number; url: string }>; phase?: string } = {}) => {
     const parts = options.parts ?? [{ partNumber: 1, url: 'u1' }, { partNumber: 2, url: 'u2' }];
@@ -409,6 +432,77 @@ describe('reviewed derivative — already adopted', () => {
   });
 });
 
+describe('reviewed derivative — the prepared reservation must match the plan', () => {
+  const bytes = Uint8Array.from({ length: 512 }, (_, i) => (i * 5) % 251);
+  const sha = createHash('sha256').update(bytes).digest('hex');
+  const boundPlan = { ...plan, derivativeSha256: sha, derivativeBytes: bytes.byteLength };
+
+  const providerStub = () => ({
+    createProtectedUpload: vi.fn(),
+    uploadPart: vi.fn(),
+    complete: vi.fn(),
+    inspect: vi.fn(),
+    confirmProtection: vi.fn(),
+  } as unknown as ImportProvider);
+
+  const prepared = (overrides: Record<string, unknown> = {}) => ({
+    ...recoveredRow,
+    state: 'prepared',
+    recovery_kind: 'derivative',
+    derivative_sha256: boundPlan.derivativeSha256,
+    derivative_bytes: boundPlan.derivativeBytes,
+    adopted_at: null,
+    ...overrides,
+  });
+
+  it('refuses when the reservation holds different derivative evidence', async () => {
+    m.recovered.mockResolvedValue(prepared({ derivative_sha256: 'f'.repeat(64) }));
+    const provider = providerStub();
+    await expect(uploadReviewedDerivative(db, source, bytes, plans([boundPlan]), provider))
+      .rejects.toThrow(/derivative evidence differs/);
+    expect(provider.createProtectedUpload).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the reservation is a legacy recovery', async () => {
+    m.recovered.mockResolvedValue(prepared({ recovery_kind: 'legacy' }));
+    const provider = providerStub();
+    await expect(uploadReviewedDerivative(db, source, bytes, plans([boundPlan]), provider))
+      .rejects.toThrow(/not a derivative recovery/);
+    expect(provider.createProtectedUpload).not.toHaveBeenCalled();
+  });
+
+  it('refuses when no reservation exists', async () => {
+    m.recovered.mockResolvedValue(null);
+    const provider = providerStub();
+    await expect(uploadReviewedDerivative(db, source, bytes, plans([boundPlan]), provider))
+      .rejects.toThrow(/run the prepare stage first/);
+    expect(provider.createProtectedUpload).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the reservation advanced past prepared', async () => {
+    m.recovered.mockResolvedValue(prepared({ state: 'processing' }));
+    const provider = providerStub();
+    await expect(uploadReviewedDerivative(db, source, bytes, plans([boundPlan]), provider))
+      .rejects.toThrow(/reconcile before uploading again/);
+    expect(provider.createProtectedUpload).not.toHaveBeenCalled();
+  });
+
+  it('reports a prepare that silently left a different reservation', async () => {
+    // RPC returns no error, but the row does not carry the reviewed evidence.
+    m.recovered.mockResolvedValue(prepared({ derivative_sha256: 'e'.repeat(64) }));
+    await expect(prepareReviewedDerivativeRecovery(db, source, plans([boundPlan])))
+      .rejects.toThrow(/derivative evidence differs/);
+  });
+
+  it('accepts a prepare whose reservation matches', async () => {
+    m.recovered.mockResolvedValue(prepared());
+    await expect(prepareReviewedDerivativeRecovery(db, source, plans([boundPlan]))).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith('prepare_reviewed_derivative_recovery', expect.objectContaining({
+      p_derivative_sha256: boundPlan.derivativeSha256,
+    }));
+  });
+});
+
 describe('reviewed derivative — a supplied plan cannot authorise a substitution', () => {
   it('refuses a local plan that the repository has not reviewed', () => {
     expect(() => assertPlanMatchesReviewed(plans([plan]), plans([])))
@@ -478,6 +572,7 @@ describe('reviewed derivative — state flow across the recovered steps', () => 
     const recovered = () => ({
       ...recoveredRow,
       state: recoveryState,
+      recovery_kind: 'derivative',
       derivative_sha256: flowPlan.derivativeSha256,
       derivative_bytes: flowPlan.derivativeBytes,
       adopted_at: null,
