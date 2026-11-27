@@ -15,7 +15,8 @@ export type ReferenceRow = { table: ReferenceTable; id: string | number; values:
 type Values = Record<string, string | null>;
 export type IdentityPatch = { table: 'video_assets' | ReferenceTable; id: string | number; before: Values; after: Values; expectedUpdatedAt?: string; mapping?: ReadyAssetMapping };
 export type UnresolvedReference = { table: string; id: string | number; field: string; value: string };
-export type RemapPlan = { patches: IdentityPatch[]; blockers: string[]; preservedDraftIds: number[]; unresolvedReferences: UnresolvedReference[] };
+import type {PublishedPlaybackException} from './published-exceptions';
+export type RemapPlan = { patches: IdentityPatch[]; blockers: string[]; preservedDraftIds: number[]; unresolvedReferences: UnresolvedReference[]; publishedExceptions?: PublishedPlaybackException[] };
 const identityColumns = ['asset_id','playback_id','provider','livepeer_asset_id','livepeer_playback_id','frameworks_asset_id','frameworks_playback_id'] as const;
 const referenceFields = {
   hack_beta_submissions: { video_asset_id: 'asset', playback_id: 'playback' },
