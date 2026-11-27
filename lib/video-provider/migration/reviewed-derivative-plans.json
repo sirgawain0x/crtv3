@@ -1,0 +1,109 @@
+{
+  "_comment": "Reviewed derivative substitutions, two-stage. 'candidate' is recorded only. 'upload-approved' authorizes transferring the reviewed bytes to the named QA database and provider, and nothing else. 'approved' authorizes replacing the original mapping, and only after a ready, protected artifact with matching evidence and a playable manifest. Never approve either stage on bytes FrameWorks has not processed, and never approve two asset ids for the same media.",
+  "plans": [
+    {
+      "status": "candidate",
+      "livepeerAssetId": "fac7fe31-599d-405e-90d1-b406b08d728a",
+      "originalPlaybackId": "fac7e3gmusdlyvpr",
+      "originalSha256": "1061aabe60bc9f11b47b234c78fa552f4ba0095c7f4a470899cc5f8161d81516",
+      "originalBytes": 237282639,
+      "derivativeSha256": "45c02340a34dfe020e78e47d14db5ccf94ff3f0525f7c5fb49b42626e0326e23",
+      "derivativeBytes": 630109556,
+      "derivativeOrigin": "transcode:h264-8bit",
+      "approvedBy": "PENDING-APPROVAL",
+      "approvedAt": "1970-01-01T00:00:00Z",
+      "reason": "CANDIDATE ONLY - not an approval. Tulleti - Brutality: AV1 10-bit original failed provider ingest; H.264 8-bit derivative decodes clean and matches its recorded evidence. Ledger identity confirmed (published Tulleti - Brutality); neither stage is approved. This is the published mapping and the record to prepare once the QA migration is applied.",
+      "_review": {
+        "video": "Tulleti - Brutality",
+        "original": {
+          "path": "/private/tmp/crtv3-frameworks-codec-check/fac7fe31-599d-405e-90d1-b406b08d728a.mp4",
+          "sha256_recomputed_locally": true,
+          "bytes_recomputed_locally": true,
+          "ffprobe": "av1 / yuv420p10le / 3840x2160 / aac / 139.007s"
+        },
+        "derivative": {
+          "path": "/private/tmp/crtv3-frameworks-codec-check/normalized/brutality-h264.mp4",
+          "sha256_recomputed_locally": true,
+          "bytes_recomputed_locally": true,
+          "ffprobe": "h264 / yuv420p / 3840x2160 / aac / 139.007s",
+          "full_decode_exit_code": 0,
+          "evidence_file": "/private/tmp/crtv3-frameworks-archive-verification/compatibility-copy-evidence-20261125.json"
+        },
+        "pending_before_approval": [
+          "migration 20261126093000 applied to the QA database and verified (four recovery columns are absent there today)",
+          "FRAMEWORKS_SIGNING_KID configured, needed at the ready stage for the playable-manifest check",
+          "explicit human approval of the stage - upload-approved for the transfer, approved only after the provider reports ready"
+        ],
+        "identity_source": {
+          "archive_queue": "/private/tmp/crtv3-frameworks-archive-verification/import-queue.json",
+          "provider_failures": "/private/tmp/crtv3-frameworks-archive-verification/provider-failed-imports.json",
+          "livepeer_playback_id_confirmed": "fac7e3gmusdlyvpr",
+          "provider_playback_id": "izVNHH3xY5S9n95r",
+          "provider_status": "failed",
+          "provider_message": "could not determine source span for completeness check"
+        },
+        "ledger_confirmed": {
+          "role": "published Tulleti - Brutality",
+          "production_row": 165,
+          "published": true,
+          "qa_import_state": "failed",
+          "original_provider_ids_retained": true,
+          "recovery_row": "none",
+          "recorded_original_evidence_matches": true
+        },
+        "targets_note": "supabaseOrigin must be the full https origin (no userinfo, port, path or query). providerEndpoint must be the complete https endpoint including path - a hostname alone would let the bearer token travel over http or to an unexpected port. providerTokenSha256 commits to the exact FRAMEWORKS_API_TOKEN approved: it proves that credential is the one in use, NOT which account owns it (one account may hold several tokens). Account identity needs providerAccountId from a provider identity query, which does not exist yet."
+      },
+      "targets": {
+        "supabaseOrigin": "PENDING-QA-SUPABASE-ORIGIN",
+        "providerTokenSha256": "PENDING-TOKEN-COMMITMENT",
+        "providerEndpoint": "https://bridge.frameworks.network/graphql"
+      }
+    },
+    {
+      "status": "candidate",
+      "livepeerAssetId": "331f72c9-7c37-4079-b8d2-bcd3e9747eaa",
+      "originalPlaybackId": "331fkklsq4doy2ti",
+      "originalSha256": "1061aabe60bc9f11b47b234c78fa552f4ba0095c7f4a470899cc5f8161d81516",
+      "originalBytes": 237282639,
+      "derivativeSha256": "45c02340a34dfe020e78e47d14db5ccf94ff3f0525f7c5fb49b42626e0326e23",
+      "derivativeBytes": 630109556,
+      "derivativeOrigin": "transcode:h264-8bit",
+      "approvedBy": "PENDING-APPROVAL",
+      "approvedAt": "1970-01-01T00:00:00Z",
+      "reason": "CANDIDATE ONLY - not an approval. Tulleti - Brutality: AV1 10-bit original failed provider ingest; H.264 8-bit derivative decodes clean and matches its recorded evidence. Ledger identity confirmed (draft duplicate of the published video); neither stage is approved. This draft duplicate must not advance while the published mapping is fac7fe31.",
+      "_review": {
+        "duplicate_of": "fac7fe31-599d-405e-90d1-b406b08d728a",
+        "why_recorded": "compatibility-copy-evidence-20261125.json lists both asset ids with the same source hash and size",
+        "resolution_required": "read frameworks_asset_imports and keep whichever row is the actual Tulleti import",
+        "identity_source": {
+          "archive_queue": "/private/tmp/crtv3-frameworks-archive-verification/import-queue.json",
+          "provider_failures": "/private/tmp/crtv3-frameworks-archive-verification/provider-failed-imports.json",
+          "livepeer_playback_id_confirmed": "331fkklsq4doy2ti",
+          "provider_playback_id": "S6faDQD793GxMoPA",
+          "provider_status": "failed",
+          "provider_message": "could not determine source span for completeness check"
+        },
+        "pending_before_approval": [
+          "migration 20261126093000 applied to the QA database and verified (four recovery columns are absent there today)",
+          "FRAMEWORKS_SIGNING_KID configured, needed at the ready stage for the playable-manifest check",
+          "explicit human approval of the stage - upload-approved for the transfer, approved only after the provider reports ready"
+        ],
+        "ledger_confirmed": {
+          "role": "draft duplicate of the published video",
+          "published": false,
+          "qa_import_state": "failed",
+          "original_provider_ids_retained": true,
+          "recovery_row": "none",
+          "recorded_original_evidence_matches": true,
+          "must_not_advance_while": "fac7fe31-599d-405e-90d1-b406b08d728a is the published mapping"
+        },
+        "targets_note": "supabaseOrigin must be the full https origin (no userinfo, port, path or query). providerEndpoint must be the complete https endpoint including path - a hostname alone would let the bearer token travel over http or to an unexpected port. providerTokenSha256 commits to the exact FRAMEWORKS_API_TOKEN approved: it proves that credential is the one in use, NOT which account owns it (one account may hold several tokens). Account identity needs providerAccountId from a provider identity query, which does not exist yet."
+      },
+      "targets": {
+        "supabaseOrigin": "PENDING-QA-SUPABASE-ORIGIN",
+        "providerTokenSha256": "PENDING-TOKEN-COMMITMENT",
+        "providerEndpoint": "https://bridge.frameworks.network/graphql"
+      }
+    }
+  ]
+}

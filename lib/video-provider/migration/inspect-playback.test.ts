@@ -1,5 +1,5 @@
 import {afterEach,describe,it,expect,vi} from 'vitest';
-vi.mock('../frameworks/playback',()=>({buildAuthorizedViewerPlayHlsUrl:()=> 'https://foghorn.frameworks.network/play/verified/hls/index.m3u8?jwt=PRIVATE'}));
+vi.mock('../frameworks/playback-signing',()=>({buildAuthorizedViewerPlayHlsUrl:()=> 'https://foghorn.frameworks.network/play/verified/hls/index.m3u8?jwt=PRIVATE'}));
 import {inspectMigrationPlayback} from './inspect-playback';
 afterEach(()=>vi.restoreAllMocks());
 describe('safe staged playback diagnostics',()=>{

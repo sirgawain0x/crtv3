@@ -1,4 +1,4 @@
-import {buildAuthorizedViewerPlayHlsUrl} from '../frameworks/playback';
+import {buildAuthorizedViewerPlayHlsUrl} from '../frameworks/playback-signing';
 import {inspectHlsManifest} from '../frameworks/hls-manifest';
 import {frameworksGraphqlRequest} from '../frameworks-graphql';
 
