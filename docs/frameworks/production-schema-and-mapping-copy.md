@@ -88,7 +88,8 @@ Record the `pg_stat_ssl` row and the successful `verify-full` connection. **Neve
 -- and the drift comparison below decides what remains.
 select table_name from information_schema.tables
  where table_schema='public'
-   and table_name in ('frameworks_asset_imports','frameworks_vod_access','frameworks_import_recoveries');
+   and table_name in ('frameworks_asset_imports','frameworks_vod_access','frameworks_webhook_receipts',
+                      'frameworks_stream_event_cursors','frameworks_ready_artifacts','frameworks_stream_replacements');
 
 -- The remap's guards need these columns; Expected before this work: 0
 select count(*) from information_schema.columns
@@ -108,53 +109,57 @@ present is a history question; a missing object is a blocker.
 
 ## §2 Apply the reviewed set, in this order
 
-Hashes are of the committed files; verify before applying:
+Eleven migrations. Hash prefixes are generated from the committed files — do not retype them.
 
 ```bash
-shasum -a 256 supabase/migrations/{20261123051536_frameworks_asset_identity,20261123053537_frameworks_vod_access,20261123054045_frameworks_vod_policy_lock,20261124170039_frameworks_recording_authority,20261124182327_frameworks_recording_gate_preservation,20261124182629_frameworks_clip_authority,20261124183930_frameworks_import_reconciliation,20261125143000_frameworks_failed_import_retry,20261126093000_frameworks_derivative_recovery}.sql
+shasum -a 256 supabase/migrations/{20261123051536_frameworks_asset_identity,20261123053537_frameworks_vod_access,20261123054045_frameworks_vod_policy_lock,20261123143443_frameworks_webhook_receipts,20261123144030_frameworks_recording_thumbnail_fallback,20261124051337_frameworks_stream_replacements,20261124170039_frameworks_recording_authority,20261124182327_frameworks_recording_gate_preservation,20261124182629_frameworks_clip_authority,20261124183930_frameworks_import_reconciliation,20261125143000_frameworks_failed_import_retry}.sql
 ```
 
 | # | migration | sha256 (first 16) | creates |
 | --- | --- | --- | --- |
-| 1 | `20261123051536_frameworks_asset_identity` | `704153b9fb151980` | `provider`/`livepeer_*`/`frameworks_*` on `video_assets` + `streams`, `frameworks_asset_imports` |
+| 1 | `20261123051536_frameworks_asset_identity` | `704153b9fb151980` | `provider`/`livepeer_*`/`frameworks_*` on `video_assets` + `streams`; **`frameworks_asset_imports`** |
 | 2 | `20261123053537_frameworks_vod_access` | `b987c5e25666d2e7` | `frameworks_vod_access` |
 | 3 | `20261123054045_frameworks_vod_policy_lock` | `14c34d5f5947caf4` | policy lock on access rows |
-| 4 | `20261124170039_frameworks_recording_authority` | `0d48b61c4d94ec05` | recording authority |
-| 5 | `20261124182327_frameworks_recording_gate_preservation` | `7362cc98492e4c36` | recording gate preservation |
-| 6 | `20261124182629_frameworks_clip_authority` | `c8632e5f39a3006a` | clip authority |
-| 7 | `20261124183930_frameworks_import_reconciliation` | `3adc0634ad617922` | import reconciliation |
-| 8 | `20261125143000_frameworks_failed_import_retry` | `d45b7b5f5683b5ad` | failed-import retry fields |
-| 9 | `20261126093000_frameworks_derivative_recovery` | `16996e88324d8285` | recovery columns, RPCs, trigger |
+| 4 | `20261123143443_frameworks_webhook_receipts` | `f9ec0408f9e7715a` | **`frameworks_webhook_receipts`**, `frameworks_stream_event_cursors`, `frameworks_ready_artifacts`, `process_frameworks_webhook()` |
+| 5 | `20261123144030_frameworks_recording_thumbnail_fallback` | `6ca079ea6962e86f` | `CREATE OR REPLACE` of `process_frameworks_webhook()` — thumbnail fallback |
+| 6 | `20261124051337_frameworks_stream_replacements` | `bd8890cc6b53678d` | **`frameworks_stream_replacements`** |
+| 7 | `20261124170039_frameworks_recording_authority` | `0d48b61c4d94ec05` | recording authority |
+| 8 | `20261124182327_frameworks_recording_gate_preservation` | `7362cc98492e4c36` | recording gate preservation |
+| 9 | `20261124182629_frameworks_clip_authority` | `c8632e5f39a3006a` | clip authority |
+| 10 | `20261124183930_frameworks_import_reconciliation` | `3adc0634ad617922` | import reconciliation |
+| 11 | `20261125143000_frameworks_failed_import_retry` | `d45b7b5f5683b5ad` | failed-import retry fields |
+| — | ~~`20261126093000_frameworks_derivative_recovery`~~ | — | **excluded**: re-upload recovery path, not the release of the 25 |
+
+Three of these are here because production is missing more than the ledger: without
+`frameworks_webhook_receipts` and `process_frameworks_webhook()` a delivered webhook cannot be processed
+(the ingest check in §5 fails), and without `frameworks_stream_replacements` the existing stream cutover
+has no table to write.
 
 Apply **one file per transaction**, so a failure is attributable to exactly one migration:
 
 ```bash
-for f in 20261123051536_frameworks_asset_identity 20261123053537_frameworks_vod_access \
-         20261123054045_frameworks_vod_policy_lock 20261124170039_frameworks_recording_authority \
-         20261124182327_frameworks_recording_gate_preservation 20261124182629_frameworks_clip_authority \
-         20261124183930_frameworks_import_reconciliation 20261125143000_frameworks_failed_import_retry; do
+for f in 20261123051536_frameworks_asset_identity 20261123053537_frameworks_vod_access 20261123054045_frameworks_vod_policy_lock 20261123143443_frameworks_webhook_receipts 20261123144030_frameworks_recording_thumbnail_fallback 20261124051337_frameworks_stream_replacements 20261124170039_frameworks_recording_authority 20261124182327_frameworks_recording_gate_preservation 20261124182629_frameworks_clip_authority 20261124183930_frameworks_import_reconciliation 20261125143000_frameworks_failed_import_retry; do
   echo "== $f"
   psql "$PROD_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 -f "supabase/migrations/$f.sql" || exit 1
 done
 ```
 
-Migration 9 (derivative recovery) is **not** part of the cutover: it exists for the re-upload recovery
-path, not for releasing the 25. Apply it when that work is scheduled, on the QA-first runbook.
-
-### Verify, then record
+Verify, then record. Only after both counts match:
 
 ```sql
 select count(*) from information_schema.columns
  where table_schema='public' and table_name='video_assets'
    and column_name in ('provider','livepeer_asset_id','livepeer_playback_id','frameworks_asset_id','frameworks_playback_id');  -- 5
 select count(*) from information_schema.tables
- where table_schema='public' and table_name in ('frameworks_asset_imports','frameworks_vod_access');                            -- 2
+ where table_schema='public' and table_name in
+   ('frameworks_asset_imports','frameworks_vod_access','frameworks_webhook_receipts',
+    'frameworks_stream_event_cursors','frameworks_ready_artifacts','frameworks_stream_replacements');                        -- 6
+select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+ where n.nspname='public' and p.proname='process_frameworks_webhook';                                                        -- 1
 ```
 
-Only after both match, record the versions the schema tool would otherwise re-apply:
-
 ```bash
-for v in 20261123051536 20261123053537 20261123054045 20261124170039 20261124182327 20261124182629 20261124183930 20261125143000; do
+for v in 20261123051536 20261123053537 20261123054045 20261123143443 20261123144030 20261124051337 20261124170039 20261124182327 20261124182629 20261124183930 20261125143000; do
   supabase migration repair --status applied --db-url "$PROD_DB_CONN" "$v" || exit 1
 done
 ```
@@ -238,6 +243,6 @@ None of these three has been run. They need production/staging credentials and a
 | item | status |
 | --- | --- |
 | production ref pinned from code | **verified** (`zdeiezfoemibjgrkyzvs`, `import-mapping-copy.ts`) |
-| migration order + hashes | **computed from committed files**; the set's composition is unverified against production |
+| migration order + hashes | **computed from committed files, 11 entries**; composition confirmed against production for the ledger, webhook receipts and stream replacements only |
 | connection guard | **executed** with dummy credentials — accept and reject cases below |
 | backup, DDL, mapping copy, remap, playback, ingest, webhook | **not run** — no production or staging credentials here |
