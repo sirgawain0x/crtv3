@@ -13,7 +13,7 @@
  */
 
 import { alchemy, base } from "@account-kit/infra";
-import { createPublicClient, http, type PublicClient, type Transport } from "viem";
+import { createPublicClient, type PublicClient } from "viem";
 import { getBaseRpcUrl } from "./base-rpc";
 
 /** Server key first, then the public key; never expose the server key to a browser. */
@@ -22,8 +22,12 @@ export function resolveAlchemyApiKey(): string | undefined {
   return serverKey || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY?.trim() || undefined;
 }
 
-/** `alchemy()` always — Account Kit configuration reads chainAgnosticUrl off it. Never throws. */
-export function createBaseTransport(): Transport {
+/**
+ * `alchemy()` always — Account Kit configuration reads chainAgnosticUrl off it and
+ * its `CreateConfigProps` requires the narrow `AlchemyTransport`, not `Transport`.
+ * Never throws.
+ */
+export function createBaseTransport(): ReturnType<typeof alchemy> {
   const apiKey = resolveAlchemyApiKey();
   if (apiKey) {
     return alchemy({ apiKey });
