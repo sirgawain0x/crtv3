@@ -327,6 +327,24 @@ Before the window, against a **pinned staging deployment** (`npx vercel inspect 
 Record the deployment id with each row. A staging pass is evidence about that deployment and that
 session; it retires the media/plumbing risk and nothing more.
 
+### Status of the staging smoke test: BLOCKED (device access)
+
+Probed on 2026-11-27 from an unauthenticated shell — deployment `crtv4-5c1yp3n1v`, commit `3e0286571`:
+
+```
+crtv4-5c1yp3n1v-creative-projects.vercel.app   HTTP 302 → https://vercel.com/sso-api?url=…
+staging.tv.creativeplatform.xyz                HTTP 302 → https://vercel.com/sso-api?url=…
+crtv4-git-staging-creative-projects.vercel.app HTTP 302 → https://vercel.com/sso-api?url=…
+```
+
+All three answer with the Vercel Authentication redirect, so no application code ran and nothing here is
+evidence about playback or webhooks. **A `302` to `sso-api` is the gate answering, not a failure of the
+app** — do not read it as one, and do not disable deployment protection or mint a bypass to get past it.
+
+The operator runs the three rows above from a signed-in session. Everything else in this document that
+needs no session has been run; this is the one section that has not, and it stays listed as blocked until
+someone with a session reports it.
+
 ## §4 Remap dry run — the gate
 
 ### Inputs, and where each one comes from
