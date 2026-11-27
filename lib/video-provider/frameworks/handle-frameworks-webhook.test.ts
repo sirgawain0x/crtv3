@@ -3,6 +3,8 @@ const {get,commit,secure}=vi.hoisted(()=>({get:vi.fn(),commit:vi.fn(),secure:vi.
 vi.mock('../index',()=>({getVideoProvider:()=>({assets:{get}})}));
 vi.mock('./webhook-store',()=>({commitFrameworksWebhook:commit}));
 vi.mock('./vod-policy',()=>({secureFrameworksVod:secure}));
+const {info}=vi.hoisted(()=>({info:vi.fn()}));
+vi.mock('@/lib/utils/logger',()=>({serverLogger:{info,warn:vi.fn(),error:vi.fn(),debug:vi.fn()}}));
 import {handleFrameworksWebhookEvent,type FrameworksWebhookEvent} from './handle-frameworks-webhook';
 const event=(type:string,data:Record<string,unknown>={}):FrameworksWebhookEvent=>({id:'evt',type,created_at:'2026-11-23T10:00:00Z',data});
 const asset={id:'hash',playbackId:'play',status:{phase:'ready'},source:{type:'recording',streamId:'parent'},videoSpec:{duration:12}};
@@ -53,4 +55,13 @@ describe('durable FrameWorks event dispatch',()=>{
  it('accepts signed test probes without provider or database work',async()=>{
   expect(await handleFrameworksWebhookEvent(event('webhook.test'))).toBe('ignored');expect(get).not.toHaveBeenCalled();expect(commit).not.toHaveBeenCalled();
  });
+});
+
+it('logs the event id together with the asset id, which the receipt table cannot express',async()=>{
+ commit.mockResolvedValue('processed');
+ get.mockResolvedValue({id:'asset-1',playbackId:'play-1',status:{phase:'ready'},source:{type:'upload'},videoSpec:{duration:12}});
+ await handleFrameworksWebhookEvent({id:'evt-1',type:'upload.ready',created_at:new Date(0).toISOString(),
+  data:{artifact:{artifactId:'asset-1'}}});
+ const [,context]=info.mock.calls.at(-1)!;
+ expect(context).toMatchObject({eventId:'evt-1',eventType:'upload.ready',assetId:'asset-1',playbackId:'play-1'});
 });
