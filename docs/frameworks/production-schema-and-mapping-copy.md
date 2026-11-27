@@ -213,11 +213,26 @@ The remap re-checks every mapping against the archive manifest, so a manifest mi
 the window costs the window. This check needs **no database access** and uses the same parser the remap
 uses:
 
+The check has two steps, both committed, so it can be re-run against a **fresh** snapshot without
+recomputing anything by hand:
+
 ```bash
+# 1. derive the expected set from the snapshot, the archive inventory and the reviewed exceptions
+npx tsx scripts/frameworks-remap-expected.ts \
+  --snapshot prod-snapshot.json \
+  --sources import-queue.json \
+  --exceptions lib/video-provider/migration/published-exceptions.json \
+  --output expected-set.json
+
+# 2. verify the manifest covers exactly that set
 npx tsx scripts/frameworks-remap-manifest-check.ts \
-  --manifest <manifest.json> [--manifest <delta.json> …] \
-  --expect expected-25.json
+  --manifest manifest.json [--manifest manifest-delta-2026-11-22.json] \
+  --expect expected-set.json
 ```
+
+Step 1 is deliberately **not** derived from the manifest: it builds the expectation from what the import
+recorded it uploaded (the archive inventory), so step 2 compares two independent records. Building it
+from the manifest would make the comparison vacuous.
 
 Expected on success — exit 0 and:
 
@@ -226,8 +241,7 @@ Expected on success — exit 0 and:
  "fingerprint":"660f3e478543df9b0024ec85ae3ccd513acb645a40e7bba5fdc85c9e37888b61"}
 ```
 
-`expected-25.json` is `{rows:[{assetId,playbackId,sha256,sizeBytes}…]}`. Its fingerprint above is the
-canonical identity of the 25: if the operator's manifest yields a different fingerprint, the sets differ
+Both steps print the same `fingerprint`, computed over sorted rows, and it is the canonical identity of the set: if the operator's manifest yields a different fingerprint, the sets differ
 and the reason must be understood before the window.
 
 **Retrieved and verified.** The manifest lives in the MEGA folder `crtv3-vod-archive` (public folder link,
@@ -242,6 +256,12 @@ Both independent checks agree with what was recorded before retrieval: the base 
 delta's `baseManifestSha256`, and the archived entries total **45 videos / 5 723 426 515 bytes**, exactly
 the figure in `docs/migration/frameworks-release-checkpoint.md`. The manifest holds 51 entries: 45
 `archived` and 6 `skipped`.
+
+Rehearsed end to end on the 2026-11-25 snapshot — step 1 reports `published 28, excepted 3, expected 25`,
+step 2 reports `matched 25, missing 0, mismatched 0`, and both print
+`660f3e478543df9b0024ec85ae3ccd513acb645a40e7bba5fdc85c9e37888b61`. Refusal paths exercised too: a
+tampered exception playback id stops step 1 with `Exception playback id for video 145 does not match the
+snapshot`, and dropping one inventory row stops it with `missingSources` naming that asset.
 
 Checker result with the real files:
 
