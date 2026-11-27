@@ -7,14 +7,19 @@
  * collects page data, so a build with no RPC credential fails outright even though
  * nothing needs the chain at build time.
  *
- * Construction here is inert: no credential means a plain HTTP transport over
- * `getBaseRpcUrl()` (which falls back to a public Base endpoint). Reads still work;
- * they just do not get Alchemy's rate limits. Clients are created on first use.
+ * Configuration follows `getBaseRpcUrl()`'s precedence, branch for branch: on the
+ * server an endpoint override outranks the key, and in a browser the public key
+ * outranks the public override. Building from the key alone would silently switch
+ * endpoints for deployments that set an override for routing or key restrictions.
+ *
+ * Every branch returns an Alchemy transport: Account Kit configuration reads
+ * `chainAgnosticUrl` off it and its `CreateConfigProps` requires `AlchemyTransport`.
+ * Clients are created on first use, never at import.
  */
 
 import { alchemy, base } from "@account-kit/infra";
 import { createPublicClient, type PublicClient } from "viem";
-import { getBaseRpcUrl } from "./base-rpc";
+import { getBaseRpcOverride, getBaseRpcUrl } from "./base-rpc";
 
 /** Server key first, then the public key; never expose the server key to a browser. */
 export function resolveAlchemyApiKey(): string | undefined {
@@ -23,18 +28,25 @@ export function resolveAlchemyApiKey(): string | undefined {
 }
 
 /**
- * `alchemy()` always — Account Kit configuration reads chainAgnosticUrl off it and
- * its `CreateConfigProps` requires the narrow `AlchemyTransport`, not `Transport`.
- * Never throws.
+ * Alchemy transport with the resolver's precedence preserved. Never throws.
+ *
+ * server : override (BASE_RPC_URL | ALCHEMY_RPC_URL) → apiKey → public endpoint
+ * browser: public apiKey → public override → public endpoint
  */
 export function createBaseTransport(): ReturnType<typeof alchemy> {
   const apiKey = resolveAlchemyApiKey();
-  if (apiKey) {
-    return alchemy({ apiKey });
+  const override = getBaseRpcOverride();
+
+  if (typeof window === "undefined") {
+    if (override) return alchemy({ rpcUrl: override });
+    if (apiKey) return alchemy({ apiKey });
+  } else {
+    if (apiKey) return alchemy({ apiKey });
+    if (override) return alchemy({ rpcUrl: override });
   }
-  // No credential: use the rpcUrl branch of the same schema rather than a plain
-  // http transport. Account Kit's createConfig expects an Alchemy transport and
-  // failed while reading chainAgnosticUrl when handed http().
+
+  // No credential and no override: use the rpcUrl branch of the same schema rather
+  // than a plain http transport, which breaks Account Kit's chainAgnosticUrl read.
   return alchemy({ rpcUrl: getBaseRpcUrl() });
 }
 

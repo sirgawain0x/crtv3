@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getBaseRpcUrl } from "./base-rpc";
 import {
   createBaseTransport,
   getBasePublicClient,
   resetBasePublicClientForTests,
   resolveAlchemyApiKey,
 } from "./base-transport";
+
+/** The transport carries its resolved configuration; read it without a live client. */
+function transportConfig(transport: unknown): Record<string, unknown> {
+  return (transport as { config: Record<string, unknown> }).config;
+}
 
 const RPC_ENV = [
   "ALCHEMY_API_KEY",
@@ -64,5 +70,41 @@ describe("base transport", () => {
     expect(getBasePublicClient()).toBe(first);
     resetBasePublicClientForTests();
     expect(getBasePublicClient()).not.toBe(first);
+  });
+
+  // An override is not interchangeable with a key: routing and key restrictions
+  // depend on it, so a configured endpoint must not be displaced by a key.
+  it("lets BASE_RPC_URL outrank the key", () => {
+    clearAllRpcEnv();
+    vi.stubEnv("ALCHEMY_API_KEY", "server-key");
+    vi.stubEnv("BASE_RPC_URL", "https://rpc.example.com/base");
+    const config = transportConfig(createBaseTransport());
+    expect(config.rpcUrl).toBe("https://rpc.example.com/base");
+    expect(config.apiKey).toBeUndefined();
+  });
+
+  it("lets ALCHEMY_RPC_URL outrank the key", () => {
+    clearAllRpcEnv();
+    vi.stubEnv("ALCHEMY_API_KEY", "server-key");
+    vi.stubEnv("ALCHEMY_RPC_URL", "https://alchemy-proxy.example.com/base");
+    const config = transportConfig(createBaseTransport());
+    expect(config.rpcUrl).toBe("https://alchemy-proxy.example.com/base");
+    expect(config.apiKey).toBeUndefined();
+  });
+
+  it("uses the key when no override is configured", () => {
+    clearAllRpcEnv();
+    vi.stubEnv("ALCHEMY_API_KEY", "server-key");
+    const config = transportConfig(createBaseTransport());
+    expect(config.apiKey).toBe("server-key");
+    expect(config.rpcUrl).toBeUndefined();
+  });
+
+  it("agrees with getBaseRpcUrl for the same environment", () => {
+    clearAllRpcEnv();
+    vi.stubEnv("ALCHEMY_API_KEY", "server-key");
+    vi.stubEnv("BASE_RPC_URL", "https://rpc.example.com/base");
+    expect(getBaseRpcUrl()).toBe("https://rpc.example.com/base");
+    expect(transportConfig(createBaseTransport()).rpcUrl).toBe("https://rpc.example.com/base");
   });
 });
