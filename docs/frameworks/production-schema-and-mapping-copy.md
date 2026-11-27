@@ -170,26 +170,66 @@ Dry-run first; the tool writes nothing without `--apply`:
 
 ```bash
 export FRAMEWORKS_PROD_IMPORT_SUPABASE_URL='https://zdeiezfoemibjgrkyzvs.supabase.co'
-npx tsx scripts/frameworks-import-mapping-copy.ts --output "$(mktemp -d)"
+COPY_DRY="$(mktemp -d)"
+export FRAMEWORKS_PROD_IMPORT_SUPABASE_URL='https://zdeiezfoemibjgrkyzvs.supabase.co'
+npx tsx scripts/frameworks-import-mapping-copy.ts --output "$COPY_DRY"
+cat "$COPY_DRY/report.json"
 ```
 
-Review the printed plan. **These two numbers are not the same thing and must not be conflated:**
+Review that report. **These two numbers are not the same thing and must not be conflated:**
 
 - `sourceReadyCount` — ready rows in the *QA ledger* (includes assets with no production catalog row).
 - `identityUpdates` in the remap dry run below — rows the production catalog will actually change (**25**).
 
-Then apply, and re-read the ledger to confirm the target count:
+Then apply. `--apply` additionally requires `FRAMEWORKS_PROD_IMPORT_DATABASE_URL` (the write connection,
+which the tool checks for the production ref) and a **fresh** output directory — the tool creates it with
+`mkdir`, so reusing the dry-run directory fails:
 
 ```bash
-npx tsx scripts/frameworks-import-mapping-copy.ts --apply
+COPY_APPLY="$(mktemp -d)"
+npx tsx scripts/frameworks-import-mapping-copy.ts --apply --output "$COPY_APPLY"
 psql "$PROD_DB_CONN" -Atc "select state, count(*) from public.frameworks_asset_imports group by 1 order by 1"
 ```
 
+`$COPY_APPLY/ready-mappings.json` is the input §4 consumes.
+
+### Credentials the copy tool reads
+
+Exactly these five, and the tool pins which endpoints are acceptable rather than trusting the values:
+
+| variable | role |
+| --- | --- |
+| `FRAMEWORKS_MIGRATION_SUPABASE_URL` | QA source — must equal `https://zxpobpucayevlrzdxhmr.supabase.co` |
+| `FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY` | QA read |
+| `FRAMEWORKS_PROD_IMPORT_SUPABASE_URL` | production target — must equal `https://zdeiezfoemibjgrkyzvs.supabase.co` |
+| `FRAMEWORKS_PROD_IMPORT_SUPABASE_SERVICE_ROLE_KEY` | production write |
+| `FRAMEWORKS_PROD_IMPORT_DATABASE_URL` | production write connection, checked for the production ref |
+
+Supply them from the operator's secret store, not from a shell history or this document.
+
 ## §4 Remap dry run — the gate
+
+### Inputs, and where each one comes from
+
+The dry run takes four inputs. Three are produced by the steps above; the fourth is an external artifact
+and is the easiest to get wrong:
+
+| input | producer | if it is wrong or missing |
+| --- | --- | --- |
+| `prod-snapshot.json` | the §1 SQL, run against production | blockers appear for videos that are fine, or the counts shift |
+| `ready-mappings.json` | **written by §3's `--apply` run** into its own new `--output` directory | `verifiedReadyMappings` is short |
+| archive manifest(s) | **the MEGA/archive CLI output already used for the imports** — not produced by this repo | every mapping fails with `Mapping is not ready or does not match its archived source` |
+| `published-exceptions.json` | filled from the snapshot for the three named rows | `blockers` will not reach 0, or the validator refuses a placeholder |
+
+The archive manifest is not optional: `buildAssetRemapPlan` re-checks each mapping's `source_sha256`,
+`source_bytes` and legacy playback id against the archived source, so a manifest that does not match the
+bytes that were imported fails every row rather than a few.
+
+
 
 ```bash
 npx tsx scripts/frameworks-vod-remap.ts \
-  --snapshot prod-snapshot.json --mappings ready-mappings.json \
+  --snapshot prod-snapshot.json --mappings "$COPY_APPLY/ready-mappings.json" \
   --manifest <archive manifests…> \
   --published-exceptions published-exceptions.json \
   --output "$(mktemp -d)"
