@@ -22,13 +22,16 @@ export function resolveAlchemyApiKey(): string | undefined {
   return serverKey || process.env.NEXT_PUBLIC_ALCHEMY_API_KEY?.trim() || undefined;
 }
 
-/** `alchemy()` when a key exists, otherwise a plain HTTP RPC. Never throws. */
+/** `alchemy()` always — Account Kit configuration reads chainAgnosticUrl off it. Never throws. */
 export function createBaseTransport(): Transport {
   const apiKey = resolveAlchemyApiKey();
   if (apiKey) {
     return alchemy({ apiKey });
   }
-  return http(getBaseRpcUrl());
+  // No credential: use the rpcUrl branch of the same schema rather than a plain
+  // http transport. Account Kit's createConfig expects an Alchemy transport and
+  // failed while reading chainAgnosticUrl when handed http().
+  return alchemy({ rpcUrl: getBaseRpcUrl() });
 }
 
 let cachedClient: PublicClient | undefined;

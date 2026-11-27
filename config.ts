@@ -3,7 +3,8 @@ import {
   type AlchemyAccountsUIConfig,
   type CreateConfigProps,
 } from "@account-kit/react";
-import { alchemy, base } from "@account-kit/infra";
+import { base } from "@account-kit/infra";
+import { createBaseTransport } from "@/lib/chain/base-transport";
 import { http } from "viem";
 import { QueryClient } from "@tanstack/react-query";
 import { modularAccountFactoryAddresses } from "./lib/utils/modularAccount";
@@ -17,10 +18,9 @@ export { walletChains as chains, lensChain } from "@/lib/wallet/chains";
 // Default chain for initial connection
 const defaultChain = base;
 
-// Create transport
-const transport = alchemy({
-  apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-});
+// Create transport on first evaluation; inert when no key is configured so a
+// keyless build can import this module.
+const transport = createBaseTransport();
 
 // Custom storage implementation with 30-day expiration to prevent auto-logout
 // Must be a function that returns the storage object (CreateStorageFn)
