@@ -207,6 +207,56 @@ Exactly these five, and the tool pins which endpoints are acceptable rather than
 
 Supply them from the operator's secret store, not from a shell history or this document.
 
+## §3.5 Pre-window manifest check — run this while #494 builds
+
+The remap re-checks every mapping against the archive manifest, so a manifest mismatch discovered inside
+the window costs the window. This check needs **no database access** and uses the same parser the remap
+uses:
+
+```bash
+npx tsx scripts/frameworks-remap-manifest-check.ts \
+  --manifest <manifest.json> [--manifest <delta.json> …] \
+  --expect expected-25.json
+```
+
+Expected on success — exit 0 and:
+
+```json
+{"mode":"manifest-check","expected":25,"matched":25,"mismatched":0,"missing":[],"executable":true,
+ "fingerprint":"660f3e478543df9b0024ec85ae3ccd513acb645a40e7bba5fdc85c9e37888b61"}
+```
+
+`expected-25.json` is `{rows:[{assetId,playbackId,sha256,sizeBytes}…]}`. Its fingerprint above is the
+canonical identity of the 25: if the operator's manifest yields a different fingerprint, the sets differ
+and the reason must be understood before the window.
+
+**Status of the manifest on this machine:** the base manifest is **not present**. Only
+`delta/manifest-delta-2026-11-22.json` exists, and it references `manifest.json` with
+`baseManifestSha256 d1aa5c232bb5a3246ca641a24fc2868b8c83273f4d40663e777e8bf712137362` — which is not on
+this host. The delta alone covers 1 of 25:
+
+```
+{"matched":1,"missing":24,"manifestAssets":1,"executable":false}   exit 1
+```
+
+So the checker is proven in both directions, and the manifest must be retrieved from the archive host
+before the window. `import-queue.json` (44 rows) is an inventory, not a manifest — it has the right
+sha256/size shape but is not what the remap parses.
+
+The three exceptions, derived from the same snapshot (28 published − 3 failed = 25):
+
+| video id | asset id | playback id | provider failure |
+| --- | --- | --- | --- |
+| 145 | `51e1d8ff-d3ae-4f0a-918c-e0dfea796f1b` | `51e1yompddbkraan` | rendition `track_4` ends 192 710 ms before the source |
+| 165 | `fac7fe31-599d-405e-90d1-b406b08d728a` | `fac7e3gmusdlyvpr` | could not determine source span |
+| 180 | `084004dd-e1dd-459a-a4a3-a72ad073f8cd` | `08408ksnl8yeygl5` | could not determine source span |
+
+Labels are **not** in the snapshots, so fill them from the catalog rather than from memory:
+
+```sql
+select id, title, asset_id, playback_id, status from public.video_assets where id in (145,165,180) order by id;
+```
+
 ## §4 Remap dry run — the gate
 
 ### Inputs, and where each one comes from
@@ -246,10 +296,21 @@ Any deviation means stop: 24 updates is a mapping that did not copy, 4 exception
 validator should have refused, and any blocker is an unexpected gap. `executable: true` licenses
 generating SQL — it is not evidence that anything was applied.
 
-## §5 Apply, then prove one migrated video plays
+## §5 Apply the reviewed remap SQL — the step that moves the 25
+
+The dry run in §4 reported `databaseWrites: 0`, which is the point of it: **nothing has moved yet.** This
+is the step that changes the catalog, and it belongs inside the #410 window.
 
 ```bash
 psql "$PROD_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 -f cutover-*/apply.sql
+```
+
+Then confirm the 25 rows actually point at FrameWorks, rather than trusting the command's exit code:
+
+```sql
+select count(*) from public.video_assets
+ where status in ('published','minted') and provider='frameworks'
+   and frameworks_asset_id is not null and frameworks_playback_id is not null;   -- expected: 25
 ```
 
 ```sql
