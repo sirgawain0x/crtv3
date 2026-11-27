@@ -91,10 +91,13 @@ export async function handlePlaybackInfo(request: NextRequest): Promise<NextResp
       let authorizedUrl: string | undefined;
       try {
         authorizedUrl = sources.length
-          ? await resolveAuthorizedFrameworksHlsUrl(canonicalPlaybackId, viewerToken)
+          ? await resolveAuthorizedFrameworksHlsUrl(canonicalPlaybackId, viewerToken, fetch, {
+              verifyDestination: process.env.FRAMEWORKS_PLAYBACK_PROBE === '1',
+              logger: serverLogger,
+            })
           : undefined;
       } catch {
-        return NextResponse.json({ error: 'Playback routing unavailable' }, {
+        return NextResponse.json({ error: 'Playback routing unavailable', code: 'PLAYBACK_ROUTING_UNAVAILABLE' }, {
           status: 503, headers: { 'Cache-Control': 'private, no-store' },
         });
       }
