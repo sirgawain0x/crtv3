@@ -230,28 +230,42 @@ Expected on success — exit 0 and:
 canonical identity of the 25: if the operator's manifest yields a different fingerprint, the sets differ
 and the reason must be understood before the window.
 
-**Status of the manifest on this machine:** the base manifest is **not present**. Only
-`delta/manifest-delta-2026-11-22.json` exists, and it references `manifest.json` with
-`baseManifestSha256 d1aa5c232bb5a3246ca641a24fc2868b8c83273f4d40663e777e8bf712137362` — which is not on
-this host. The delta alone covers 1 of 25:
+**Retrieved and verified.** The manifest lives in the MEGA folder `crtv3-vod-archive` (public folder link,
+key in the URL fragment; readable without an account via `megajs`, which decrypts the fragment key):
 
+| file | bytes | sha256 |
+| --- | --- | --- |
+| `manifest.json` | 25 395 | `d1aa5c232bb5a3246ca641a24fc2868b8c83273f4d40663e777e8bf712137362` |
+| `manifest-delta-2026-11-22.json` | 616 | `7e2d003c006f5f0f4389cf832c71355d570bf4e20d685da22162825e9bd9ab51` |
+
+Both independent checks agree with what was recorded before retrieval: the base file's hash equals the
+delta's `baseManifestSha256`, and the archived entries total **45 videos / 5 723 426 515 bytes**, exactly
+the figure in `docs/migration/frameworks-release-checkpoint.md`. The manifest holds 51 entries: 45
+`archived` and 6 `skipped`.
+
+Checker result with the real files:
+
+```json
+{"manifestAssets":45,"expected":25,"matched":25,"mismatched":0,"missing":[],"executable":true,
+ "fingerprint":"660f3e478543df9b0024ec85ae3ccd513acb645a40e7bba5fdc85c9e37888b61"}
 ```
-{"matched":1,"missing":24,"manifestAssets":1,"executable":false}   exit 1
-```
 
-So the checker is proven in both directions, and the manifest must be retrieved from the archive host
-before the window. `import-queue.json` (44 rows) is an inventory, not a manifest — it has the right
-sha256/size shape but is not what the remap parses.
+`manifest.json` is **not committed** — it is an external artifact. Verify the sha256 above after any
+re-retrieval; a manifest that hashes differently is a different archive.
 
-The three exceptions, derived from the same snapshot (28 published − 3 failed = 25):
+The three exceptions, from the same snapshot (28 published − 3 failed = 25), and confirmed against the
+production catalog:
 
-| video id | asset id | playback id | provider failure |
-| --- | --- | --- | --- |
-| 145 | `51e1d8ff-d3ae-4f0a-918c-e0dfea796f1b` | `51e1yompddbkraan` | rendition `track_4` ends 192 710 ms before the source |
-| 165 | `fac7fe31-599d-405e-90d1-b406b08d728a` | `fac7e3gmusdlyvpr` | could not determine source span |
-| 180 | `084004dd-e1dd-459a-a4a3-a72ad073f8cd` | `08408ksnl8yeygl5` | could not determine source span |
+| video id | label | asset id | playback id | provider failure |
+| --- | --- | --- | --- | --- |
+| 145 | Monster | `51e1d8ff-…` | `51e1yompddbkraan` | rendition `track_4` ends 192 710 ms before the source |
+| 165 | Tulleti - Brutality | `fac7fe31-…` | `fac7e3gmusdlyvpr` | could not determine source span |
+| 180 | "Friends" the Second Single off my debut album "Keys To Success" drops November 24th | `084004dd-…` | `08408ksnl8yeygl5` | could not determine source span |
 
-Labels are **not** in the snapshots, so fill them from the catalog rather than from memory:
+They live in `lib/video-provider/migration/published-exceptions.json`. Verified against the snapshot: 28
+published rows produce 28 blockers with no mappings, the three resolve, and **25 blockers remain** — the
+set the remap will convert into updates. The validator re-checks every identity against the run's
+snapshot, so a stale entry is refused rather than silently applied.
 
 ```sql
 select id, title, asset_id, playback_id, status from public.video_assets where id in (145,165,180) order by id;
