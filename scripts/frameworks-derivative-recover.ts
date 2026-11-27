@@ -42,6 +42,7 @@ async function main() {
   let stage: Stage | undefined;
   let execute = false;
   let selfCheck = false;
+  let verifySchema = false;
 
   for (let i = 0; i < args.length; i++) {
     const value = () => {
@@ -56,6 +57,7 @@ async function main() {
       case '--derivative': derivativePath = value(); break;
       case '--execute': execute = true; break;
       case '--self-check': selfCheck = true; break;
+      case '--verify-schema': verifySchema = true; break;
       case '--prepare': stage = 'prepare'; break;
       case '--upload': stage = 'upload'; break;
       case '--ready': stage = 'ready'; break;
@@ -63,6 +65,31 @@ async function main() {
       default:
         throw new Error('Unknown option. Use --manifest PATH --source ID --plan PATH [--derivative PATH] --prepare|--upload|--ready|--adopt [--execute]');
     }
+  }
+
+  // Read-only schema probe: the ledger select needs the derivative columns, so a QA
+  // database without the migration fails here instead of mid-recovery.
+  if (verifySchema) {
+    const url = process.env.FRAMEWORKS_MIGRATION_SUPABASE_URL;
+    const key = process.env.FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      throw new Error('FRAMEWORKS_MIGRATION_SUPABASE_URL and FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY are required');
+    }
+    const db = createClient(url, key, { auth: { persistSession: false } });
+    const { error } = await db
+      .from('frameworks_import_recoveries')
+      .select('recovery_kind,derivative_sha256,derivative_bytes,derivative_origin')
+      .limit(0);
+    console.log(JSON.stringify({
+      stage: 'verify-schema',
+      derivativeColumnsPresent: !error,
+      detail: error ? error.message : null,
+      note: 'columns only; the two RPCs and the evidence trigger need the SQL checks in supabase/migrations',
+      providerRequests: 0,
+      databaseWrites: 0,
+    }));
+    if (error) process.exitCode = 1;
+    return;
   }
 
   // Load the modules the adopt stage needs, without touching the provider or the
