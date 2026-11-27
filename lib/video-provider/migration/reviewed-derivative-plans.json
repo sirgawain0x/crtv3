@@ -50,7 +50,12 @@
           "original_provider_ids_retained": true,
           "recovery_row": "none",
           "recorded_original_evidence_matches": true
-        }
+        },
+        "targets_note": "providerHost is the endpoint from FRAMEWORKS_GRAPHQL_URL; qaProjectRef must be the QA project ref from FRAMEWORKS_MIGRATION_SUPABASE_URL. A placeholder target keeps the plan non-actionable however its status is edited."
+      },
+      "targets": {
+        "qaProjectRef": "PENDING-QA-PROJECT-REF",
+        "providerHost": "bridge.frameworks.network"
       }
     },
     {
@@ -90,7 +95,12 @@
           "recovery_row": "none",
           "recorded_original_evidence_matches": true,
           "must_not_advance_while": "fac7fe31-599d-405e-90d1-b406b08d728a is the published mapping"
-        }
+        },
+        "targets_note": "providerHost is the endpoint from FRAMEWORKS_GRAPHQL_URL; qaProjectRef must be the QA project ref from FRAMEWORKS_MIGRATION_SUPABASE_URL. A placeholder target keeps the plan non-actionable however its status is edited."
+      },
+      "targets": {
+        "qaProjectRef": "PENDING-QA-PROJECT-REF",
+        "providerHost": "bridge.frameworks.network"
       }
     }
   ]

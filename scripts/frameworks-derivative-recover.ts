@@ -18,10 +18,12 @@
 import { readFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import { archivedSourcesFromManifests } from '../lib/video-provider/migration/archive';
+import { frameworksGraphqlUrl } from '../lib/video-provider/config';
 import {
   ADOPTION_STATUSES,
   TRANSFER_STATUSES,
   adoptReviewedDerivative,
+  assertPlanTargets,
   approvedDerivativePlans,
   assertPlanMatchesReviewed,
   confirmReviewedDerivativeReady,
@@ -134,10 +136,23 @@ async function main() {
     stage === 'adopt' ? ADOPTION_STATUSES : TRANSFER_STATUSES,
   );
 
+  // The provider endpoint the run would use, and the QA project the plan is bound to.
+  const providerHost = new URL(frameworksGraphqlUrl()).hostname;
+  const qaUrlForTargets = process.env.FRAMEWORKS_MIGRATION_SUPABASE_URL;
+  const qaProjectRef = qaUrlForTargets ? new URL(qaUrlForTargets).hostname.split('.')[0] : null;
+  let targetsVerified = false;
+  if (qaProjectRef) {
+    assertPlanTargets(plan, { qaProjectRef, providerHost });
+    targetsVerified = true;
+  }
+
   const summary = {
     stage,
     mode: execute ? 'execute' : 'dry-run',
     planStatus: plan.status,
+    plannedTargets: plan.targets,
+    actualTargets: { qaProjectRef, providerHost },
+    targetsVerified,
     livepeerAssetId: plan.livepeerAssetId,
     originalBytes: plan.originalBytes,
     derivativeBytes: plan.derivativeBytes,
@@ -154,6 +169,8 @@ async function main() {
   const url = process.env.FRAMEWORKS_MIGRATION_SUPABASE_URL;
   const key = process.env.FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Migration database credentials are required to execute');
+  // Refuse a correctly approved plan executed against a different database or provider.
+  assertPlanTargets(plan, { qaProjectRef: new URL(url).hostname.split('.')[0], providerHost });
   const db = createClient(url, key, { auth: { persistSession: false } });
 
   switch (stage) {

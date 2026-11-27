@@ -26,9 +26,11 @@ import {
   adoptReviewedDerivative,
   approvedDerivativePlans,
   assertPlanMatchesReviewed,
+  assertPlanTargets,
   confirmReviewedDerivativeReady,
   findReviewedDerivativePlan,
   prepareReviewedDerivativeRecovery,
+  uploadAuthorizedPlans,
   uploadReviewedDerivative,
 } from './reviewed-derivative';
 
@@ -53,6 +55,7 @@ const plan = {
   approvedBy: '0xReviewer',
   approvedAt: '2026-11-26T00:00:00Z',
   reason: '10-bit AV1 is not ingested by the provider; H.264 derivative decodes clean',
+  targets: { qaProjectRef: 'qaprojectref123', providerHost: 'bridge.frameworks.network' },
 };
 const plans = (list: unknown[]) => ({ plans: list });
 
@@ -670,5 +673,76 @@ describe('reviewed derivative — two-stage approval', () => {
   it('rejects a supplied plan whose status differs from the record', () => {
     expect(() => assertPlanMatchesReviewed(plans([{ ...stagePlan }]), plans([uploadApproved])))
       .toThrow(/differs from the reviewed record/);
+  });
+});
+
+describe('reviewed derivative — execution target binding', () => {
+  const actual = { qaProjectRef: 'qaprojectref123', providerHost: 'bridge.frameworks.network' };
+
+  it('accepts the reviewed QA project and provider host', () => {
+    expect(() => assertPlanTargets(plan, actual)).not.toThrow();
+  });
+
+  it('refuses a different QA project', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, qaProjectRef: 'someone-elses-qa' }))
+      .toThrow(/QA database does not match the reviewed plan/);
+  });
+
+  it('refuses a different provider host', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, providerHost: 'bridge.example.com' }))
+      .toThrow(/Provider host does not match the reviewed plan/);
+  });
+
+  it('refuses a plan with no recorded targets', () => {
+    const noTargets = { ...plan, targets: undefined } as unknown as typeof plan;
+    expect(() => assertPlanTargets(noTargets, actual))
+      .toThrow(/records no execution targets/);
+  });
+
+  it('treats a target difference as a reviewed-record difference', () => {
+    const edited = { ...plan, targets: { ...plan.targets, qaProjectRef: 'otherproject' } };
+    expect(() => assertPlanMatchesReviewed(plans([edited]), plans([plan])))
+      .toThrow(/differs from the reviewed record \(targets\)/);
+  });
+});
+
+describe('reviewed derivative — placeholder approval evidence', () => {
+  const placeholders = {
+    ...plan,
+    status: 'upload-approved' as const,
+    approvedBy: 'PENDING-APPROVAL',
+    approvedAt: '1970-01-01T00:00:00Z',
+  };
+
+  it('does not make placeholder evidence actionable by changing status', () => {
+    expect(uploadAuthorizedPlans(plans([placeholders]))).toHaveLength(0);
+    expect(approvedDerivativePlans(plans([placeholders]))).toHaveLength(0);
+  });
+
+  it('refuses the transfer stage for a status-only edit', async () => {
+    m.recovered.mockResolvedValue({ ...recoveredRow, state: 'prepared', recovery_kind: 'derivative' });
+    await expect(prepareReviewedDerivativeRecovery(db, source, plans([placeholders])))
+      .rejects.toThrow(/no upload-approved derivative plan/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('refuses an approval timestamp before 2020', () => {
+    const stale = { ...plan, approvedAt: '1970-01-01T00:00:00Z' };
+    expect(approvedDerivativePlans(plans([stale]))).toHaveLength(0);
+  });
+
+  it('refuses an unparseable approval timestamp', () => {
+    const bogus = { ...plan, approvedAt: 'not-a-date' };
+    expect(approvedDerivativePlans(plans([bogus]))).toHaveLength(0);
+  });
+
+  it('refuses placeholder targets even with real approval evidence', () => {
+    const pendingTargets = { ...plan, targets: { ...plan.targets, qaProjectRef: 'PENDING-QA-PROJECT-REF' } };
+    expect(approvedDerivativePlans(plans([pendingTargets]))).toHaveLength(0);
+  });
+
+  it('accepts a plan with real evidence and real targets', () => {
+    expect(approvedDerivativePlans(plans([plan]))).toHaveLength(1);
+    expect(uploadAuthorizedPlans(plans([{ ...plan, status: 'upload-approved' as const }]))).toHaveLength(1);
   });
 });

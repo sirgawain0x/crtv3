@@ -53,7 +53,65 @@ export type ReviewedDerivativePlan = {
   approvedBy: string;
   approvedAt: string;
   reason: string;
+  /** QA project ref and provider host this approval is limited to. */
+  targets: ReviewedDerivativeTargets;
 };
+
+/** The only QA database and provider endpoint a plan may be executed against. */
+export type ReviewedDerivativeTargets = {
+  qaProjectRef: string;
+  providerHost: string;
+};
+
+export type ExecutionTargets = {
+  qaProjectRef: string;
+  providerHost: string;
+};
+
+/**
+ * Placeholders must never become actionable by editing `status` alone. These
+ * checks run for every non-candidate plan, so an "upload-approved" record still
+ * needs a real approver, a real timestamp, and real targets.
+ */
+function isPlaceholder(value: unknown): boolean {
+  if (typeof value !== 'string') return true;
+  const v = value.trim().toLowerCase();
+  if (v.length === 0) return true;
+  if (v.startsWith('pending') || v.includes('placeholder')) return true;
+  return ['tbd', 'todo', 'changeme', 'unapproved', 'none', 'null', 'unknown'].includes(v);
+}
+
+function isValidApprover(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length >= 3 && !isPlaceholder(value);
+}
+
+function isValidApprovalTime(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return false;
+  const earliest = Date.parse('2020-01-01T00:00:00Z');
+  const latest = Date.now() + 24 * 60 * 60 * 1000;
+  return parsed >= earliest && parsed <= latest;
+}
+
+function hasValidTargets(targets: unknown): targets is ReviewedDerivativeTargets {
+  if (!targets || typeof targets !== 'object') return false;
+  const t = targets as Record<string, unknown>;
+  const ref = typeof t.qaProjectRef === 'string' ? t.qaProjectRef.trim() : '';
+  const host = typeof t.providerHost === 'string' ? t.providerHost.trim() : '';
+  return (
+    /^[a-z0-9][a-z0-9-]{2,}$/i.test(ref) && !isPlaceholder(ref) &&
+    /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host) && !isPlaceholder(host)
+  );
+}
+
+function isActionable(plan: ReviewedDerivativePlan): boolean {
+  return (
+    isValidApprover(plan.approvedBy) &&
+    isValidApprovalTime(plan.approvedAt) &&
+    hasValidTargets(plan.targets)
+  );
+}
 
 type OriginalRecord = {
   state?: string | null;
@@ -78,7 +136,8 @@ function isPlan(value: unknown): value is ReviewedDerivativePlan {
     typeof p.derivativeOrigin === 'string' && p.derivativeOrigin.length > 0 &&
     typeof p.approvedBy === 'string' && p.approvedBy.trim().length > 0 &&
     typeof p.approvedAt === 'string' && p.approvedAt.trim().length > 0 &&
-    typeof p.reason === 'string' && p.reason.trim().length > 0
+    typeof p.reason === 'string' && p.reason.trim().length > 0 &&
+    typeof p.targets === 'object' && p.targets !== null
   );
 }
 
@@ -101,7 +160,11 @@ function plansWithStatus(
 ): ReviewedDerivativePlan[] {
   const container = raw as { plans?: unknown } | undefined;
   const list = Array.isArray(container?.plans) ? container!.plans : [];
-  return list.filter(isPlan).filter((plan) => statuses.includes(plan.status));
+  return list
+    .filter(isPlan)
+    .filter((plan) => statuses.includes(plan.status))
+    // A status-only edit must not make placeholder evidence actionable.
+    .filter((plan) => plan.status === 'candidate' || isActionable(plan));
 }
 
 /** Every recorded status — used only to compare a supplied file against the record. */
@@ -218,6 +281,23 @@ export function findReviewedDerivativePlan(
 }
 
 /**
+ * Refuse to execute an approved plan against a database or provider it was not
+ * reviewed for. Without this, the URL and provider host come from the environment
+ * and a correctly approved plan can be run somewhere else entirely.
+ */
+export function assertPlanTargets(plan: ReviewedDerivativePlan, actual: ExecutionTargets): void {
+  if (!hasValidTargets(plan.targets)) {
+    throw new ReviewedDerivativeError('Reviewed plan records no execution targets');
+  }
+  if (plan.targets.qaProjectRef.trim().toLowerCase() !== actual.qaProjectRef.trim().toLowerCase()) {
+    throw new ReviewedDerivativeError('QA database does not match the reviewed plan');
+  }
+  if (plan.targets.providerHost.trim().toLowerCase() !== actual.providerHost.trim().toLowerCase()) {
+    throw new ReviewedDerivativeError('Provider host does not match the reviewed plan');
+  }
+}
+
+/**
  * Enforce that a supplied plan is the reviewed one.
  *
  * A caller may hand in a plan file (for review, diffing or CI), but it must match
@@ -249,6 +329,9 @@ export function assertPlanMatchesReviewed(
       if (plan[key] !== trusted[key]) {
         throw new ReviewedDerivativeError(`Supplied plan differs from the reviewed record (${key})`);
       }
+    }
+    if (JSON.stringify(plan.targets) !== JSON.stringify(trusted.targets)) {
+      throw new ReviewedDerivativeError('Supplied plan differs from the reviewed record (targets)');
     }
     return trusted;
   });
