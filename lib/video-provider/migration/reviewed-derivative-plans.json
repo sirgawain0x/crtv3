@@ -1,4 +1,59 @@
 {
   "_comment": "Reviewed derivative substitutions. A plan is only actionable when status is 'approved'. 'candidate' plans are recorded for review and are rejected by the loader. Never add an approved plan for bytes FrameWorks has not processed to ready.",
-  "plans": []
+  "plans": [
+    {
+      "status": "candidate",
+      "livepeerAssetId": "fac7fe31-599d-405e-90d1-b406b08d728a",
+      "originalPlaybackId": "PENDING-QA-LEDGER",
+      "originalSha256": "1061aabe60bc9f11b47b234c78fa552f4ba0095c7f4a470899cc5f8161d81516",
+      "originalBytes": 237282639,
+      "derivativeSha256": "45c02340a34dfe020e78e47d14db5ccf94ff3f0525f7c5fb49b42626e0326e23",
+      "derivativeBytes": 630109556,
+      "derivativeOrigin": "transcode:h264-8bit",
+      "approvedBy": "PENDING-APPROVAL",
+      "approvedAt": "1970-01-01T00:00:00Z",
+      "reason": "CANDIDATE ONLY - not an approval. Tulleti - Brutality: AV1 10-bit original failed provider ingest; H.264 8-bit derivative decodes clean and matches its recorded evidence. originalPlaybackId, and the recorded source bytes as held by the QA ledger, must be confirmed before this can be approved.",
+      "_review": {
+        "video": "Tulleti - Brutality",
+        "original": {
+          "path": "/private/tmp/crtv3-frameworks-codec-check/fac7fe31-599d-405e-90d1-b406b08d728a.mp4",
+          "sha256_recomputed_locally": true,
+          "bytes_recomputed_locally": true,
+          "ffprobe": "av1 / yuv420p10le / 3840x2160 / aac / 139.007s"
+        },
+        "derivative": {
+          "path": "/private/tmp/crtv3-frameworks-codec-check/normalized/brutality-h264.mp4",
+          "sha256_recomputed_locally": true,
+          "bytes_recomputed_locally": true,
+          "ffprobe": "h264 / yuv420p / 3840x2160 / aac / 139.007s",
+          "full_decode_exit_code": 0,
+          "evidence_file": "/private/tmp/crtv3-frameworks-archive-verification/compatibility-copy-evidence-20261125.json"
+        },
+        "pending_before_approval": [
+          "originalPlaybackId from frameworks_asset_imports (currently PENDING-QA-LEDGER)",
+          "source_sha256 / source_bytes as recorded in the QA ledger (locally verified, not yet compared)",
+          "import state must be failed or ambiguous",
+          "original frameworks_asset_id / frameworks_playback_id must still be retained"
+        ]
+      }
+    },
+    {
+      "status": "candidate",
+      "livepeerAssetId": "331f72c9-7c37-4079-b8d2-bcd3e9747eaa",
+      "originalPlaybackId": "PENDING-QA-LEDGER",
+      "originalSha256": "1061aabe60bc9f11b47b234c78fa552f4ba0095c7f4a470899cc5f8161d81516",
+      "originalBytes": 237282639,
+      "derivativeSha256": "45c02340a34dfe020e78e47d14db5ccf94ff3f0525f7c5fb49b42626e0326e23",
+      "derivativeBytes": 630109556,
+      "derivativeOrigin": "transcode:h264-8bit",
+      "approvedBy": "PENDING-APPROVAL",
+      "approvedAt": "1970-01-01T00:00:00Z",
+      "reason": "CANDIDATE ONLY - duplicate of fac7fe31. Identical source_sha256 and source_bytes mean the same media was archived under two asset ids. Recorded so the ambiguity is visible; only the id the QA ledger lists for Tulleti - Brutality should ever be approved, and the other should stay candidate or be dropped.",
+      "_review": {
+        "duplicate_of": "fac7fe31-599d-405e-90d1-b406b08d728a",
+        "why_recorded": "compatibility-copy-evidence-20261125.json lists both asset ids with the same source hash and size",
+        "resolution_required": "read frameworks_asset_imports and keep whichever row is the actual Tulleti import"
+      }
+    }
+  ]
 }
