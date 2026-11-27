@@ -44,10 +44,14 @@ async function handleClip(request: NextRequest) {
     ), botCheck);
   }
 
-  if (typeof clipperAddress!=='string' || !ADDRESS_REGEX.test(clipperAddress) ||
-      typeof playbackId!=='string' || !/^[A-Za-z0-9_-]{1,200}$/.test(playbackId) ||
-      typeof sessionId!=='string' || sessionId.length>200) {
+  if (typeof clipperAddress !== "string" || !ADDRESS_REGEX.test(clipperAddress)) {
     return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Invalid clipperAddress format" }, { status: 400 }), botCheck);
+  }
+  if (typeof playbackId !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(playbackId)) {
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Invalid playbackId" }, { status: 400 }), botCheck);
+  }
+  if (typeof sessionId !== "string" || sessionId.length > 200) {
+    return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Invalid sessionId" }, { status: 400 }), botCheck);
   }
 
   const start = Number(startTime);
