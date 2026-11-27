@@ -231,8 +231,19 @@ npx tsx scripts/frameworks-remap-manifest-check.ts \
 ```
 
 Step 1 is deliberately **not** derived from the manifest: it builds the expectation from what the import
-recorded it uploaded (the archive inventory), so step 2 compares two independent records. Building it
-from the manifest would make the comparison vacuous.
+recorded it uploaded, so step 2 compares two independent records. Building it from the manifest would
+make the comparison vacuous.
+
+`--sources` accepts either record the operator actually holds:
+
+| shape | fields |
+| --- | --- |
+| archive inventory | `assetId`, `playbackId`, `sha256`, `sizeBytes` |
+| QA ledger export | `livepeer_asset_id`, `livepeer_playback_id`, `source_sha256`, `source_bytes`, `state` |
+
+Both were run against the same snapshot and produced **the same 25 rows and the same fingerprint**. A
+ledger row whose `state` is not `ready` is not a source — marking one `failed` drops it and step 1 exits
+1 with that asset in `missingSources` rather than silently building a set of 24.
 
 Expected on success — exit 0 and:
 

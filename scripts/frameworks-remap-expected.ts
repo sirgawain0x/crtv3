@@ -18,12 +18,24 @@ function arg(name:string):string{
  for(let i=2;i<process.argv.length;i++)if(process.argv[i]===name&&process.argv[i+1])return process.argv[++i];
  throw new Error(`Missing ${name}`);
 }
-function isSourceRow(value:unknown):value is SourceRow{
- if(!value||typeof value!=='object')return false;
+/**
+ * Accepts either the archive inventory shape (assetId/playbackId/sha256/sizeBytes) or a QA ledger
+ * export (livepeer_asset_id/livepeer_playback_id/source_sha256/source_bytes), so the operator can use
+ * whichever independent record they actually hold at the window.
+ */
+function normalizeSource(value:unknown):SourceRow|null{
+ if(!value||typeof value!=='object')return null;
  const row=value as Record<string,unknown>;
- return typeof row.assetId==='string'&&typeof row.playbackId==='string'&&
-  typeof row.sha256==='string'&&/^[0-9a-f]{64}$/.test(row.sha256)&&
-  Number.isSafeInteger(row.sizeBytes)&&(row.sizeBytes as number)>0;
+ const assetId=row.assetId ?? row.livepeer_asset_id;
+ const playbackId=row.playbackId ?? row.livepeer_playback_id;
+ const sha256=row.sha256 ?? row.source_sha256;
+ const rawSize=row.sizeBytes ?? row.source_bytes;
+ const sizeBytes=typeof rawSize==='string'?Number(rawSize):rawSize;
+ if(typeof assetId!=='string'||typeof playbackId!=='string')return null;
+ if(typeof sha256!=='string'||!/^[0-9a-f]{64}$/.test(sha256))return null;
+ if(typeof sizeBytes!=='number'||!Number.isSafeInteger(sizeBytes)||sizeBytes<=0)return null;
+ if('state' in row && row.state!=='ready')return null;
+ return {assetId,playbackId,sha256,sizeBytes};
 }
 
 async function main(){
@@ -32,8 +44,10 @@ async function main(){
  const videos:SnapshotVideo[]=Array.isArray(snapshot?.videos)?snapshot.videos:[];
  if(!videos.length)throw new Error('Snapshot has no videos');
  const rawSources=JSON.parse(await readFile(sourcesPath,'utf8'));
- const sources:unknown[]=Array.isArray(rawSources)?rawSources:Array.isArray(rawSources?.rows)?rawSources.rows:[];
- if(!sources.length||!sources.every(isSourceRow))throw new Error('Archive inventory is empty or contains an invalid row');
+ const rawRows:unknown[]=Array.isArray(rawSources)?rawSources:Array.isArray(rawSources?.rows)?rawSources.rows:[];
+ if(!rawRows.length)throw new Error('Source inventory is empty');
+ const sources:SourceRow[]=rawRows.map(normalizeSource).filter((row):row is SourceRow=>row!==null);
+ if(!sources.length)throw new Error('Source inventory has no usable asset identity, SHA-256 and size');
  const exceptions:Exception[]=JSON.parse(await readFile(exceptionsPath,'utf8'));
  if(!Array.isArray(exceptions))throw new Error('Invalid exceptions file');
 
