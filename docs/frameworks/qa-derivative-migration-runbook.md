@@ -288,20 +288,26 @@ repair**. Reconcile the schema instead of recording it as applied.
 
 ### 2.2 Apply
 
-```bash
-supabase db push --db-url "$QA_DB_CONN"
-```
+**Prefer the direct apply for this run.** `supabase db push` records the version itself, which would
+put the ledger entry ahead of verification. Applying with `psql` lets the schema be checked first and
+recorded only once it is proven, and `--single-transaction` means a failed statement rolls the whole
+migration back instead of leaving a half-applied schema:
 
-Direct alternative, for when the CLI cannot be used at all. Syntax checked against Supabase CLI 2.110.0:
-
 ```bash
-psql "$QA_DB_CONN" -v ON_ERROR_STOP=1 \
+psql "$QA_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 \
   -f supabase/migrations/20261126093000_frameworks_derivative_recovery.sql
-
-supabase migration repair --status applied --db-url "$QA_DB_CONN" 20261126093000
 ```
 
-## 3. Verify
+Safe to wrap: the migration contains no explicit `BEGIN`/`COMMIT` and no non-transactional statement
+(`CONCURRENTLY`, `VACUUM`, …). Do **not** record anything yet — §3.1 decides that.
+
+If the CLI must be used instead, `supabase db push --db-url "$QA_DB_CONN"` applies and records in one
+step, so verification happens after the ledger already claims success. Syntax checked against
+Supabase CLI 2.110.0.
+
+## 3. Verify the schema, then record it
+
+### 3.1 Verify — nothing is recorded until this passes
 
 ```sql
 -- a) four columns. Expected: 4
@@ -329,8 +335,22 @@ select (select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid
           join pg_namespace n on n.oid=p.pronamespace
          where n.nspname='public' and p.proname='preserve_frameworks_recovery_evidence') as body_updated;
 
--- e) ledger. Expected: 1
-select count(*) from supabase_migrations.schema_migrations where version='20261126093000';
+-- d2) the prerequisite is still intact after the change. Expected: 14 | t | 2 | 1 | 2
+select count(*) as columns,
+       (select count(*) from pg_constraint c join pg_class t on t.oid=c.conrelid
+         where t.relname='frameworks_import_recoveries' and c.contype='c'
+           and pg_get_constraintdef(c.oid) ilike '%prepared%'
+           and pg_get_constraintdef(c.oid) ilike '%failed%') = 1 as state_check_present,
+       (select count(*) from pg_constraint c join pg_class t on t.oid=c.conrelid
+         where t.relname='frameworks_import_recoveries' and c.contype='c'
+           and (pg_get_constraintdef(c.oid) ilike '%original_asset_id%'
+             or pg_get_constraintdef(c.oid) ilike '%original_playback_id%')) as reuse_checks,
+       (select count(*) from pg_constraint c join pg_class t on t.oid=c.conrelid
+         where t.relname='frameworks_import_recoveries' and c.contype='f') as fkey,
+       (select count(*) from pg_constraint c join pg_class t on t.oid=c.conrelid
+         where t.relname='frameworks_import_recoveries' and c.contype='u') as uniques
+  from information_schema.columns
+ where table_schema='public' and table_name='frameworks_import_recoveries';
 ```
 
 ```bash
@@ -338,11 +358,27 @@ npx tsx scripts/frameworks-derivative-recover.ts --verify-schema
 # expected: {"stage":"verify-schema","derivativeColumnsPresent":true,"providerRequests":0,"databaseWrites":0}
 ```
 
-`--verify-schema` proves the four columns only; (b)–(e) are checks it cannot make.
+`--verify-schema` proves the four columns only; (b)–(d2) are checks it cannot make.
 
-**The run stops here.** This session's deliverable is a migrated, verified ledger. §4 rollback exists
-for a failed verification, not as a normal follow-on step, and no plan status change, `--prepare` or
-`--upload` belongs to this run.
+**If any value differs, stop.** Do not record the version, and treat §4 as the recovery path — a
+schema that does not match the reviewed migration must not be marked as applied.
+
+### 3.2 Record the applied version, then confirm it
+
+Only after 3.1 passes:
+
+```bash
+supabase migration repair --status applied --db-url "$QA_DB_CONN" 20261126093000
+```
+
+```sql
+-- confirm the entry landed and nothing else changed. Expected: 1
+select count(*) from supabase_migrations.schema_migrations where version='20261126093000';
+```
+
+**The run stops here.** The deliverable is a migrated, verified ledger. `20261124183930` is still not
+recorded — that repair is the separately reviewed action in §2.1, and no plan status change,
+`--prepare` or `--upload` belongs to this session.
 
 ## 4. Rollback
 
@@ -418,8 +454,9 @@ substitution. Restore the step-1 dump instead and escalate.
 | Rollback block (§4) | **executed** against PGlite on top of both migrations: 11/11 assertions, including immutability after rollback |
 | Connection guard (§0) | **executed** in 12 dummy-credential scenarios asserting the reason and that the emitted string carries no query: direct and pooler with `verify-full` accepted; missing, empty, `require`, `verify-ca` and duplicated `sslmode`, `?host=` override, production REST/DB, lookalike pooler and a foreign user all refused |
 | Prerequisite (§0.1, all rows) | **matched live QA** — reviewer confirmed the three function bodies, 14 columns, 2 uniques, 1 foreign key, the state constraint, both reuse constraints, the ready-state constraint, `service_role` grants and the `BEFORE UPDATE` trigger |
-| Verification queries (§3) | apply-side counts exercised on the same PGlite run (4 / 4 / 2 / trigger 1 / body updated) |
+| Verification queries (§3.1) | apply-side counts exercised on the same PGlite run (4 / 4 / 2 / trigger 1 / body updated); the §3.1 d2 prerequisite-intact check is authored, not yet run |
 | Backup commands (§1) | `pg_dump` **not executed** (needs QA credentials); the fail-closed guard was **executed** against four synthetic files — empty, missing-table and truncated all stopped, a complete dump passed |
+| `psql --single-transaction` (§2.2) | flag confirmed supported by psql 19; the migration contains no explicit `BEGIN`/`COMMIT` and no non-transactional statement, so wrapping is safe — **not executed** against QA |
 | `db push` / `migration repair` (§2, §4) | syntax checked against Supabase CLI 2.110.0, **not run**; every call uses `--db-url` with the validated URI, so the CLI inherits `sslmode=verify-full` instead of choosing its own policy |
 | Anything against the live QA project | **not run** |
 
@@ -437,8 +474,8 @@ substitution. Restore the step-1 dump instead and escalate.
 6. `db push --dry-run` lists any migration other than `20261126093000`, or any command is run with
    `--linked`/`supabase link` instead of `--db-url "$QA_DB_CONN"`.
 7. Anyone proposes repairing the ledger (§2.1) without the complete §0.1 output attached.
-8. Any §3 count differs from its expected value, or `--verify-schema` reports `false` after a
-   claimed success.
+8. Any §3.1 value differs from its expected value, or `--verify-schema` reports `false` — in which
+   case the version must **not** be recorded. If §3.2 is reached, its ledger check must equal 1.
 9. `recovery_kind_domain` / `recovery_derivative_evidence` fails because existing rows violate it —
    report the offending rows; do not delete or coerce them.
 10. Anyone proposes approving a plan in the same change as this migration.
