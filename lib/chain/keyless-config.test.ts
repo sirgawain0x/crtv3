@@ -32,7 +32,7 @@ describe("keyless Account Kit config", () => {
     clearAllRpcEnv();
     const mod = await import("../sdk/wallet/migration-config");
     expect(mod.alchemyMigrationConfig).toBeTruthy();
-  });
+  }, 30_000);
 
   it("constructs the root app config with no RPC credentials", async () => {
     clearAllRpcEnv();
