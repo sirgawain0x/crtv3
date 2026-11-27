@@ -90,13 +90,13 @@ beforeEach(() => {
 describe('reviewed derivative — plan authorization', () => {
   it('refuses a source with no plan at all', () => {
     expect(() => findReviewedDerivativePlan(source, originalRow, plans([]))).toThrow(ReviewedDerivativeError);
-    expect(() => findReviewedDerivativePlan(source, originalRow, plans([]))).toThrow(/no approved derivative plan/);
+    expect(() => findReviewedDerivativePlan(source, originalRow, plans([]))).toThrow(/no upload-approved derivative plan/);
   });
 
   it('refuses a candidate plan — reviewed but not approved', () => {
     const candidate = { ...plan, status: 'candidate' };
     expect(approvedDerivativePlans(plans([candidate]))).toHaveLength(0);
-    expect(() => findReviewedDerivativePlan(source, originalRow, plans([candidate]))).toThrow(/no approved/);
+    expect(() => findReviewedDerivativePlan(source, originalRow, plans([candidate]))).toThrow(/no upload-approved/);
   });
 
   it('refuses an approved plan that lacks an approver or reason', () => {
@@ -106,11 +106,11 @@ describe('reviewed derivative — plan authorization', () => {
 
   it('refuses a plan recorded for a different asset', () => {
     const other = { ...plan, livepeerAssetId: 'someone-elses-asset' };
-    expect(() => findReviewedDerivativePlan(source, originalRow, plans([other]))).toThrow(/no approved/);
+    expect(() => findReviewedDerivativePlan(source, originalRow, plans([other]))).toThrow(/no upload-approved/);
   });
 
   it('does not act on any plan before the database is touched', async () => {
-    await expect(prepareReviewedDerivativeRecovery(db, source, plans([]))).rejects.toThrow(/no approved/);
+    await expect(prepareReviewedDerivativeRecovery(db, source, plans([]))).rejects.toThrow(/no upload-approved/);
     expect(rpc).not.toHaveBeenCalled();
     expect(m.secure).not.toHaveBeenCalled();
   });
@@ -588,5 +588,87 @@ describe('reviewed derivative — state flow across the recovered steps', () => 
     m.original.mockResolvedValue({ ...originalRow, state: 'failed' });
     await adoptReviewedDerivative(db, source, plans([flowPlan]));
     expect(rpc).toHaveBeenCalledWith('adopt_reviewed_derivative_recovery', { p_source: source.assetId });
+  });
+});
+
+describe('reviewed derivative — two-stage approval', () => {
+  const stageData = Uint8Array.from({ length: 512 }, (_, i) => (i * 7) % 251);
+  const stageSha = createHash('sha256').update(stageData).digest('hex');
+  const stagePlan = { ...plan, derivativeSha256: stageSha, derivativeBytes: stageData.byteLength };
+  const uploadApproved = { ...stagePlan, status: 'upload-approved' as const };
+  const candidate = { ...stagePlan, status: 'candidate' as const };
+
+  const stageProvider = () => ({
+    createProtectedUpload: vi.fn(async () => ({
+      assetId: 'new-asset', playbackId: 'new-play', uploadId: 'up1', partSize: 512,
+      parts: [{ partNumber: 1, url: 'u1' }],
+    })),
+    uploadPart: vi.fn(async () => 'etag-1'),
+    complete: vi.fn(async () => ({ assetId: 'new-asset', playbackId: 'new-play' })),
+    inspect: vi.fn(async () => ({ assetId: 'new-asset', playbackId: 'new-play', phase: 'ready' })),
+    confirmProtection: vi.fn(async () => undefined),
+  } as unknown as ImportProvider);
+
+  const preparedRow = () => ({
+    ...recoveredRow,
+    state: 'prepared',
+    recovery_kind: 'derivative',
+    derivative_sha256: stagePlan.derivativeSha256,
+    derivative_bytes: stagePlan.derivativeBytes,
+    adopted_at: null,
+  });
+
+  it('lets upload-approved prepare the recovery', async () => {
+    m.recovered.mockResolvedValue(preparedRow());
+    await expect(prepareReviewedDerivativeRecovery(db, source, plans([uploadApproved])))
+      .resolves.toBeUndefined();
+  });
+
+  it('lets upload-approved transfer the reviewed bytes', async () => {
+    m.recovered.mockResolvedValue(preparedRow());
+    const provider = stageProvider();
+    await expect(uploadReviewedDerivative(db, source, stageData, plans([uploadApproved]), provider))
+      .resolves.toEqual({ assetId: 'new-asset', playbackId: 'new-play' });
+    expect(provider.confirmProtection).toHaveBeenCalledWith('new-asset', 'new-play');
+  });
+
+  it('lets upload-approved confirm readiness', async () => {
+    m.recovered.mockResolvedValue({ ...preparedRow(), state: 'processing', frameworks_asset_id: 'new-asset', frameworks_playback_id: 'new-play' });
+    await expect(confirmReviewedDerivativeReady(db, source, plans([uploadApproved]), { provider: stageProvider(), delayMs: 0 }))
+      .resolves.toBeUndefined();
+  });
+
+  it('refuses adoption with an upload-approved plan', async () => {
+    m.recovered.mockResolvedValue({ ...preparedRow(), state: 'ready', frameworks_asset_id: 'new-asset', frameworks_playback_id: 'new-play' });
+    await expect(adoptReviewedDerivative(db, source, plans([uploadApproved])))
+      .rejects.toThrow(/no approved derivative plan/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('refuses every stage for a candidate plan', async () => {
+    m.recovered.mockResolvedValue(preparedRow());
+    const provider = stageProvider();
+    await expect(prepareReviewedDerivativeRecovery(db, source, plans([candidate])))
+      .rejects.toThrow(/no upload-approved derivative plan/);
+    await expect(uploadReviewedDerivative(db, source, stageData, plans([candidate]), provider))
+      .rejects.toThrow(/no upload-approved derivative plan/);
+    await expect(adoptReviewedDerivative(db, source, plans([candidate])))
+      .rejects.toThrow(/no approved derivative plan/);
+    expect(provider.createProtectedUpload).not.toHaveBeenCalled();
+  });
+
+  it('treats an approved plan as authorizing both stages', async () => {
+    m.recovered.mockResolvedValue({ ...preparedRow(), state: 'ready', frameworks_asset_id: 'new-asset', frameworks_playback_id: 'new-play' });
+    m.original.mockResolvedValue({ ...originalRow, state: 'failed' });
+    await expect(adoptReviewedDerivative(db, source, plans([stagePlan]))).resolves.toBeUndefined();
+  });
+
+  it('accepts a supplied upload-approved plan that matches the record exactly', () => {
+    expect(assertPlanMatchesReviewed(plans([{ ...uploadApproved }]), plans([uploadApproved]))).toHaveLength(1);
+  });
+
+  it('rejects a supplied plan whose status differs from the record', () => {
+    expect(() => assertPlanMatchesReviewed(plans([{ ...stagePlan }]), plans([uploadApproved])))
+      .toThrow(/differs from the reviewed record/);
   });
 });

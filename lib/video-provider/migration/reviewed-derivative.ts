@@ -39,8 +39,10 @@ import plansFile from './reviewed-derivative-plans.json';
 /** Fixed local checks only; provider and database messages are never surfaced raw. */
 export class ReviewedDerivativeError extends Error {}
 
+export type ReviewedDerivativePlanStatus = 'approved' | 'upload-approved' | 'candidate';
+
 export type ReviewedDerivativePlan = {
-  status: 'approved' | 'candidate';
+  status: ReviewedDerivativePlanStatus;
   livepeerAssetId: string;
   originalPlaybackId: string;
   originalSha256: string;
@@ -66,7 +68,7 @@ function isPlan(value: unknown): value is ReviewedDerivativePlan {
   if (!value || typeof value !== 'object') return false;
   const p = value as Record<string, unknown>;
   return (
-    (p.status === 'approved' || p.status === 'candidate') &&
+    (p.status === 'approved' || p.status === 'upload-approved' || p.status === 'candidate') &&
     typeof p.livepeerAssetId === 'string' && p.livepeerAssetId.length > 0 &&
     typeof p.originalPlaybackId === 'string' && p.originalPlaybackId.length > 0 &&
     typeof p.originalSha256 === 'string' && SHA256.test(p.originalSha256) &&
@@ -81,13 +83,40 @@ function isPlan(value: unknown): value is ReviewedDerivativePlan {
 }
 
 /**
- * Plans from the checked-in file. Only `approved` plans are returned; a
- * `candidate` is a recorded review item, not permission to substitute.
+ * Plans from the checked-in file.
+ *
+ * Two-stage approval.
+ *
+ * `upload-approved` decides only that the reviewed bytes may be sent to the named
+ * QA database and provider. It never authorizes replacing the original mapping:
+ * adoption requires the second stage, `approved`, plus a ready, protected artifact
+ * whose evidence and playable manifest both check out.
  */
-export function approvedDerivativePlans(raw: unknown = plansFile): ReviewedDerivativePlan[] {
+export const TRANSFER_STATUSES = ['upload-approved', 'approved'] as const;
+export const ADOPTION_STATUSES = ['approved'] as const;
+
+function plansWithStatus(
+  raw: unknown,
+  statuses: readonly ReviewedDerivativePlanStatus[],
+): ReviewedDerivativePlan[] {
   const container = raw as { plans?: unknown } | undefined;
   const list = Array.isArray(container?.plans) ? container!.plans : [];
-  return list.filter(isPlan).filter((plan) => plan.status === 'approved');
+  return list.filter(isPlan).filter((plan) => statuses.includes(plan.status));
+}
+
+/** Every recorded status — used only to compare a supplied file against the record. */
+export function reviewableDerivativePlans(raw: unknown = plansFile): ReviewedDerivativePlan[] {
+  return plansWithStatus(raw, ['approved', 'upload-approved', 'candidate']);
+}
+
+/** Stage two: plans that authorize replacing the original mapping. */
+export function approvedDerivativePlans(raw: unknown = plansFile): ReviewedDerivativePlan[] {
+  return plansWithStatus(raw, ADOPTION_STATUSES);
+}
+
+/** Stage one: plans that authorize transferring the reviewed bytes. */
+export function uploadAuthorizedPlans(raw: unknown = plansFile): ReviewedDerivativePlan[] {
+  return plansWithStatus(raw, TRANSFER_STATUSES);
 }
 
 /**
@@ -99,10 +128,15 @@ export function approvedDerivativePlans(raw: unknown = plansFile): ReviewedDeriv
 export function resolveReviewedDerivativePlan(
   source: ArchivedSource,
   raw: unknown = plansFile,
+  statuses: readonly ReviewedDerivativePlanStatus[] = ADOPTION_STATUSES,
 ): ReviewedDerivativePlan {
-  const plan = approvedDerivativePlans(raw).find((p) => p.livepeerAssetId === source.assetId);
+  const plan = plansWithStatus(raw, statuses).find((p) => p.livepeerAssetId === source.assetId);
   if (!plan) {
-    throw new ReviewedDerivativeError('This source has no approved derivative plan');
+    throw new ReviewedDerivativeError(
+      statuses === ADOPTION_STATUSES
+        ? 'This source has no approved derivative plan'
+        : 'This source has no upload-approved derivative plan',
+    );
   }
   if (plan.originalPlaybackId !== source.playbackId) {
     throw new ReviewedDerivativeError('Reviewed derivative source evidence differs');
@@ -171,13 +205,14 @@ export function assertPreparedRecoveryMatchesPlan(
   }
 }
 
-/** Plan lookup for a substitution that is still pending (prepare / upload). */
+/** Plan lookup for a substitution that is still pending (prepare / upload / ready). */
 export function findReviewedDerivativePlan(
   source: ArchivedSource,
   original: OriginalRecord,
   raw: unknown = plansFile,
+  statuses: readonly ReviewedDerivativePlanStatus[] = TRANSFER_STATUSES,
 ): ReviewedDerivativePlan {
-  const plan = resolveReviewedDerivativePlan(source, raw);
+  const plan = resolveReviewedDerivativePlan(source, raw, statuses);
   assertRecoverableOriginal(original);
   return plan;
 }
@@ -194,12 +229,13 @@ export function assertPlanMatchesReviewed(
   suppliedPlans: unknown,
   raw: unknown = plansFile,
 ): ReviewedDerivativePlan[] {
-  const supplied = approvedDerivativePlans(suppliedPlans);
-  const reviewed = approvedDerivativePlans(raw);
+  const supplied = reviewableDerivativePlans(suppliedPlans);
+  const reviewed = reviewableDerivativePlans(raw);
   if (!supplied.length) {
-    throw new ReviewedDerivativeError('Supplied plan file contains no approved plan');
+    throw new ReviewedDerivativeError('Supplied plan file contains no reviewable plan');
   }
   const keys: Array<keyof ReviewedDerivativePlan> = [
+    'status',
     'livepeerAssetId', 'originalPlaybackId', 'originalSha256', 'originalBytes',
     'derivativeSha256', 'derivativeBytes', 'derivativeOrigin',
     'approvedBy', 'approvedAt', 'reason',
@@ -380,7 +416,7 @@ export async function confirmReviewedDerivativeReady(
 ): Promise<void> {
   const { attempts = 12, delayMs = 5000, provider: providerOverride } = options;
   const provider = providerOverride ?? (await import('./frameworks-import-provider')).createFrameworksImportProvider();
-  const plan = resolveReviewedDerivativePlan(source, raw);
+  const plan = resolveReviewedDerivativePlan(source, raw, TRANSFER_STATUSES);
   const ledger = createImportLedger(db, 'frameworks_import_recoveries');
   const recovered = await ledger.find(source.assetId);
   if (!recovered || !recovered.frameworks_asset_id) {

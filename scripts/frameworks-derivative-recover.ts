@@ -19,12 +19,15 @@ import { readFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import { archivedSourcesFromManifests } from '../lib/video-provider/migration/archive';
 import {
+  ADOPTION_STATUSES,
+  TRANSFER_STATUSES,
   adoptReviewedDerivative,
   approvedDerivativePlans,
   assertPlanMatchesReviewed,
   confirmReviewedDerivativeReady,
   prepareReviewedDerivativeRecovery,
   resolveReviewedDerivativePlan,
+  uploadAuthorizedPlans,
   uploadReviewedDerivative,
 } from '../lib/video-provider/migration/reviewed-derivative';
 
@@ -74,6 +77,7 @@ async function main() {
       adoptPathLoaded: typeof inspectMigrationPlayback === 'function',
       providerAdapterLoaded: typeof provider.createProtectedUpload === 'function',
       approvedPlans: approvedDerivativePlans().length,
+      uploadAuthorizedPlans: uploadAuthorizedPlans().length,
       providerRequests: 0,
       databaseWrites: 0,
     }));
@@ -96,11 +100,17 @@ async function main() {
   }
 
   // Refuse before any side effect if the reviewed set does not cover this source.
-  const plan = resolveReviewedDerivativePlan(source);
+  // Adoption needs stage two; every other stage needs stage one.
+  const plan = resolveReviewedDerivativePlan(
+    source,
+    undefined,
+    stage === 'adopt' ? ADOPTION_STATUSES : TRANSFER_STATUSES,
+  );
 
   const summary = {
     stage,
     mode: execute ? 'execute' : 'dry-run',
+    planStatus: plan.status,
     livepeerAssetId: plan.livepeerAssetId,
     originalBytes: plan.originalBytes,
     derivativeBytes: plan.derivativeBytes,
