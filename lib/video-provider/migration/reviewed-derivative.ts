@@ -57,15 +57,27 @@ export type ReviewedDerivativePlan = {
   targets: ReviewedDerivativeTargets;
 };
 
-/** The only QA database and provider endpoint a plan may be executed against. */
+/**
+ * The only QA database and provider account a plan may be executed against.
+ *
+ * `supabaseOrigin` is the complete origin, not a project ref: a first-label
+ * comparison lets `<ref>.other-domain.example` pass and then hands that origin the
+ * service-role key. The frame provider is bound either by a resolvable
+ * `providerAccountId` or, failing that, by a commitment to the exact credential
+ * (`providerTokenSha256`) — a hostname identifies the endpoint, never the account.
+ */
 export type ReviewedDerivativeTargets = {
-  qaProjectRef: string;
+  supabaseOrigin: string;
   providerHost: string;
+  providerAccountId?: string;
+  providerTokenSha256?: string;
 };
 
 export type ExecutionTargets = {
-  qaProjectRef: string;
+  supabaseOrigin: string;
   providerHost: string;
+  providerAccountId?: string;
+  providerTokenSha256?: string;
 };
 
 /**
@@ -94,14 +106,50 @@ function isValidApprovalTime(value: unknown): boolean {
   return parsed >= earliest && parsed <= latest;
 }
 
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * Strict Supabase origin: https only, no userinfo, no port other than 443, no
+ * path, query or fragment. Returns the normalized origin or null.
+ */
+export function parseSupabaseOrigin(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  if (raw.length === 0 || isPlaceholder(raw)) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return null;
+    if (url.username || url.password) return null;
+    if (url.port && url.port !== '443') return null;
+    if (url.pathname !== '/' && url.pathname !== '') return null;
+    if (url.search || url.hash) return null;
+    return url.origin.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function parseProviderHost(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim().toLowerCase();
+  if (v.length === 0 || isPlaceholder(v)) return null;
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v) ? v : null;
+}
+
+function hasProviderAccountBinding(targets: ReviewedDerivativeTargets): boolean {
+  const account = targets.providerAccountId;
+  if (typeof account === 'string' && account.trim().length >= 3 && !isPlaceholder(account)) return true;
+  const commitment = targets.providerTokenSha256;
+  return typeof commitment === 'string' && SHA256_HEX.test(commitment.trim());
+}
+
 function hasValidTargets(targets: unknown): targets is ReviewedDerivativeTargets {
   if (!targets || typeof targets !== 'object') return false;
-  const t = targets as Record<string, unknown>;
-  const ref = typeof t.qaProjectRef === 'string' ? t.qaProjectRef.trim() : '';
-  const host = typeof t.providerHost === 'string' ? t.providerHost.trim() : '';
+  const t = targets as ReviewedDerivativeTargets;
   return (
-    /^[a-z0-9][a-z0-9-]{2,}$/i.test(ref) && !isPlaceholder(ref) &&
-    /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host) && !isPlaceholder(host)
+    parseSupabaseOrigin(t.supabaseOrigin) !== null &&
+    parseProviderHost(t.providerHost) !== null &&
+    hasProviderAccountBinding(t)
   );
 }
 
@@ -282,18 +330,46 @@ export function findReviewedDerivativePlan(
 
 /**
  * Refuse to execute an approved plan against a database or provider it was not
- * reviewed for. Without this, the URL and provider host come from the environment
- * and a correctly approved plan can be run somewhere else entirely.
+ * reviewed for. Without this, the URL and provider credential come from the
+ * environment and a correctly approved plan can be run somewhere else entirely.
  */
 export function assertPlanTargets(plan: ReviewedDerivativePlan, actual: ExecutionTargets): void {
   if (!hasValidTargets(plan.targets)) {
-    throw new ReviewedDerivativeError('Reviewed plan records no execution targets');
+    throw new ReviewedDerivativeError('Reviewed plan records no verifiable execution targets');
   }
-  if (plan.targets.qaProjectRef.trim().toLowerCase() !== actual.qaProjectRef.trim().toLowerCase()) {
-    throw new ReviewedDerivativeError('QA database does not match the reviewed plan');
+
+  const plannedOrigin = parseSupabaseOrigin(plan.targets.supabaseOrigin);
+  const actualOrigin = parseSupabaseOrigin(actual.supabaseOrigin);
+  if (!actualOrigin) {
+    throw new ReviewedDerivativeError('Execution QA origin is not an acceptable HTTPS origin');
   }
-  if (plan.targets.providerHost.trim().toLowerCase() !== actual.providerHost.trim().toLowerCase()) {
+  if (plannedOrigin !== actualOrigin) {
+    throw new ReviewedDerivativeError('QA database origin does not match the reviewed plan');
+  }
+
+  const plannedHost = parseProviderHost(plan.targets.providerHost);
+  const actualHost = parseProviderHost(actual.providerHost);
+  if (!actualHost) {
+    throw new ReviewedDerivativeError('Execution provider host is not valid');
+  }
+  if (plannedHost !== actualHost) {
     throw new ReviewedDerivativeError('Provider host does not match the reviewed plan');
+  }
+
+  // The host binds the endpoint; only an account identifier or a credential
+  // commitment can bind the account behind the token.
+  const plannedAccount = plan.targets.providerAccountId?.trim();
+  if (plannedAccount) {
+    if (!actual.providerAccountId || actual.providerAccountId.trim() !== plannedAccount) {
+      throw new ReviewedDerivativeError('FrameWorks account does not match the reviewed plan');
+    }
+  }
+
+  const plannedCommitment = plan.targets.providerTokenSha256?.trim();
+  if (plannedCommitment) {
+    if (!actual.providerTokenSha256 || actual.providerTokenSha256.trim() !== plannedCommitment) {
+      throw new ReviewedDerivativeError('FrameWorks credential does not match the reviewed approval');
+    }
   }
 }
 

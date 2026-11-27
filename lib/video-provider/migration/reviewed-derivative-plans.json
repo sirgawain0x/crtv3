@@ -51,11 +51,12 @@
           "recovery_row": "none",
           "recorded_original_evidence_matches": true
         },
-        "targets_note": "providerHost is the endpoint from FRAMEWORKS_GRAPHQL_URL; qaProjectRef must be the QA project ref from FRAMEWORKS_MIGRATION_SUPABASE_URL. A placeholder target keeps the plan non-actionable however its status is edited."
+        "targets_note": "supabaseOrigin must be the full https origin (no port, userinfo, path or query); providerHost comes from FRAMEWORKS_GRAPHQL_URL. The account is bound by providerTokenSha256 - the sha256 of the exact FRAMEWORKS_API_TOKEN approved - because a hostname identifies the endpoint, not the account."
       },
       "targets": {
-        "qaProjectRef": "PENDING-QA-PROJECT-REF",
-        "providerHost": "bridge.frameworks.network"
+        "supabaseOrigin": "PENDING-QA-SUPABASE-ORIGIN",
+        "providerHost": "bridge.frameworks.network",
+        "providerTokenSha256": "PENDING-TOKEN-COMMITMENT"
       }
     },
     {
@@ -96,11 +97,12 @@
           "recorded_original_evidence_matches": true,
           "must_not_advance_while": "fac7fe31-599d-405e-90d1-b406b08d728a is the published mapping"
         },
-        "targets_note": "providerHost is the endpoint from FRAMEWORKS_GRAPHQL_URL; qaProjectRef must be the QA project ref from FRAMEWORKS_MIGRATION_SUPABASE_URL. A placeholder target keeps the plan non-actionable however its status is edited."
+        "targets_note": "supabaseOrigin must be the full https origin (no port, userinfo, path or query); providerHost comes from FRAMEWORKS_GRAPHQL_URL. The account is bound by providerTokenSha256 - the sha256 of the exact FRAMEWORKS_API_TOKEN approved - because a hostname identifies the endpoint, not the account."
       },
       "targets": {
-        "qaProjectRef": "PENDING-QA-PROJECT-REF",
-        "providerHost": "bridge.frameworks.network"
+        "supabaseOrigin": "PENDING-QA-SUPABASE-ORIGIN",
+        "providerHost": "bridge.frameworks.network",
+        "providerTokenSha256": "PENDING-TOKEN-COMMITMENT"
       }
     }
   ]

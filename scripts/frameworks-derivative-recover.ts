@@ -17,6 +17,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
 import { archivedSourcesFromManifests } from '../lib/video-provider/migration/archive';
 import { frameworksGraphqlUrl } from '../lib/video-provider/config';
 import {
@@ -138,11 +139,18 @@ async function main() {
 
   // The provider endpoint the run would use, and the QA project the plan is bound to.
   const providerHost = new URL(frameworksGraphqlUrl()).hostname;
+  const tokenForTargets = process.env.FRAMEWORKS_API_TOKEN?.trim();
+  const providerTokenSha256 = tokenForTargets
+    ? createHash('sha256').update(tokenForTargets).digest('hex')
+    : undefined;
   const qaUrlForTargets = process.env.FRAMEWORKS_MIGRATION_SUPABASE_URL;
-  const qaProjectRef = qaUrlForTargets ? new URL(qaUrlForTargets).hostname.split('.')[0] : null;
   let targetsVerified = false;
-  if (qaProjectRef) {
-    assertPlanTargets(plan, { qaProjectRef, providerHost });
+  if (qaUrlForTargets) {
+    assertPlanTargets(plan, {
+      supabaseOrigin: qaUrlForTargets,
+      providerHost,
+      providerTokenSha256,
+    });
     targetsVerified = true;
   }
 
@@ -151,7 +159,11 @@ async function main() {
     mode: execute ? 'execute' : 'dry-run',
     planStatus: plan.status,
     plannedTargets: plan.targets,
-    actualTargets: { qaProjectRef, providerHost },
+    actualTargets: {
+      supabaseOrigin: qaUrlForTargets ?? null,
+      providerHost,
+      providerTokenSha256: providerTokenSha256 ? `${providerTokenSha256.slice(0, 12)}…` : null,
+    },
     targetsVerified,
     livepeerAssetId: plan.livepeerAssetId,
     originalBytes: plan.originalBytes,
@@ -170,7 +182,7 @@ async function main() {
   const key = process.env.FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Migration database credentials are required to execute');
   // Refuse a correctly approved plan executed against a different database or provider.
-  assertPlanTargets(plan, { qaProjectRef: new URL(url).hostname.split('.')[0], providerHost });
+  assertPlanTargets(plan, { supabaseOrigin: url, providerHost, providerTokenSha256 });
   const db = createClient(url, key, { auth: { persistSession: false } });
 
   switch (stage) {

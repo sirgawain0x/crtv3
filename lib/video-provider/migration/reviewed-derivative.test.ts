@@ -55,7 +55,11 @@ const plan = {
   approvedBy: '0xReviewer',
   approvedAt: '2026-11-26T00:00:00Z',
   reason: '10-bit AV1 is not ingested by the provider; H.264 derivative decodes clean',
-  targets: { qaProjectRef: 'qaprojectref123', providerHost: 'bridge.frameworks.network' },
+  targets: {
+    supabaseOrigin: 'https://qaprojectref123.supabase.co',
+    providerHost: 'bridge.frameworks.network',
+    providerTokenSha256: 'a'.repeat(64),
+  },
 };
 const plans = (list: unknown[]) => ({ plans: list });
 
@@ -677,30 +681,79 @@ describe('reviewed derivative — two-stage approval', () => {
 });
 
 describe('reviewed derivative — execution target binding', () => {
-  const actual = { qaProjectRef: 'qaprojectref123', providerHost: 'bridge.frameworks.network' };
+  const commitment = 'a'.repeat(64);
+  const actual = {
+    supabaseOrigin: 'https://qaprojectref123.supabase.co',
+    providerHost: 'bridge.frameworks.network',
+    providerTokenSha256: commitment,
+  };
 
-  it('accepts the reviewed QA project and provider host', () => {
+  it('accepts the reviewed origin, provider host and credential commitment', () => {
     expect(() => assertPlanTargets(plan, actual)).not.toThrow();
   });
 
-  it('refuses a different QA project', () => {
-    expect(() => assertPlanTargets(plan, { ...actual, qaProjectRef: 'someone-elses-qa' }))
-      .toThrow(/QA database does not match the reviewed plan/);
+  it('refuses a lookalike domain that shares the project ref', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, supabaseOrigin: 'https://qaprojectref123.other-domain.example' }))
+      .toThrow(/QA database origin does not match/);
+  });
+
+  it('refuses a non-HTTPS origin', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, supabaseOrigin: 'http://qaprojectref123.supabase.co' }))
+      .toThrow(/not an acceptable HTTPS origin/);
+  });
+
+  it('refuses an origin carrying userinfo', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, supabaseOrigin: 'https://user:pass@qaprojectref123.supabase.co' }))
+      .toThrow(/not an acceptable HTTPS origin/);
+  });
+
+  it('refuses an unexpected port', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, supabaseOrigin: 'https://qaprojectref123.supabase.co:8443' }))
+      .toThrow(/not an acceptable HTTPS origin/);
   });
 
   it('refuses a different provider host', () => {
     expect(() => assertPlanTargets(plan, { ...actual, providerHost: 'bridge.example.com' }))
-      .toThrow(/Provider host does not match the reviewed plan/);
+      .toThrow(/Provider host does not match/);
+  });
+
+  it('refuses a different credential commitment', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, providerTokenSha256: 'b'.repeat(64) }))
+      .toThrow(/FrameWorks credential does not match/);
+  });
+
+  it('refuses a missing credential commitment when the plan requires it', () => {
+    expect(() => assertPlanTargets(plan, { ...actual, providerTokenSha256: undefined }))
+      .toThrow(/FrameWorks credential does not match/);
+  });
+
+  it('binds by account id when the plan records one', () => {
+    const withAccount = { ...plan, targets: { ...plan.targets, providerAccountId: 'acct_123' } };
+    expect(() => assertPlanTargets(withAccount, { ...actual, providerAccountId: 'acct_123' })).not.toThrow();
+    expect(() => assertPlanTargets(withAccount, { ...actual, providerAccountId: 'acct_999' }))
+      .toThrow(/FrameWorks account does not match/);
   });
 
   it('refuses a plan with no recorded targets', () => {
     const noTargets = { ...plan, targets: undefined } as unknown as typeof plan;
     expect(() => assertPlanTargets(noTargets, actual))
-      .toThrow(/records no execution targets/);
+      .toThrow(/no verifiable execution targets/);
+  });
+
+  it('refuses a plan that binds neither account nor credential', () => {
+    const unbound = {
+      ...plan,
+      targets: { supabaseOrigin: plan.targets.supabaseOrigin, providerHost: plan.targets.providerHost },
+    } as unknown as typeof plan;
+    expect(() => assertPlanTargets(unbound, actual))
+      .toThrow(/no verifiable execution targets/);
   });
 
   it('treats a target difference as a reviewed-record difference', () => {
-    const edited = { ...plan, targets: { ...plan.targets, qaProjectRef: 'otherproject' } };
+    const edited = {
+      ...plan,
+      targets: { ...plan.targets, supabaseOrigin: 'https://qaprojectref123.other-domain.example' },
+    };
     expect(() => assertPlanMatchesReviewed(plans([edited]), plans([plan])))
       .toThrow(/differs from the reviewed record \(targets\)/);
   });
@@ -737,7 +790,7 @@ describe('reviewed derivative — placeholder approval evidence', () => {
   });
 
   it('refuses placeholder targets even with real approval evidence', () => {
-    const pendingTargets = { ...plan, targets: { ...plan.targets, qaProjectRef: 'PENDING-QA-PROJECT-REF' } };
+    const pendingTargets = { ...plan, targets: { ...plan.targets, supabaseOrigin: 'PENDING-QA-SUPABASE-ORIGIN' } };
     expect(approvedDerivativePlans(plans([pendingTargets]))).toHaveLength(0);
   });
 
