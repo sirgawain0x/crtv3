@@ -38,6 +38,10 @@ export FRAMEWORKS_MIGRATION_SUPABASE_SERVICE_ROLE_KEY='…'
 ```bash
 set -euo pipefail
 
+# Pinned again here, in the shell: the value below is used for every CLI call, and an
+# operator's stale QA_REF must never be what gets linked or pushed to.
+export QA_REF='zxpobpucayevlrzdxhmr'
+
 # Emits a sanitised connection string on stdout (all diagnostics go to stderr) and
 # exits non-zero unless the target is provably the pinned QA project.
 QA_DB_CONN=$(python3 - "$QA_DATABASE_URL" "$FRAMEWORKS_MIGRATION_SUPABASE_URL" <<'PY'
@@ -92,9 +96,9 @@ elif re.fullmatch(r"aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com", host) and use
 else:
     stop(f"database URL does not target {QA_REF} (host={host!r} user={user!r})")
 
-# Everything that was validated is kept; the query string is dropped so nothing
-# unchecked can reach libpq, and TLS policy comes from the environment instead.
-print(urllib.parse.urlunsplit((u.scheme, u.netloc, u.path or "/postgres", "", "")))
+# Everything that was validated is kept and the query is rebuilt from the single
+# checked value, so nothing unchecked can reach libpq, psql, pg_dump or the CLI.
+print(urllib.parse.urlunsplit((u.scheme, u.netloc, u.path or "/postgres", "sslmode=verify-full", "")))
 PY
 ) || exit 1
 
@@ -242,12 +246,14 @@ checkpoint if available. Keep the stamp: it identifies the restore set.
 
 ## 2. Apply — inspect the pending set first
 
-`supabase db push` applies **every** pending migration, not just this one.
+`supabase db push` applies **every** pending migration, not just this one. Every command below uses
+`--db-url "$QA_DB_CONN"` rather than `--linked`: the linked path opens its own connection, which this
+guard does not govern and whose TLS policy is the CLI's choice, not ours. Not linking also means a
+stale `supabase link` in the operator's config cannot redirect anything.
 
 ```bash
-supabase link --project-ref "$QA_REF"
-supabase migration list --linked        # what the remote ledger records
-supabase db push --dry-run --linked     # what a push would apply
+supabase migration list --db-url "$QA_DB_CONN"        # what the remote ledger records
+supabase db push --db-url "$QA_DB_CONN" --dry-run     # what a push would apply
 ```
 
 **Stop unless the dry run lists exactly `20261126093000`.**
@@ -262,8 +268,8 @@ so it is not part of the default path:
 2. A reviewer decides. Only then:
 
 ```bash
-supabase migration repair --status applied --linked 20261124183930
-supabase db push --dry-run --linked     # re-check: only 20261126093000 may remain
+supabase migration repair --status applied --db-url "$QA_DB_CONN" 20261124183930
+supabase db push --db-url "$QA_DB_CONN" --dry-run   # re-check: only 20261126093000 may remain
 ```
 
 If any 0.1 check fails — a differing body hash, a missing constraint, a missing grant — **do not
@@ -272,10 +278,10 @@ repair**. Reconcile the schema instead of recording it as applied.
 ### 2.2 Apply
 
 ```bash
-supabase db push --linked
+supabase db push --db-url "$QA_DB_CONN"
 ```
 
-Direct alternative when `--linked` is unavailable. Syntax checked against Supabase CLI 2.110.0:
+Direct alternative, for when the CLI cannot be used at all. Syntax checked against Supabase CLI 2.110.0:
 
 ```bash
 psql "$QA_DB_CONN" -v ON_ERROR_STOP=1 \
@@ -367,8 +373,7 @@ commit;
 ```
 
 ```bash
-supabase migration repair --status reverted --linked 20261126093000
-# or: --db-url "$QA_DB_CONN" 20261126093000
+supabase migration repair --status reverted --db-url "$QA_DB_CONN" 20261126093000
 ```
 
 Post-rollback checks: expected `0 | 0 | 0` for columns, constraints and RPCs, with the trigger still
@@ -396,11 +401,10 @@ substitution. Restore the step-1 dump instead and escalate.
 |---|---|
 | Rollback block (§4) | **executed** against PGlite on top of both migrations: 11/11 assertions, including immutability after rollback |
 | Connection guard (§0) | **executed** in 12 dummy-credential scenarios asserting the reason and that the emitted string carries no query: direct and pooler with `verify-full` accepted; missing, empty, `require`, `verify-ca` and duplicated `sslmode`, `?host=` override, production REST/DB, lookalike pooler and a foreign user all refused |
-| Prerequisite function hashes (§0.1 c) | **matched QA** (reviewer-confirmed) |
-| Prerequisite structural assertions (§0.1 a/b/d/e) | reviewer confirmed 14 columns, 2 uniques and 1 foreign key; the constraint-definition, grant and trigger rows are **not yet reported** |
+| Prerequisite (§0.1, all rows) | **matched live QA** — reviewer confirmed the three function bodies, 14 columns, 2 uniques, 1 foreign key, the state constraint, both reuse constraints, the ready-state constraint, `service_role` grants and the `BEFORE UPDATE` trigger |
 | Verification queries (§3) | apply-side counts exercised on the same PGlite run (4 / 4 / 2 / trigger 1 / body updated) |
 | Backup commands (§1) | `pg_dump` **not executed** (needs QA credentials); the fail-closed guard was **executed** against four synthetic files — empty, missing-table and truncated all stopped, a complete dump passed |
-| `db push` / `migration repair` (§2, §4) | syntax checked against Supabase CLI 2.110.0, **not run** |
+| `db push` / `migration repair` (§2, §4) | syntax checked against Supabase CLI 2.110.0, **not run**; every call uses `--db-url` with the validated URI, so the CLI inherits `sslmode=verify-full` instead of choosing its own policy |
 | Anything against the live QA project | **not run** |
 
 ## 6. Stop conditions — halt and report if any is true
@@ -414,7 +418,8 @@ substitution. Restore the step-1 dump instead and escalate.
 4. `fac7fe31…` is not `failed`, has lost its original provider ids, or already has a recovery row.
 5. The backup files are not non-empty, not cleanly terminated, not checksum-verified, or not stored
    off-repo.
-6. `db push --dry-run` lists any migration other than `20261126093000`.
+6. `db push --dry-run` lists any migration other than `20261126093000`, or any command is run with
+   `--linked`/`supabase link` instead of `--db-url "$QA_DB_CONN"`.
 7. Anyone proposes repairing the ledger (§2.1) without the complete §0.1 output attached.
 8. Any §3 count differs from its expected value, or `--verify-schema` reports `false` after a
    claimed success.
