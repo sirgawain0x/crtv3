@@ -38,16 +38,22 @@ export async function handleFrameworksWebhookEvent(event:FrameworksWebhookEvent)
     ...(asset.name?{name:asset.name.slice(0,500)}:{}),
     ...(Number.isFinite(asset.videoSpec?.duration) && asset.videoSpec!.duration!>=0?{durationSeconds:asset.videoSpec!.duration!}:{})};
  }
- // The receipt table keys on event_id and carries no asset id, so this line is the only place the
- // event -> asset linkage exists. Ids and the event type only: no payload, no credential, no URL.
- serverLogger.info('[frameworks webhook] event accepted',{
-  eventId:event.id,
-  eventType:event.type,
-  assetId:artifact?.assetId ?? null,
-  playbackId:artifact?.playbackId ?? null,
-  streamId:streamId?toFrameworksStreamNodeId(streamId):null,
- });
- return commitFrameworksWebhook({eventId:event.id,type:event.type,occurredAt:new Date(event.created_at).toISOString(),
+ const result=await commitFrameworksWebhook({eventId:event.id,type:event.type,occurredAt:new Date(event.created_at).toISOString(),
   payloadSha256:createHash('sha256').update(JSON.stringify(event)).digest('hex'),
   streamId:streamId?toFrameworksStreamNodeId(streamId):undefined,artifact});
+ // Emitted only after the write returns 'processed': the receipt table keys on event_id and carries
+ // no asset id, so this line is the only place the event -> asset linkage exists, and it must never
+ // describe a delivery whose write failed or was already recorded.
+ // warn, not info: lib/utils/logger.ts suppresses info outside development, so an info line would be
+ // absent from exactly the deployed environment this evidence is needed in.
+ if(result==='processed'){
+  serverLogger.warn('[frameworks webhook] event processed',{
+   eventId:event.id,
+   eventType:event.type,
+   assetId:artifact?.assetId ?? null,
+   playbackId:artifact?.playbackId ?? null,
+   streamId:streamId?toFrameworksStreamNodeId(streamId):null,
+  });
+ }
+ return result;
 }
