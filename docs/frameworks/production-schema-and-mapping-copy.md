@@ -611,9 +611,18 @@ it as absent would delete a setting the environment relied on. Resolve it first 
 `vercel env pull` into a temporary file that is deleted after the value is recorded.
 
 **If the window is parked and the deploy freeze lifted**, the recorded baseline stops being "immediate pre-switch":
-any later production deploy supersedes it. On resume, re-read `vercel inspect tv.creativeplatform.xyz`, record the
-new baseline, and update §6's rollback target before capturing anything else. A stale baseline is re-verifiable; a
-window that assumes it is still current is not.
+any later production deploy supersedes it. Reopening the window is a fixed sequence — nothing else may happen
+first:
+
+1. `vercel inspect tv.creativeplatform.xyz` — record what actually serves production now
+2. read `VIDEO_PROVIDER`'s presence **and** value in production (`vercel env ls --json`)
+3. refresh §6's rollback target and the baseline in this document to the deployment found in step 1
+4. **reinstate the deploy freeze** — from here until the provider setting is persisted
+5. re-take the pre-switch capture (provider state, alias snapshot) into a fresh window directory
+6. run the backup gate; schema, mappings, remap and the provider setting wait behind it
+
+A stale baseline is re-verifiable; a window that assumes it is still current is not. And a window that resumes
+without reinstating the freeze has no protection against a deploy landing between the capture and the switch.
 
 Then **pause other production deployments from the prebuild through the smoke tests and the provider-setting
 persistence**. A hotfix or a merge landing mid-window would build against a half-switched provider setting, and
