@@ -111,6 +111,20 @@ function checkedValues(table: IdentityPatch['table'], values: Values): [string,s
 function condition(table: IdentityPatch['table'], values: Values): string {
   return checkedValues(table,values).map(([key,value]) => `${key} IS NOT DISTINCT FROM ${literal(value)}`).join(' AND ');
 }
+/**
+ * Before/after predicates for each patch, built with the same `condition`/`literal` pair the apply SQL uses.
+ * Resume verification must compare rows exactly as the generator does — re-implementing the comparison is how a
+ * NULL field becomes `= 'null'` and an untouched legacy row is misread as ambiguous.
+ */
+export function identityStatePredicates(plan: RemapPlan): { table: string; id: string; before: string; after: string }[] {
+  return plan.patches.map(patch => ({
+    table: patch.table,
+    id: String(patch.id),
+    before: condition(patch.table, patch.before),
+    after: condition(patch.table, patch.after),
+  }));
+}
+
 /** Transactional, guarded SQL only; a separate operator action is required to apply it. */
 export function renderAssetRemapSql(plan: RemapPlan, direction: 'apply' | 'rollback'): string {
   if (plan.blockers.length || plan.unresolvedReferences.length) throw new Error('Resolve published coverage and historical reference exceptions before generating executable SQL');

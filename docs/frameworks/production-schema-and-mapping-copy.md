@@ -726,22 +726,24 @@ two different plans can produce the same counts. The resume check compares the *
 
 ```bash
 GENERATED="$CUTOVER_DIR/generated"
-jq -r 'def sql_literal: tostring | gsub("\u0027"; "\u0027\u0027") | "\u0027" + . + "\u0027";
-       .plan.identities.patches[]
-       | [ .table, (.id|tostring),
-           (.before|to_entries|map("\(.key)=\(.value|sql_literal)")|join(" AND ")),
-           (.after |to_entries|map("\(.key)=\(.value|sql_literal)")|join(" AND ")) ]
-       | @tsv' "$GENERATED/plan.json" > "$CUTOVER_DIR/patches.tsv"
+npx tsx scripts/frameworks-remap-verify.ts "$GENERATED/plan.json" > "$CUTOVER_DIR/patches.tsv"
 ```
 
-`sql_literal` matters twice over. `tojson` would emit double quotes, which Postgres reads as identifiers rather than
-strings, so the conditions would fail to parse instead of comparing values. The quoting also has to survive the
-shell, so the apostrophe is written as `\u0027` rather than as a literal character — written the obvious way, the
-program is mangled by shell quoting and the escaping silently disappears. Output is one line per patch:
+The predicates come from `identityStatePredicates`, which shares `condition`/`literal` with the apply SQL — the same
+function that decides whether a row may be updated decides whether it has already been updated. That matters for
+`NULL`: a legacy row carries `null` in `frameworks_asset_id`, and any hand-rolled comparison renders it as
+`= 'null'`, which matches nothing. Every untouched row would then read as ambiguous. The generator emits
+`IS NOT DISTINCT FROM NULL`, which matches.
 
-```
-video_assets	145	provider='livepeer' AND title='Tulleti - Brutality'	provider='frameworks' AND title='Bob''s Song'
-```
+Verified against PGlite (real Postgres semantics) with a legacy row containing nulls and an apostrophe:
+
+| row state | before predicate | after predicate | reading |
+| --- | --- | --- | --- |
+| untouched legacy row | 1 | 0 | unmapped |
+| `frameworks_asset_id = NULL` (hand-rolled) | 0 | — | matches nothing, three-valued logic |
+| `frameworks_asset_id = 'null'` (hand-rolled) | 0 | 0 | **misreads as ambiguous** |
+| after apply | 0 | 1 | applied |
+| drifted value | 0 | 0 | genuinely ambiguous — stop |
 
 For each line, count the rows in that table matching the `before` condition and the `after` condition:
 
