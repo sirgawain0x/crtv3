@@ -402,6 +402,27 @@ is a stop, not a judgement call.
 psql "$PROD_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 -f cutover-*/apply.sql
 ```
 
+### 5.0 The provider switch is a separate step, and merging does not perform it
+
+**Deploying `main` does not activate FrameWorks.** `resolveVideoProviderId()` (`lib/video-provider/config.ts`)
+returns `livepeer` unless `VIDEO_PROVIDER` is literally `frameworks`; the default is stated in the source. The
+switch is therefore an environment change plus a redeploy, not a merge:
+
+```bash
+vercel env add VIDEO_PROVIDER production      # value: frameworks
+# then redeploy production so the new value is baked in, and confirm the running deployment
+```
+
+Current state, verified from the code path rather than the dashboard: the staging relay only executes when
+`VERCEL_ENV=production` **and** `VIDEO_PROVIDER !== 'frameworks'`, and it did execute during the 2026-11-27 test
+(all three lifecycle events returned `204` from the relay). So production is on **livepeer** today.
+
+**The remap and the switch must be adjacent.** Applying the remap first leaves 25 catalog rows pointing at
+FrameWorks asset ids while the provider still resolves to Livepeer, and those videos fail playback until the
+switch lands. Switching first, then remapping, instead leaves rows carrying Livepeer ids under a FrameWorks
+provider. Neither gap is avoidable, so keep it to seconds: apply → switch → §5.1 → §5.2 → §5.3, and roll back
+if §5.2 cannot open one of the 25.
+
 ### 5.1 Confirm the row count
 
 ```sql
