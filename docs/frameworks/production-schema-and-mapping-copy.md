@@ -327,23 +327,31 @@ Before the window, against a **pinned staging deployment** (`npx vercel inspect 
 Record the deployment id with each row. A staging pass is evidence about that deployment and that
 session; it retires the media/plumbing risk and nothing more.
 
-### Status of the staging smoke test: BLOCKED (device access)
+### Status of the staging smoke test: PASSED (2026-11-27)
 
-Probed on 2026-11-27 from an unauthenticated shell — deployment `crtv4-5c1yp3n1v`, commit `3e0286571`:
+Run from a signed-in Chrome against the pinned deployment. Two builds are involved because the first was
+superseded mid-test; the evidence is attached to the build that produced it.
 
-```
-crtv4-5c1yp3n1v-creative-projects.vercel.app   HTTP 302 → https://vercel.com/sso-api?url=…
-staging.tv.creativeplatform.xyz                HTTP 302 → https://vercel.com/sso-api?url=…
-crtv4-git-staging-creative-projects.vercel.app HTTP 302 → https://vercel.com/sso-api?url=…
-```
+| check | deployment | evidence |
+| --- | --- | --- |
+| playback | `dpl_HPVfJCsRXoS5vdMZGhpnuVkj3wgW` | 17:04:19 EST, playhead 4.89 → 8.20 s on a 20 s clip, five `200`s from `/api/internal/playback-info` just before Play |
+| ingest | `dpl_F5esZBmozb4jk8Y7Y568e2sBDWXF` | asset `202611280133060c818dff6b2c412c`, playback `jZaV9t7k0yxBZVhm`, created through the normal creator upload; transfer completed |
+| ready webhook | `dpl_F5esZBmozb4jk8Y7Y568e2sBDWXF` | `upload.ready` 19:34:06 EST; log line and receipt share event id `01a21f92-c656-7891-8abf-23e5fb63c404`; `frameworks_ready_artifacts` row for the same `asset_id` |
 
-All three answer with the Vercel Authentication redirect, so no application code ran and nothing here is
-evidence about playback or webhooks. **A `302` to `sso-api` is the gate answering, not a failure of the
-app** — do not read it as one, and do not disable deployment protection or mint a bypass to get past it.
+The pre-cutover relay is proven end to end by these runs: provider → production receiver → relay → staging,
+`200` from both. It exists because the provider cannot send `x-vercel-protection-bypass` itself.
 
-The operator runs the three rows above from a signed-in session. Everything else in this document that
-needs no session has been run; this is the one section that has not, and it stays listed as blocked until
-someone with a session reports it.
+Two things this pass does **not** establish, and both should survive into the production run:
+
+1. **The first attempt failed provider-side and its root cause is unknown.** Asset
+   `202611280024258b5153ecb4e01efa` stalled at 0% and ended in `upload.failed`; the retry with a normalised
+   20-second clip reached ready 62 s after upload start. The two clips differed in duration and encode history,
+   so the retry is one success, not a diagnosis. `FAILED` is terminal at the provider — remediating a stall
+   always means a new upload.
+2. **A `302` to `sso-api` is still the gate answering, not an app failure.** Every unauthenticated probe of these
+   hostnames returns it. Never read it as a failed check, and never disable deployment protection or mint a
+   bypass to get past it. Note that `/api/livepeer/webhook` is different: unsigned it returns `401` **from the
+   application**, which is why a provider delivery can reach it while ordinary pages cannot.
 
 ## §4 Remap dry run — the gate
 
@@ -410,17 +418,56 @@ select id, asset_id, playback_id, provider, frameworks_asset_id from public.vide
 select count(*) from public.frameworks_vod_access;   -- >= 25
 ```
 
-### 5.2 Prove it through the production catalog, after the switch
+### 5.2 Migrated playback — proves the catalog migration
 
-A staging pass in §3.6 does not transfer here: it exercised a different catalog row. These two are the
-post-switch evidence, and neither has been run:
+Prerequisite: the dry run in §4 reported **25 updates, 3 exceptions, 0 blockers**, and the remap has been applied
+inside the approved window. Any other count is a stop.
 
-| check | decisive signal |
+Then open **one of the 25** through the production catalog with `tv.creativeplatform.xyz` serving FrameWorks, and
+record:
+
+| field | value |
 | --- | --- |
-| remapped playback | open one of the 25 **through the production catalog** with `tv.creativeplatform.xyz` serving FrameWorks, and watch the playhead advance against wall-clock |
-| production ingest webhook | a test ingest on production is delivered **and processed** — confirm the receipt row and the resulting asset state, not a `200` from the endpoint |
+| video | `id` and title from the 25 |
+| deployment | `vercel inspect tv.creativeplatform.xyz` at the time of the test |
+| start time | wall clock when Play was pressed |
+| playhead | start and end position, against elapsed wall clock |
+| response | `/api/internal/playback-info` statuses observed |
 
-If either fails after the switch, roll back first (§6) and report afterwards.
+Not evidence for this row: archive or preview playback, a metadata or poster `200`, or any pass recorded on a
+staging deployment. Only the production catalog row demonstrates that the migration moved *that* video.
+
+### 5.3 New upload and webhook — proves production ingest and webhook processing
+
+A different proof from §5.2, and not interchangeable with it: a remapped video shows the catalog moved, a fresh
+upload shows that production **accepts and processes** new ingest. Both are required; neither substitutes for the
+other.
+
+Upload one disposable clip in production and record the upload time, the asset id and the playback id. The
+acceptance triple — the shape verified on staging in #409 — is all three of:
+
+| # | evidence | requirement |
+| --- | --- | --- |
+| 1 | post-commit log | `[frameworks webhook] event processed { eventId, assetId, playbackId }` on the production deployment |
+| 2 | receipt | a `public.frameworks_webhook_receipts` row whose `event_id` equals that `eventId` |
+| 3 | asset state | a `public.frameworks_ready_artifacts` row for the same `asset_id`, `event_type = 'upload.ready'` |
+
+Rules that decide whether the evidence counts:
+
+- **A `200` alone is not evidence.** An event type outside the business set returns `200 {"ok":true}` and
+  processes nothing; the receipt and the asset row are what distinguish processing from acknowledgement.
+- **A replayed `event_id` proves nothing.** An already-recorded id returns `204`, writes no receipt and emits no
+  log line — indistinguishable in a request log from an ignored lifecycle event.
+- **`FAILED` is terminal, and needs a new upload.** The provider exposes no reprocess operation, so a failed asset
+  can never satisfy this check; a stall is remediated by a new upload with new event ids.
+- **Readiness cannot be polled.** `/api/internal/playback-info` answers with an x402 payment challenge
+  (0.05 USDC per call) and the provider's HLS path needs a signed `fwjwt`; wait for the ready webhook instead.
+- **An empty `vercel logs <deployment>` from a shell is a tooling gap, not a finding.** Read delivery from the
+  Vercel dashboard or the provider's delivery history.
+- **Timing is a triage aid, not a timeout.** On staging the ready event arrived 62 s after upload start; the
+  failed attempt took 6 m 37 s to fail. Neither bound is a threshold to fail against.
+
+If either §5.2 or §5.3 fails after the switch, roll back first (§6) and report afterwards.
 
 ## §6 Rollback
 
@@ -437,4 +484,5 @@ If either fails after the switch, roll back first (§6) and report afterwards.
 | production ref pinned from code | **verified** (`zdeiezfoemibjgrkyzvs`, `import-mapping-copy.ts`) |
 | migration order + hashes | **computed from committed files, 11 entries**; composition confirmed against production for the ledger, webhook receipts and stream replacements only |
 | connection guard | **executed** with dummy credentials — accept and reject cases below |
-| backup, DDL, mapping copy, remap, playback, ingest, webhook | **not run** — no production or staging credentials here |
+| staging playback, ingest, ready webhook | **verified** 2026-11-27 on `dpl_HPVfJCsRXoS5vdMZGhpnuVkj3wgW` and `dpl_F5esZBmozb4jk8Y7Y568e2sBDWXF` (§3.6) |
+| backup, DDL, mapping copy, remap, production playback, production ingest | **not run** — no production credentials here; awaits the approved #410 window |
