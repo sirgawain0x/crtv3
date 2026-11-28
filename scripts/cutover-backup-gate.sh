@@ -17,6 +17,7 @@ umask 077
 : "${PROD_DB_CONN:?set PROD_DB_CONN to the production URI (sslmode=verify-full)}"
 : "${SCRATCH_DB_CONN:?set SCRATCH_DB_CONN to a scratch database URI}"
 : "${CUTOVER_DIR:?set CUTOVER_DIR to the window directory}"
+: "${CATALOG_REFERENCE:?set CATALOG_REFERENCE to the pre-migration catalog snapshot (videos[] with id, asset_id, playback_id)}"
 
 DUMP="$CUTOVER_DIR/backup.dump"
 DUMP_TMP="$CUTOVER_DIR/.backup.dump.tmp"
@@ -66,10 +67,13 @@ scratch_target=$(parse "$SCRATCH_DB_CONN")
 [ ! -e "$DUMP" ] || stop "$DUMP already exists — use a fresh CUTOVER_DIR"
 rm -f "$DUMP_TMP"
 
-# Homebrew keeps libpq keg-only, so the client tools exist without being on PATH.
-for candidate in /opt/homebrew/opt/libpq/bin /usr/local/opt/libpq/bin; do
-  [ -x "$candidate/pg_dump" ] && PATH="$candidate:$PATH" && export PATH && break
-done
+# Homebrew keeps libpq keg-only, so the client tools can exist without being on PATH. Only fall back to the
+# keg when nothing resolvable is found - an explicitly supplied PATH must win.
+if ! command -v pg_dump >/dev/null 2>&1; then
+  for candidate in /opt/homebrew/opt/libpq/bin /usr/local/opt/libpq/bin; do
+    [ -x "$candidate/pg_dump" ] && PATH="$candidate:$PATH" && export PATH && break
+  done
+fi
 command -v pg_dump >/dev/null || stop "pg_dump not found (install the postgres client: brew install libpq)"
 command -v pg_restore >/dev/null || stop "pg_restore not found (install the postgres client: brew install libpq)"
 command -v psql >/dev/null || stop "psql not found (install the postgres client: brew install libpq)"
@@ -104,6 +108,64 @@ scratch_rows=$(psql "$SCRATCH_DB_CONN" -Atc "select count(*) from public.video_a
 [ "$prod_rows" = "$scratch_rows" ] \
   || stop "restored copy has $scratch_rows video_assets, production has $prod_rows"
 
+# --- pre-migration schema: the backup is taken BEFORE the 11 migrations ---------
+# If any of these are already present, the dump was taken after the schema work started and is not the
+# pre-migration baseline this window needs.
+ledger_tables=$(psql "$SCRATCH_DB_CONN" -Atc "
+  select count(*) from information_schema.tables
+   where table_schema='public'
+     and table_name in ('frameworks_asset_imports','frameworks_vod_access','frameworks_webhook_receipts',
+                        'frameworks_stream_event_cursors','frameworks_ready_artifacts','frameworks_stream_replacements')") \
+  || stop "cannot inspect the restored schema"
+[ "$ledger_tables" = "0" ] \
+  || stop "restored copy already has $ledger_tables framework tables — this dump is not pre-migration"
+
+identity_columns=$(psql "$SCRATCH_DB_CONN" -Atc "
+  select count(*) from information_schema.columns
+   where table_schema='public' and table_name='video_assets'
+     and column_name in ('provider','livepeer_asset_id','livepeer_playback_id',
+                         'frameworks_asset_id','frameworks_playback_id')") \
+  || stop "cannot inspect video_assets columns in the restored copy"
+# EXPECTED_COLUMNS is 0 pre-migration and 5 after the migrations; the window sets which phase this is.
+expected_columns="${EXPECTED_IDENTITY_COLUMNS:-0}"
+[ "$identity_columns" = "$expected_columns" ] \
+  || stop "restored video_assets has $identity_columns identity columns, expected $expected_columns for this phase"
+
+# --- row identity: compare against the pre-migration catalog snapshot -----------
+# Counts can match while identities moved. Compare id, legacy asset id and playback id per row.
+jq -e '.videos | type=="array" and length>0' "$CATALOG_REFERENCE" >/dev/null 2>&1 \
+  || stop "CATALOG_REFERENCE is not a catalog snapshot (expected .videos[] with at least one row)"
+
+expected_tsv="$CUTOVER_DIR/catalog-expected.tsv"
+actual_tsv="$CUTOVER_DIR/catalog-restored.tsv"
+jq -r '.videos[] | [.id, (.asset_id // ""), (.playback_id // "")] | @tsv' "$CATALOG_REFERENCE" \
+  | sort -n > "$expected_tsv" || stop "cannot read identifiers from CATALOG_REFERENCE"
+
+bad_ids=$(cut -f1 "$expected_tsv" | grep -cvE '^[0-9]+$' || true)
+[ "$bad_ids" = "0" ] || stop "$bad_ids catalog rows have a non-numeric id; refusing to build a query from them"
+
+id_list=$(cut -f1 "$expected_tsv" | paste -sd, -)
+psql "$SCRATCH_DB_CONN" -Atc "
+  select id, coalesce(asset_id,''), coalesce(playback_id,'')
+    from public.video_assets where id in ($id_list) order by id" \
+  | sort -n > "$actual_tsv" || stop "cannot read identities from the restored copy"
+
+expected_rows=$(wc -l < "$expected_tsv" | tr -d ' ')
+actual_rows=$(wc -l < "$actual_tsv" | tr -d ' ')
+
+if [ "$expected_rows" != "$actual_rows" ]; then
+  missing=$(comm -23 "$expected_tsv" "$actual_tsv" | cut -f1 | paste -sd, -)
+  stop "restored copy has $actual_rows of $expected_rows catalog rows (missing or changed: $missing)"
+fi
+
+if ! diff -q "$expected_tsv" "$actual_tsv" >/dev/null; then
+  # Written to a file first: a head-closed pipe inside a command substitution trips `pipefail` and would
+  # exit without printing the STOP line — silence on the one path that must explain itself.
+  diff "$expected_tsv" "$actual_tsv" > "$CUTOVER_DIR/catalog-diff.txt" 2>&1 || true
+  detail=$(grep -E '^[<>]' "$CUTOVER_DIR/catalog-diff.txt" | head -5 | paste -sd';' - 2>/dev/null || true)
+  stop "row identities differ between the catalog snapshot and the restored copy: $detail (full diff: $CUTOVER_DIR/catalog-diff.txt)"
+fi
+
 # --- record -----------------------------------------------------------------
 # Computed outside the heredoc: nested quotes inside a heredoc substitution are a parsing trap.
 scratch_display=$(printf '%s' "$scratch_target" | tr '\t' '/')
@@ -114,6 +176,8 @@ cat > "$RESULT" <<JSON
   "archive_entries": $entries,
   "restore": "completed",
   "video_assets": { "production": $prod_rows, "scratch": $scratch_rows },
+  "catalog_rows_verified": $actual_rows,
+  "pre_migration_schema": { "framework_tables": $ledger_tables, "identity_columns": $identity_columns },
   "scratch_target": "$scratch_display"
 }
 JSON
