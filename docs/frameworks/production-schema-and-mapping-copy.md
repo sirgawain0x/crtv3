@@ -399,7 +399,7 @@ changes the catalog. The gate before it is **25 updates, 3 exceptions, zero bloc
 is a stop, not a judgement call.
 
 ```bash
-psql "$PROD_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 -f cutover-*/apply.sql
+psql "$PROD_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 -f "$CUTOVER_DIR/apply.sql"
 ```
 
 ### 5.0 The provider switch is a separate step, and merging does not perform it
@@ -424,10 +424,19 @@ Two things recorded before the window opens, because neither can be reconstructe
 ```bash
 set -euo pipefail          # a failed vercel call or a broken pipe must not be recorded as a result
 umask 077                  # every file created below is owner-only from the moment it exists
-CUTOVER_DIR="${CUTOVER_DIR:?set CUTOVER_DIR to this window's output directory}"
 VERCEL_PROJECT="${VERCEL_PROJECT:?set VERCEL_PROJECT to the project name or id}"
-mkdir -p "$CUTOVER_DIR"
+
+# A fresh directory per window, created without -p so an existing one aborts the run.
+# Never reuse a previous window's directory: a stale capture reads exactly like a current one.
+CUTOVER_DIR="$(pwd)/cutover-$(date +%Y%m%dT%H%M%S)-$$"
+mkdir "$CUTOVER_DIR" || { echo "STOP: $CUTOVER_DIR already exists" >&2; exit 1; }
+[ -z "$(ls -A "$CUTOVER_DIR")" ] || { echo "STOP: $CUTOVER_DIR is not empty" >&2; exit 1; }
+echo "window record: $CUTOVER_DIR"
 ```
+
+Record that path in #410 when the window opens. Every artifact below — the provider capture, the alias
+snapshot, the dry-run JSON, the remap output, the rollback SQL — belongs in this one directory, so a capture can
+never be confused with one from an earlier attempt.
 
 Capture, validating the response before any conclusion is drawn from it:
 
