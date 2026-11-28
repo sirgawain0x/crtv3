@@ -903,12 +903,22 @@ Rules for an interrupted run:
 
 ## §6 Rollback
 
-| lever | target | effect |
-| --- | --- | --- |
-| identity | `"$GENERATED/rollback.sql"` — same directory that produced the applied plan | reverses remapped identities in one transaction; **retains** `frameworks_vod_access` and import reservations |
-| database | the §1 backup | full restore; the last resort |
-| deployment | `dpl_F9yyW6RZfqNffoCgto35EGHE5AyM` (`d3a791d52`, `tv.creativeplatform.xyz`) | re-serves the pre-cutover build; re-verify with `vercel inspect` immediately before use |
-| provider setting | restore the state captured before the window — the exact prior value, or removal **only** if it was absent | **restore, not delete**; promoting the old deployment alone leaves whatever the project now holds, and the next build would compile against it |
+**Order matters, and it is cheapest-and-least-destructive first.** Each rung is only reached when the one above it
+cannot restore service.
+
+| # | lever | target | effect |
+| --- | --- | --- | --- |
+| 1 | **promote the previous deployment** | `dpl_F9yyW6RZfqNffoCgto35EGHE5AyM` (`d3a791d52`) — re-verify with `vercel inspect` immediately before use | stops the bleeding in seconds if the fault is the new build. Writes nothing; loses nothing. |
+| 2 | **reverse the remap** | `"$GENERATED/rollback.sql"` — only after confirming the remap was applied (§5.4); same directory that produced the applied plan | reverses remapped identities in one transaction; **retains** `frameworks_vod_access` and import reservations. Surgical, no data loss. |
+| 3 | **restore the provider setting** | the state captured before the window — the exact prior value, or removal **only** if it was absent | **restore, not delete**; promoting a deployment alone leaves whatever the project now holds, and the next build compiles against it |
+| 4 | **full database restore** | the backup taken **inside this window** | **last resort.** Every write after that snapshot is discarded — including anything users did while the window ran. Reach for it only when 1–3 cannot produce a working catalog. |
+
+Why the order matters: rungs 1–3 change pointers and rows, and are reversible; rung 4 destroys data accumulated
+since the dump. A restore that "fixed" the incident by deleting an hour of writes is a second incident, not a
+recovery.
+
+If a full restore is genuinely required, record the window between the snapshot and the restore so the lost writes
+can be accounted for rather than assumed empty.
 
 ## Status of this document
 
