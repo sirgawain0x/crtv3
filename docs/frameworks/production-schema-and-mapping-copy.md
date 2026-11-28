@@ -417,6 +417,22 @@ Current state, verified from the code path rather than the dashboard: the stagin
 `VERCEL_ENV=production` **and** `VIDEO_PROVIDER !== 'frameworks'`, and it did execute during the 2026-11-27 test
 (all three lifecycle events returned `204` from the relay). So production is on **livepeer** today.
 
+#### Before anything: capture state and freeze other deploys
+
+Two things recorded before the window opens, because neither can be reconstructed afterwards:
+
+```bash
+vercel env ls production > cutover-*/env-before-window.txt    # capture VIDEO_PROVIDER's presence and value
+vercel inspect tv.creativeplatform.xyz                        # capture the alias target
+```
+
+Record explicitly whether `VIDEO_PROVIDER` was **absent** or present with a value — the rollback path differs, and
+"remove it" is wrong if it existed beforehand.
+
+Then **pause other production deployments from the prebuild through the smoke tests and the provider-setting
+persistence**. A hotfix or a merge landing mid-window would build against a half-switched provider setting, and
+the smoke tests would then be measuring a deployment nobody chose. Note who owns that freeze and when it lifts.
+
 #### Prebuild the FrameWorks deployment so the switch is an alias move, not a build
 
 A redeploy takes minutes; the remap-to-switch gap should not. Build the deployment **without moving the alias**,
@@ -425,12 +441,18 @@ using settings scoped to that one deployment so nothing project-wide changes:
 ```bash
 # from a clean checkout of the approved commit, not the working tree
 git worktree add /tmp/cutover-build <approved-sha>
-cd /tmp/cutover-build && npm ci
+cd /tmp/cutover-build
+yarn install --frozen-lockfile --production=false --network-timeout 600000   # yarn.lock is the only lockfile
+yarn build           # optional pre-flight; the Vercel build repeats it
 
 vercel deploy --prod --skip-domain \
   --build-env VIDEO_PROVIDER=frameworks \
   --env VIDEO_PROVIDER=frameworks
 ```
+
+There is **no `package-lock.json`** in this repository — `npm ci` fails. `yarn.lock` is the only lockfile and the
+CI workflow installs with `yarn install --production=false --network-timeout 600000`, so `--frozen-lockfile` here
+is what keeps the build honest about the committed dependencies.
 
 `--skip-domain` applies to this deployment only: it disables automatic promotion, so `tv.creativeplatform.xyz`
 keeps serving the current deployment while the new one builds. `--build-env` and `--env` are per-deployment as
@@ -467,11 +489,18 @@ the next build would compile as FrameWorks again:
 
 ```bash
 vercel promote <rollback-deployment-url>          # 1. move the alias back
-vercel env rm VIDEO_PROVIDER production            # 2. drop the persisted setting, if it was added
+# 2. restore VIDEO_PROVIDER to the state captured before the window:
+#    - if it had a value, set that exact value again
+#    - if it was absent, remove what this window added
 # 3. optionally redeploy so the running build matches the project setting exactly
+# 4. run the identity rollback from the SAME remap output directory used to apply it
 ```
 
-Do step 2 whenever step "persist" ran, and record which of the two states the project is left in.
+Step 2 is a restore, not a deletion — if `VIDEO_PROVIDER` existed before the cutover, removing it changes state the
+window never owned. Step 4 matters because rollback SQL generated from a different output directory can target a
+plan that was never applied.
+
+Do step 2 whenever the persist step ran, and record which state the project is left in.
 
 **The remap and the switch must be adjacent.** Applying the remap first leaves 25 catalog rows pointing at
 FrameWorks asset ids while the provider still resolves to Livepeer, and those videos fail playback until the
@@ -555,7 +584,7 @@ If either §5.2 or §5.3 fails after the switch, roll back first (§6) and repor
 | identity | `rollback.sql` from the same output dir | reverses remapped identities in one transaction; **retains** `frameworks_vod_access` and import reservations |
 | database | the §1 backup | full restore; the last resort |
 | deployment | `dpl_F9yyW6RZfqNffoCgto35EGHE5AyM` (`d3a791d52`, `tv.creativeplatform.xyz`) | re-serves the pre-cutover build; re-verify with `vercel inspect` immediately before use |
-| provider setting | `vercel env rm VIDEO_PROVIDER production` | only needed if the setting was persisted after a passing §5.2/§5.3; **promoting the old deployment alone leaves it in place**, and the next build would compile as FrameWorks again |
+| provider setting | restore the state captured before the window — the exact prior value, or removal **only** if it was absent | **restore, not delete**; promoting the old deployment alone leaves whatever the project now holds, and the next build would compile against it |
 
 ## Status of this document
 
