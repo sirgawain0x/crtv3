@@ -417,10 +417,33 @@ Current state, verified from the code path rather than the dashboard: the stagin
 `VERCEL_ENV=production` **and** `VIDEO_PROVIDER !== 'frameworks'`, and it did execute during the 2026-11-27 test
 (all three lifecycle events returned `204` from the relay). So production is on **livepeer** today.
 
+#### Prebuild the FrameWorks deployment so the switch is an alias move, not a build
+
+A redeploy takes minutes; the remap-to-switch gap should not. Build the deployment **without moving the alias**,
+then promote it:
+
+```bash
+vercel env add VIDEO_PROVIDER production        # value: frameworks — applies to the NEXT build only
+vercel deploy --prod --skip-domain              # production build, automatic promotion disabled
+# wait until the deployment reports READY
+vercel promote <deployment-url>                 # alias move: seconds, no rebuild
+```
+
+`--skip-domain` is what keeps `tv.creativeplatform.xyz` on the current deployment while the new one builds.
+Promote only after the remap has been applied, so the window's exposed interval is the alias move rather than the
+build.
+
+Two cautions:
+
+- setting the env var before the window means **any** later production build also compiles as FrameWorks. The
+  alias stays put until someone promotes, but do not leave that state unattended.
+- if the prebuild is skipped, budget the full redeploy time inside the approved window, because the 25 rows are
+  unmapped to a live provider for its duration.
+
 **The remap and the switch must be adjacent.** Applying the remap first leaves 25 catalog rows pointing at
 FrameWorks asset ids while the provider still resolves to Livepeer, and those videos fail playback until the
 switch lands. Switching first, then remapping, instead leaves rows carrying Livepeer ids under a FrameWorks
-provider. Neither gap is avoidable, so keep it to seconds: apply → switch → §5.1 → §5.2 → §5.3, and roll back
+provider. Neither gap is avoidable, so keep it to seconds: apply → promote → §5.1 → §5.2 → §5.3, and roll back
 if §5.2 cannot open one of the 25.
 
 ### 5.1 Confirm the row count
