@@ -24,6 +24,15 @@ LIST="$CUTOVER_DIR/backup.list"
 RESULT="$CUTOVER_DIR/backup-result.json"
 
 stop() { echo "STOP: $*" >&2; exit 1; }
+
+# The window directory is created here so the caller only has to export its path. umask 077 above
+# makes it owner-only; an existing non-empty directory is refused rather than absorbed.
+if [ -e "$CUTOVER_DIR" ]; then
+  [ -d "$CUTOVER_DIR" ] || stop "$CUTOVER_DIR exists and is not a directory"
+  [ -z "$(ls -A "$CUTOVER_DIR")" ] || stop "$CUTOVER_DIR is not empty — use a fresh directory"
+else
+  mkdir "$CUTOVER_DIR" || stop "cannot create $CUTOVER_DIR"
+fi
 # Append-only progress record for this window (same file the window setup writes).
 step_done() { printf '%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$1" "$2" >> "$CUTOVER_DIR/steps.log"; }
 

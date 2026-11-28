@@ -100,8 +100,12 @@ It records, in `$CUTOVER_DIR/backup-result.json` and `steps.log`: dump byte size
 which is what makes the rehearsal a proof rather than an exercise.
 
 ```bash
+export CUTOVER_DIR="$(pwd)/cutover-$(date +%Y%m%dT%H%M%S)-$$"   # exported: the script reads it from the environment
 bash scripts/cutover-backup-gate.sh
 ```
+
+The script creates `CUTOVER_DIR` itself — with `umask 077`, so owner-only — and refuses an existing non-empty
+directory rather than absorbing it into the new run.
 
 Six guard cases are exercised without a database (missing env, absent/weak/duplicate `sslmode`, scratch equal to
 production, missing client binaries). The dump-and-restore path itself needs a live connection.
