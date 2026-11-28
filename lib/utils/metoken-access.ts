@@ -1,15 +1,6 @@
-import { createPublicClient, erc20Abi, formatEther, getAddress, parseEther } from "viem";
-import { base } from "@account-kit/infra";
+import { erc20Abi, formatEther, getAddress, parseEther } from "viem";
+import { getBasePublicClient } from "@/lib/chain/base-transport";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
-import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
-
-// Module-scope client: the transport must not throw when the API key is absent,
-// or every route importing this module fails to build ("Failed to collect
-// configuration").
-const publicClient = createPublicClient({
-  chain: base,
-  transport: getAlchemyTransport("base-mainnet"),
-});
 
 export type MeTokenAccessDenyReason =
   | "no_metoken"
@@ -126,7 +117,7 @@ export async function checkMeTokenAccess(params: {
   let maxBalance = BigInt(0);
   for (const viewer of normalizedViewers) {
     try {
-      const balance = await publicClient.readContract({
+      const balance = await getBasePublicClient().readContract({
         address: meToken.address as `0x${string}`,
         abi: erc20Abi,
         functionName: "balanceOf",

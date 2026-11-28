@@ -1,6 +1,6 @@
 import { createMigrationConfig } from "@privy-io/alchemy-migration";
 import { base } from "@account-kit/infra";
-import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
+import { createBaseTransport } from "@/lib/chain/base-transport";
 
 const migrationRedirectUrl =
   process.env.NEXT_PUBLIC_URL ??
@@ -10,7 +10,7 @@ const migrationRedirectUrl =
 
 export const alchemyMigrationConfig = createMigrationConfig(
   {
-    transport: getAlchemyTransport("base-mainnet"),
+    transport: createBaseTransport(),
     chain: base,
     ssr: true,
   } as never,

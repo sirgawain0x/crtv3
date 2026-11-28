@@ -50,6 +50,18 @@ export function isSameOriginAppRequest(request: NextRequest): boolean {
   return !origin || origin === request.nextUrl.origin;
 }
 
+
+/** Coarse classification of a BotID failure. Never includes the message or any token. */
+function classifyBotIdFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/x-vercel-oidc-token.*missing|OIDC option/i.test(message)) return "oidc_missing";
+  if (/Must be deployed on Vercel/i.test(message)) return "no_request_context";
+  if (/Invalid checkLevel/i.test(message)) return "bad_check_level";
+  if (error instanceof SyntaxError) return "botid_response_not_json";
+  if (error instanceof TypeError) return "botid_fetch_failed";
+  return "unclassified";
+}
+
 async function tryAllowSameOriginAppRequest(
   request: NextRequest,
   resource?: string,
@@ -72,8 +84,17 @@ async function tryAllowSameOriginAppRequest(
         !(verification.bypassed && process.env.NODE_ENV === "production")) {
       return { allowed: true, tier: "public" };
     }
-  } catch {
-    serverLogger.warn("[platformApiAccess] Browser verification unavailable", { resource });
+  } catch (error) {
+    // Diagnostic only: record why verification was unavailable without ever logging a credential.
+    // The gate itself is unchanged - this still refuses with 503.
+    serverLogger.warn("[platformApiAccess] Browser verification unavailable", {
+      resource,
+      errorName: error instanceof Error ? error.name : typeof error,
+      reason: classifyBotIdFailure(error),
+      oidcHeaderPresent: request.headers.get("x-vercel-oidc-token") !== null,
+      oidcEnvPresent: Boolean(process.env.VERCEL_OIDC_TOKEN),
+      vercelEnv: process.env.VERCEL_ENV ?? "unset",
+    });
     return {
       allowed: false,
       response: NextResponse.json({ error: "Browser verification unavailable", code: "VERIFICATION_UNAVAILABLE" },

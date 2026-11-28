@@ -1,13 +1,7 @@
-import { createPublicClient, getAddress } from "viem";
-import { base } from "@account-kit/infra";
+import { getAddress } from "viem";
+import { getBasePublicClient } from "@/lib/chain/base-transport";
 import { logger } from '@/lib/utils/logger';
-import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
 
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: getAlchemyTransport("base-mainnet"),
-});
 
 /**
  * Checks if a signer is an EOA (Externally Owned Account) or SCA (Smart Contract Account)
@@ -20,7 +14,7 @@ export async function isEOA(signer: any): Promise<boolean> {
       signer.account?.address || signer.getAddress()
     );
     const checksummedAddress = getAddress(address);
-    const code = await publicClient.getCode({ address: checksummedAddress });
+    const code = await getBasePublicClient().getCode({ address: checksummedAddress });
     return !code || code === "0x";
   } catch (error) {
     logger.error("Error checking if wallet is EOA:", error);

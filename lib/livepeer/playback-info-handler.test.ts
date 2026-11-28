@@ -28,7 +28,9 @@ describe('provider playback HTTP boundary', () => {
     expect(playback).toHaveBeenCalledWith('pb-1');
     expect((await response.json()).meta.source[0].url).toBe(id === 'frameworks'
       ? 'https://edge.frameworks.network/hls/video/index.m3u8?fwjwt=viewer-token' : 'https://media.example/hls.m3u8');
-    if(id==='frameworks')expect(resolveAuthorizedFrameworksHlsUrl).toHaveBeenCalledWith('pb-1','viewer-token');
+    if(id==='frameworks')expect(resolveAuthorizedFrameworksHlsUrl).toHaveBeenCalledWith('pb-1','viewer-token',
+      expect.any(Function),
+      expect.objectContaining({verifyDestination:expect.any(Boolean),origin:expect.any(String),logger:expect.anything()}));
     if (id === 'frameworks') expect(response.headers.get('cache-control')).toBe('private, no-store');
   });
   it('resolves old embeds to the canonical playback URL', async () => {

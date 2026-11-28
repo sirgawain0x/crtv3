@@ -1,18 +1,21 @@
 import {preserveReviewedReferences,type PreservedReference} from './reference-exceptions';
 import type {ArchivedSource} from './archive';
 import type {SystemPublicAsset} from './system-assets';
+import {applyReviewedPublishedExceptions} from './published-exceptions';
+import type {PublishedPlaybackException} from './published-exceptions';
 import {buildAssetRemapPlan,renderAssetRemapSql,type ReadyAssetMapping,type ReferenceRow,type RemapPlan,type VideoIdentityRow} from './remap-plan';
 export type AccessVideoSnapshot=VideoIdentityRow & {creator_id:string;requires_metoken:boolean;metoken_price:number|string|null};
 type AccessSeed={videoId:number;assetId:string;playbackId:string;creator:string;sourceCreator:string;status:string;required:boolean;price:string|null;mapping:ReadyAssetMapping};
-export type AssetCutoverPlan={identities:RemapPlan;accessSeeds:AccessSeed[];systemSeeds:Array<{creator:string;mapping:ReadyAssetMapping}>;blockers:string[];preservedReferences:PreservedReference[]};
+export type AssetCutoverPlan={identities:RemapPlan;accessSeeds:AccessSeed[];systemSeeds:Array<{creator:string;mapping:ReadyAssetMapping}>;blockers:string[];preservedReferences:PreservedReference[];publishedExceptions:PublishedPlaybackException[]};
 function sqlString(value:string):string {
  if(value.includes('\0'))throw new Error('Invalid cutover SQL value');return `'${value.replaceAll("'","''")}'`;
 }
 function priceSql(value:string|null):string{return value===null?'NULL':`${sqlString(value)}::numeric`;}
 /** Adds authoritative playback records from the reviewed source snapshot, never inferred from new provider IDs. */
-export function buildAssetCutoverPlan(input:{videos:AccessVideoSnapshot[];references:ReferenceRow[];mappings:ReadyAssetMapping[];archive:ArchivedSource[];preserveReferences?:PreservedReference[];systemAssets?:SystemPublicAsset[]}):AssetCutoverPlan {
+export function buildAssetCutoverPlan(input:{videos:AccessVideoSnapshot[];references:ReferenceRow[];mappings:ReadyAssetMapping[];archive:ArchivedSource[];preserveReferences?:PreservedReference[];publishedExceptions?:PublishedPlaybackException[];systemAssets?:SystemPublicAsset[]}):AssetCutoverPlan {
  const reviewed=preserveReviewedReferences({plan:buildAssetRemapPlan(input),exceptions:input.preserveReferences??[],...input});
- const result:AssetCutoverPlan={identities:reviewed.plan,accessSeeds:[],systemSeeds:[],blockers:[],preservedReferences:reviewed.preserved};
+ const excepted=applyReviewedPublishedExceptions({plan:reviewed.plan,exceptions:input.publishedExceptions??[],videos:input.videos});
+ const result:AssetCutoverPlan={identities:excepted.plan,accessSeeds:[],systemSeeds:[],blockers:[],preservedReferences:reviewed.preserved,publishedExceptions:excepted.excluded};
  const mappings=new Map(input.mappings.map(map=>[map.livepeer_asset_id,map]));
  for(const source of input.systemAssets??[]){
   const archived=input.archive.find(row=>row.assetId===source.assetId),mapping=mappings.get(source.assetId);
@@ -61,7 +64,17 @@ export function renderAssetCutoverSql(plan:AssetCutoverPlan,direction:'apply'|'r
   statements.push(`WITH seeded AS (INSERT INTO public.frameworks_vod_access(asset_id,playback_id,creator_id,status,requires_metoken,metoken_price) SELECT ${sqlString(map.frameworks_asset_id)},${sqlString(map.frameworks_playback_id)},${sqlString(seed.creator)},'published',false,0 WHERE ${ready} ON CONFLICT(asset_id) DO NOTHING RETURNING asset_id) SELECT 1 / CASE WHEN ${ready} AND ((SELECT count(*) FROM seeded)=1 OR EXISTS(SELECT 1 FROM public.frameworks_vod_access WHERE ${authority})) THEN 1 ELSE 0 END AS system_asset_guard;`);
  }
  // A new publication since the snapshot must not be silently left on the retired provider.
- statements.push(`SELECT 1 / CASE WHEN NOT EXISTS(SELECT 1 FROM public.video_assets WHERE status IN ('published','minted')${publishedIds.length?` AND id NOT IN (${publishedIds.join(',')})`:''}) THEN 1 ELSE 0 END AS published_catalog_guard;`);
+ const exceptionIds=plan.publishedExceptions.map(exception=>{
+  if(!Number.isSafeInteger(exception.videoId)||exception.videoId<=0)throw new Error('Invalid excepted published video identity');
+  return exception.videoId;
+ });
+ // Excepted rows are allowed to stay on the retired provider, but only in the exact
+ // unmapped shape that was reviewed; anything else is an unexpected gap and aborts.
+ for(const exception of plan.publishedExceptions){
+  statements.push(`SELECT 1 / CASE WHEN EXISTS(SELECT 1 FROM public.video_assets WHERE id=${exception.videoId} AND asset_id=${sqlString(exception.legacyAssetId)} AND playback_id=${sqlString(exception.legacyPlaybackId)} AND status IN ('published','minted') AND provider IS DISTINCT FROM 'frameworks' AND frameworks_asset_id IS NULL AND frameworks_playback_id IS NULL) THEN 1 ELSE 0 END AS published_exception_guard;`);
+ }
+ const coveredIds=[...publishedIds,...exceptionIds];
+ statements.push(`SELECT 1 / CASE WHEN NOT EXISTS(SELECT 1 FROM public.video_assets WHERE status IN ('published','minted')${coveredIds.length?` AND id NOT IN (${coveredIds.join(',')})`:''}) THEN 1 ELSE 0 END AS published_catalog_guard;`);
  const allowedFields:Record<string,string[]>={metoken_transactions:['playback_id'],hack_beta_submissions:['video_asset_id','playback_id'],shoppable_videos:['livepeer_asset_id','livepeer_playback_id']};
  for(const row of plan.preservedReferences){
   if(!allowedFields[row.table]?.includes(row.field))throw new Error('Invalid preserved reference column');
