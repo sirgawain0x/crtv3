@@ -78,6 +78,18 @@ command -v pg_dump >/dev/null || stop "pg_dump not found (install the postgres c
 command -v pg_restore >/dev/null || stop "pg_restore not found (install the postgres client: brew install libpq)"
 command -v psql >/dev/null || stop "psql not found (install the postgres client: brew install libpq)"
 
+# --- snapshot consistency ----------------------------------------------------
+# pg_dump is consistent with itself, but the catalog reference is a separate read. If a row changes between
+# the two, a sound restore compares unequal and the gate stops on a phantom drift. The reference and the dump
+# must therefore describe the same instant:
+#
+#   * pause catalog writes for the duration (the default here), or
+#   * capture both against one exported snapshot - documented in §1.0, not automated here.
+#
+# A deploy freeze does not help: it stops deploys, not catalog edits.
+[ "${WRITES_PAUSED:-0}" = "1" ] \
+  || stop "catalog writes are not paused — capture the reference and the dump against one instant (WRITES_PAUSED=1 once writes are paused, or use the exported-snapshot recipe in §1.0)"
+
 # --- dump -------------------------------------------------------------------
 echo "dumping production (custom format)…"
 # Written to a temp path and moved into place only when it parses, so a failed dump cannot leave a
@@ -177,6 +189,7 @@ cat > "$RESULT" <<JSON
   "restore": "completed",
   "video_assets": { "production": $prod_rows, "scratch": $scratch_rows },
   "catalog_rows_verified": $actual_rows,
+  "catalog_consistency": "writes-paused",
   "pre_migration_schema": { "framework_tables": $ledger_tables, "identity_columns": $identity_columns },
   "scratch_target": "$scratch_display"
 }

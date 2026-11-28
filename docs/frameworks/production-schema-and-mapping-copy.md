@@ -102,8 +102,43 @@ which is what makes the rehearsal a proof rather than an exercise.
 ```bash
 export CUTOVER_DIR="$(pwd)/cutover-$(date +%Y%m%dT%H%M%S)-$$"   # exported: the script reads it from the environment
 export CATALOG_REFERENCE="$CUTOVER_DIR/catalog-before-migration.json"   # captured from production BEFORE the dump
+export WRITES_PAUSED=1                                                  # the gate refuses without this
 bash scripts/cutover-backup-gate.sh
 ```
+
+#### The reference and the dump must describe one instant
+
+`pg_dump` is consistent with itself; the catalog reference is a separate read. A row that changes between the two
+makes a **sound** restore compare unequal, and the gate then stops on a phantom drift — the worst kind of failure,
+because it punishes a good backup.
+
+A deploy freeze does not help: it stops deployments, not catalog edits.
+
+**Default: pause catalog writes for the duration.** The gate refuses to run unless `WRITES_PAUSED=1`, so the
+acknowledgment is deliberate rather than assumed:
+
+```bash
+export WRITES_PAUSED=1     # only once writes are actually paused
+```
+
+Capture the reference, take the dump, then resume writes.
+
+**Alternative: one exported snapshot for both.** For automation, hold a repeatable-read session open and export its
+snapshot, then pass it to `pg_dump` while the session stays alive:
+
+```sql
+BEGIN ISOLATION LEVEL REPEATABLE READ;
+SELECT pg_export_snapshot();          -- keep the session open while pg_dump runs
+```
+```bash
+pg_dump "$PROD_DB_CONN" --snapshot='<exported-id>' --format=custom --file backup.dump
+```
+
+The reference must then be read inside that same session, before it commits — which is why this is documented rather
+than automated: the fifo handoff is easy to get subtly wrong, and a backup gate that fails silently is worse than one
+an operator drives.
+
+#### Inputs
 
 `CATALOG_REFERENCE` is the pre-migration catalog snapshot — `{videos:[{id, asset_id, playback_id, …}], references:[]}`,
 the same shape the remap dry run later consumes. It must be captured while production is still pre-migration, because
