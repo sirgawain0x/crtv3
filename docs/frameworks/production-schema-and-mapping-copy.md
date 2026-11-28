@@ -704,13 +704,64 @@ no-op that reports success is the worst possible outcome after an incident, so:
 > exactly the three named exceptions still on the retired provider. If those counts are not present, the rollback is
 > not the lever you want; reconcile first.
 
+#### Schema: applied but unrecorded is a real state
+
+The apply order is DDL **then** record the version. If the shell stops between them, `schema_migrations` shows a
+version as absent while the schema has already changed — so the ledger alone cannot decide whether to re-run.
+
+On resume, for each pending version:
+
+1. **inspect the actual schema** that version is responsible for — tables, columns, constraints, indexes, functions —
+   and compare it to what the migration file creates
+2. if it matches **exactly**, verify it against the migration's own checks and then record the version
+   (`supabase migration repair --status applied <version> --db-url …`), rather than re-running the DDL
+3. if the schema is partially present, differs in any detail, or you cannot tell — **stop.** Re-running DDL over a
+   partially applied migration is how a schema ends up in a state neither the migration nor the backup describes
+
+#### Remap: compare identities, not counts
+
+The 25-row count and the three exception IDs are a summary, and a summary cannot identify which plan was applied —
+two different plans can produce the same counts. The resume check compares the **exact rows and values** in
+`plan.json`:
+
+```bash
+GENERATED="$CUTOVER_DIR/generated"
+jq -r 'def sql_literal: tostring | gsub("\u0027"; "\u0027\u0027") | "\u0027" + . + "\u0027";
+       .plan.identities.patches[]
+       | [ .table, (.id|tostring),
+           (.before|to_entries|map("\(.key)=\(.value|sql_literal)")|join(" AND ")),
+           (.after |to_entries|map("\(.key)=\(.value|sql_literal)")|join(" AND ")) ]
+       | @tsv' "$GENERATED/plan.json" > "$CUTOVER_DIR/patches.tsv"
+```
+
+`sql_literal` matters twice over. `tojson` would emit double quotes, which Postgres reads as identifiers rather than
+strings, so the conditions would fail to parse instead of comparing values. The quoting also has to survive the
+shell, so the apostrophe is written as `\u0027` rather than as a literal character — written the obvious way, the
+program is mangled by shell quoting and the escaping silently disappears. Output is one line per patch:
+
+```
+video_assets	145	provider='livepeer' AND title='Tulleti - Brutality'	provider='frameworks' AND title='Bob''s Song'
+```
+
+For each line, count the rows in that table matching the `before` condition and the `after` condition:
+
+| before | after | reading |
+| --- | --- | --- |
+| 1 | 0 | this row is unmapped — the plan has not been applied to it |
+| 0 | 1 | this row already carries the planned identity — applied |
+| 0 | 0 | **ambiguous** — the row matches neither state; stop and reconcile |
+| 1 | 1 | **ambiguous** — the conditions overlap; the plan cannot distinguish them |
+
+Every patch must read the same way. Mixed readings mean the applied state does not correspond to a single plan, and
+the response is reconciliation against `plan.json`, not a retry.
+
 #### Determine state, then act
 
 | step | state to read | before | after | neither |
 | --- | --- | --- | --- | --- |
-| schema | `supabase_migrations.schema_migrations` | re-run the migration | log it done | stop — reconcile |
+| schema | actual schema objects vs the migration file, then the ledger | record-and-verify, or re-run if nothing applied | record the version | stop (§ schema) |
 | mappings | row counts in production | re-run the copy | log it done | stop — reconcile |
-| remap | the 25-row count + exceptions query | re-run `apply.sql` (safe) | log it done | stop — the guard will abort, do not hand-patch rows |
+| remap | per-patch `before`/`after` comparison from `plan.json` | re-run `apply.sql` (safe) | log it done | stop — never hand-patch rows |
 | switch | `vercel inspect tv.creativeplatform.xyz` | promote | log it done | stop — someone else promoted |
 
 Rules for an interrupted run:
