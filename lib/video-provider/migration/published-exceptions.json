@@ -1,0 +1,23 @@
+[
+  {
+    "videoId": 145,
+    "legacyAssetId": "51e1d8ff-d3ae-4f0a-918c-e0dfea796f1b",
+    "legacyPlaybackId": "51e1yompddbkraan",
+    "label": "Monster",
+    "reason": "Provider import failed: rendition coverage - rendition track_4 ends 192710ms before the source. Re-upload tracked separately; playback remains impaired until it lands."
+  },
+  {
+    "videoId": 165,
+    "legacyAssetId": "fac7fe31-599d-405e-90d1-b406b08d728a",
+    "legacyPlaybackId": "fac7e3gmusdlyvpr",
+    "label": "Tulleti - Brutality",
+    "reason": "Provider import failed: could not determine source span for completeness check. Re-upload tracked separately; playback remains impaired until it lands."
+  },
+  {
+    "videoId": 180,
+    "legacyAssetId": "084004dd-e1dd-459a-a4a3-a72ad073f8cd",
+    "legacyPlaybackId": "08408ksnl8yeygl5",
+    "label": "\"Friends\" the Second Single off my debut album \"Keys To Success\" drops November 24th",
+    "reason": "Provider import failed: could not determine source span for completeness check. Re-upload tracked separately; playback remains impaired until it lands."
+  }
+]
