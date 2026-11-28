@@ -3,6 +3,8 @@ const {get,commit,secure}=vi.hoisted(()=>({get:vi.fn(),commit:vi.fn(),secure:vi.
 vi.mock('../index',()=>({getVideoProvider:()=>({assets:{get}})}));
 vi.mock('./webhook-store',()=>({commitFrameworksWebhook:commit}));
 vi.mock('./vod-policy',()=>({secureFrameworksVod:secure}));
+const {info,warn}=vi.hoisted(()=>({info:vi.fn(),warn:vi.fn()}));
+vi.mock('@/lib/utils/logger',()=>({serverLogger:{info,warn,error:vi.fn(),debug:vi.fn()}}));
 import {handleFrameworksWebhookEvent,type FrameworksWebhookEvent} from './handle-frameworks-webhook';
 const event=(type:string,data:Record<string,unknown>={}):FrameworksWebhookEvent=>({id:'evt',type,created_at:'2026-11-23T10:00:00Z',data});
 const asset={id:'hash',playbackId:'play',status:{phase:'ready'},source:{type:'recording',streamId:'parent'},videoSpec:{duration:12}};
@@ -53,4 +55,34 @@ describe('durable FrameWorks event dispatch',()=>{
  it('accepts signed test probes without provider or database work',async()=>{
   expect(await handleFrameworksWebhookEvent(event('webhook.test'))).toBe('ignored');expect(get).not.toHaveBeenCalled();expect(commit).not.toHaveBeenCalled();
  });
+});
+
+it('logs the event id together with the asset id, which the receipt table cannot express',async()=>{
+ commit.mockResolvedValue('processed');
+ get.mockResolvedValue({id:'asset-1',playbackId:'play-1',status:{phase:'ready'},source:{type:'upload'},videoSpec:{duration:12}});
+ await handleFrameworksWebhookEvent({id:'evt-1',type:'upload.ready',created_at:new Date(0).toISOString(),
+  data:{artifact:{artifactId:'asset-1'}}});
+ const [,context]=warn.mock.calls.at(-1)!;
+ expect(context).toMatchObject({eventId:'evt-1',eventType:'upload.ready',assetId:'asset-1',playbackId:'play-1'});
+});
+
+it('emits no success line when the write rejects',async()=>{
+ commit.mockRejectedValue(new Error('database unavailable'));
+ get.mockResolvedValue({id:'asset-2',playbackId:'play-2',status:{phase:'ready'},source:{type:'upload'},videoSpec:{duration:5}});
+ warn.mockClear();
+ await expect(handleFrameworksWebhookEvent({id:'evt-2',type:'upload.ready',created_at:new Date(0).toISOString(),
+  data:{artifact:{artifactId:'asset-2'}}})).rejects.toThrow('database unavailable');
+ expect(warn).not.toHaveBeenCalledWith('[frameworks webhook] event processed',expect.anything());
+});
+
+it('emits no success line for a duplicate or ignored delivery',async()=>{
+ get.mockResolvedValue({id:'asset-3',playbackId:'play-3',status:{phase:'ready'},source:{type:'upload'},videoSpec:{duration:5}});
+ for(const result of ['duplicate','ignored'] as const){
+  commit.mockResolvedValue(result);
+  warn.mockClear();
+  const outcome=await handleFrameworksWebhookEvent({id:'evt-3',type:'upload.ready',created_at:new Date(0).toISOString(),
+   data:{artifact:{artifactId:'asset-3'}}});
+  expect(outcome).toBe(result);
+  expect(warn).not.toHaveBeenCalledWith('[frameworks webhook] event processed',expect.anything());
+ }
 });

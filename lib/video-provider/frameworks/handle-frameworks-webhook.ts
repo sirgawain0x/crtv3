@@ -6,6 +6,7 @@ import {FrameworksWebhookRetryableError} from './webhook-errors';
 import {toFrameworksStreamNodeId} from './stream-id';
 import {commitFrameworksWebhook,type ReadyWebhookArtifact} from './webhook-store';
 import {secureFrameworksVod} from './vod-policy';
+import {serverLogger} from '@/lib/utils/logger';
 export type FrameworksWebhookEvent={id:string;type:string;api_version?:string;created_at?:string;data:Record<string,unknown>};
 const businessTypes=new Set(['stream.live','stream.idle','recording.ready','clip.ready','upload.ready']);
 function string(data:Record<string,unknown>,key:string):string|undefined {
@@ -37,7 +38,22 @@ export async function handleFrameworksWebhookEvent(event:FrameworksWebhookEvent)
     ...(asset.name?{name:asset.name.slice(0,500)}:{}),
     ...(Number.isFinite(asset.videoSpec?.duration) && asset.videoSpec!.duration!>=0?{durationSeconds:asset.videoSpec!.duration!}:{})};
  }
- return commitFrameworksWebhook({eventId:event.id,type:event.type,occurredAt:new Date(event.created_at).toISOString(),
+ const result=await commitFrameworksWebhook({eventId:event.id,type:event.type,occurredAt:new Date(event.created_at).toISOString(),
   payloadSha256:createHash('sha256').update(JSON.stringify(event)).digest('hex'),
   streamId:streamId?toFrameworksStreamNodeId(streamId):undefined,artifact});
+ // Emitted only after the write returns 'processed': the receipt table keys on event_id and carries
+ // no asset id, so this line is the only place the event -> asset linkage exists, and it must never
+ // describe a delivery whose write failed or was already recorded.
+ // warn, not info: lib/utils/logger.ts suppresses info outside development, so an info line would be
+ // absent from exactly the deployed environment this evidence is needed in.
+ if(result==='processed'){
+  serverLogger.warn('[frameworks webhook] event processed',{
+   eventId:event.id,
+   eventType:event.type,
+   assetId:artifact?.assetId ?? null,
+   playbackId:artifact?.playbackId ?? null,
+   streamId:streamId?toFrameworksStreamNodeId(streamId):null,
+  });
+ }
+ return result;
 }
