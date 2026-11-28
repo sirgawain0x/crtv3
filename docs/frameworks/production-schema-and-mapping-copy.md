@@ -169,9 +169,7 @@ done
 Dry-run first; the tool writes nothing without `--apply`:
 
 ```bash
-export FRAMEWORKS_PROD_IMPORT_SUPABASE_URL='https://zdeiezfoemibjgrkyzvs.supabase.co'
-COPY_DRY="$(mktemp -d)"
-export FRAMEWORKS_PROD_IMPORT_SUPABASE_URL='https://zdeiezfoemibjgrkyzvs.supabase.co'
+COPY_DRY="$CUTOVER_DIR/copy-dry"        # must not exist; the tool creates it with mkdir
 npx tsx scripts/frameworks-import-mapping-copy.ts --output "$COPY_DRY"
 cat "$COPY_DRY/report.json"
 ```
@@ -186,7 +184,7 @@ which the tool checks for the production ref) and a **fresh** output directory �
 `mkdir`, so reusing the dry-run directory fails:
 
 ```bash
-COPY_APPLY="$(mktemp -d)"
+COPY_APPLY="$CUTOVER_DIR/mappings"      # must not exist; fresh for --apply
 npx tsx scripts/frameworks-import-mapping-copy.ts --apply --output "$COPY_APPLY"
 psql "$PROD_DB_CONN" -Atc "select state, count(*) from public.frameworks_asset_imports group by 1 order by 1"
 ```
@@ -374,12 +372,22 @@ bytes that were imported fails every row rather than a few.
 
 
 ```bash
+# Everything this window produces stays in one directory: COPY_APPLY is this window's mapping-copy output.
+COPY_APPLY="$CUTOVER_DIR/mappings"          # set when §3's --apply run is invoked
+GENERATED="$CUTOVER_DIR/generated"          # must not exist: the script refuses to reuse a directory
+
 npx tsx scripts/frameworks-vod-remap.ts \
-  --snapshot prod-snapshot.json --mappings "$COPY_APPLY/ready-mappings.json" \
-  --manifest <archive manifests…> \
-  --published-exceptions published-exceptions.json \
-  --output "$(mktemp -d)"
+  --snapshot "$CUTOVER_DIR/prod-snapshot.json" --mappings "$COPY_APPLY/ready-mappings.json" \
+  --manifest "$MANIFEST_1" "$MANIFEST_2" \
+  --published-exceptions "$CUTOVER_DIR/published-exceptions.json" \
+  --output "$GENERATED"
+
+step_done dry-run "$(jq -c '.summary' "$GENERATED/plan.json")"
 ```
+
+`--output` writes `plan.json`, and — only when `executable` is true — `apply.sql` and `rollback.sql` into the same
+directory, each mode `0600` with exclusive create (`wx`). That is why the dry run, the apply and the rollback all
+come from one path: `$GENERATED`, inside this window's `CUTOVER_DIR`.
 
 Expected, exactly:
 
@@ -399,7 +407,7 @@ changes the catalog. The gate before it is **25 updates, 3 exceptions, zero bloc
 is a stop, not a judgement call.
 
 ```bash
-psql "$PROD_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 -f "$CUTOVER_DIR/apply.sql"
+psql "$PROD_DB_CONN" --single-transaction -v ON_ERROR_STOP=1 -f "$GENERATED/apply.sql"
 ```
 
 ### 5.0 The provider switch is a separate step, and merging does not perform it
@@ -432,6 +440,9 @@ CUTOVER_DIR="$(pwd)/cutover-$(date +%Y%m%dT%H%M%S)-$$"
 mkdir "$CUTOVER_DIR" || { echo "STOP: $CUTOVER_DIR already exists" >&2; exit 1; }
 [ -z "$(ls -A "$CUTOVER_DIR")" ] || { echo "STOP: $CUTOVER_DIR is not empty" >&2; exit 1; }
 echo "window record: $CUTOVER_DIR"
+
+# Append-only progress record. Written only after a step's evidence has been confirmed, never before.
+step_done() { printf '%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$1" "$2" >> "$CUTOVER_DIR/steps.log"; }
 ```
 
 Record that path in #410 when the window opens. Every artifact below — the provider capture, the alias
@@ -518,11 +529,13 @@ using settings scoped to that one deployment so nothing project-wide changes:
 
 ```bash
 # from a clean checkout of the approved commit, not the working tree
-git worktree add /tmp/cutover-build <approved-sha>
-cd /tmp/cutover-build
+APPROVED_SHA="${APPROVED_SHA:?set APPROVED_SHA to the release-branch commit}"
+git worktree add "$CUTOVER_DIR/build" "$APPROVED_SHA"
+cd "$CUTOVER_DIR/build"
 yarn install --frozen-lockfile --production=false --network-timeout 600000   # yarn.lock is the only lockfile
 yarn build           # optional pre-flight; the Vercel build repeats it
 
+NEW_DEPLOYMENT_URL="${NEW_DEPLOYMENT_URL:?set after the prebuild reports its URL}"
 vercel deploy --prod --skip-domain \
   --build-env VIDEO_PROVIDER=frameworks \
   --env VIDEO_PROVIDER=frameworks
@@ -545,7 +558,7 @@ vercel inspect tv.creativeplatform.xyz     # expect dpl_F9yyW6RZfqNffoCgto35EGHE
 Promote only after the remap has been applied:
 
 ```bash
-vercel promote <deployment-url>            # alias move: seconds, no rebuild
+vercel promote "$NEW_DEPLOYMENT_URL"       # alias move: seconds, no rebuild
 ```
 
 #### When to persist the project-wide setting
@@ -566,7 +579,7 @@ Promoting the old deployment is **not** sufficient on its own — it would leave
 the next build would compile as FrameWorks again:
 
 ```bash
-vercel promote <rollback-deployment-url>          # 1. move the alias back
+vercel promote "$ROLLBACK_DEPLOYMENT_URL"         # 1. move the alias back
 # 2. restore VIDEO_PROVIDER to the state captured before the window:
 #    - if it had a value, set that exact value again
 #    - if it was absent, remove what this window added
@@ -655,11 +668,37 @@ Rules that decide whether the evidence counts:
 
 If either §5.2 or §5.3 fails after the switch, roll back first (§6) and report afterwards.
 
+### 5.4 Resuming an interrupted window
+
+`$CUTOVER_DIR/steps.log` is the only record of what ran. On resume, read it and then **confirm every completed step
+against its own evidence** — an artifact on disk proves a file was written, not that an effect happened:
+
+| step | evidence to confirm, not infer |
+| --- | --- |
+| backup | the dump exists **and** `pg_restore --list` succeeds **and** the restore rehearsal completed |
+| schema | the 11 ledger versions present, `20261126093000` absent, the five tables present |
+| mappings copied | row counts in production for the copied mappings |
+| dry run | `plan.json` summary equals `25 / 3 / 0` |
+| remap applied | the 25-row count query **and** exactly the three named exceptions remaining |
+| switch | `vercel inspect tv.creativeplatform.xyz` points at the FrameWorks prebuild |
+| §5.2 / §5.3 | the recorded video, playhead, log line, receipt id and ready row |
+
+Rules for an interrupted run:
+
+- **resume from `$CUTOVER_DIR` only.** A second directory means a second plan — never mix them.
+- **re-run a step only when its evidence is absent.** The generator and its writers use exclusive create, so a
+  second `apply.sql` cannot silently overwrite a reviewed plan.
+- **stop if the log implies a step happened that its evidence contradicts**, or if a later step's evidence exists
+  while an earlier one's does not. That is an inconsistent record, and the correct move is rollback (§6) and a
+  fresh window, not an improvised partial re-run.
+- **append to `steps.log` only after confirming the evidence.** A log entry written optimistically is worse than a
+  missing one, because the next operator will trust it.
+
 ## §6 Rollback
 
 | lever | target | effect |
 | --- | --- | --- |
-| identity | `rollback.sql` from the same output dir | reverses remapped identities in one transaction; **retains** `frameworks_vod_access` and import reservations |
+| identity | `"$GENERATED/rollback.sql"` — same directory that produced the applied plan | reverses remapped identities in one transaction; **retains** `frameworks_vod_access` and import reservations |
 | database | the §1 backup | full restore; the last resort |
 | deployment | `dpl_F9yyW6RZfqNffoCgto35EGHE5AyM` (`d3a791d52`, `tv.creativeplatform.xyz`) | re-serves the pre-cutover build; re-verify with `vercel inspect` immediately before use |
 | provider setting | restore the state captured before the window — the exact prior value, or removal **only** if it was absent | **restore, not delete**; promoting the old deployment alone leaves whatever the project now holds, and the next build would compile against it |
