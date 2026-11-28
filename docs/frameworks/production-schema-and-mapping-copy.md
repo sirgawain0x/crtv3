@@ -670,29 +670,60 @@ If either §5.2 or §5.3 fails after the switch, roll back first (§6) and repor
 
 ### 5.4 Resuming an interrupted window
 
-`$CUTOVER_DIR/steps.log` is the only record of what ran. On resume, read it and then **confirm every completed step
-against its own evidence** — an artifact on disk proves a file was written, not that an effect happened:
+**A missing `steps.log` entry is not evidence that the step did not run.** A database write commits and then the
+shell dies; the log line never appears. So for any interrupted write, the state comes from the system of record —
+the database or the alias — never from the log.
 
-| step | evidence to confirm, not infer |
+#### What the generated SQL actually guarantees
+
+`renderAssetRemapSql` emits every patch as one transaction (`BEGIN … COMMIT`) guarded by a division that fails the
+transaction when a row is in an unexpected state:
+
+```sql
+WITH changed AS (UPDATE public.video_assets SET … WHERE id=… AND <before-state> … RETURNING id)
+SELECT 1 / CASE WHEN (SELECT count(*) FROM changed)=1
+                OR EXISTS (SELECT 1 FROM public.video_assets WHERE id=… AND <after-state> …)
+           THEN 1 ELSE 0 END AS identity_guard;
+```
+
+Three consequences, all relevant to a resume:
+
+| consequence | why |
 | --- | --- |
-| backup | the dump exists **and** `pg_restore --list` succeeds **and** the restore rehearsal completed |
-| schema | the 11 ledger versions present, `20261126093000` absent, the five tables present |
-| mappings copied | row counts in production for the copied mappings |
-| dry run | `plan.json` summary equals `25 / 3 / 0` |
-| remap applied | the 25-row count query **and** exactly the three named exceptions remaining |
-| switch | `vercel inspect tv.creativeplatform.xyz` points at the FrameWorks prebuild |
-| §5.2 / §5.3 | the recorded video, playhead, log line, receipt id and ready row |
+| **the remap is all-or-nothing** | the file is one transaction under `--single-transaction`; a shell that dies mid-file commits nothing |
+| **re-running `apply.sql` is safe** | already-applied rows satisfy the `EXISTS(<after-state>)` branch, so the guard passes them |
+| **a drifted row aborts the run** | a row in neither before nor after state makes the guard `1/0`, which fails the transaction instead of skipping it |
+
+#### `rollback.sql` requires confirmed application first
+
+Rollback runs the same guard with the states reversed. On a plan that was **never applied**, its `UPDATE` matches
+nothing, the `EXISTS(<before-state>)` branch is true, and the statement **succeeds while changing nothing**. A
+no-op that reports success is the worst possible outcome after an incident, so:
+
+> Run `rollback.sql` only after confirming the remap was applied — 25 rows carrying `frameworks_asset_id`, and
+> exactly the three named exceptions still on the retired provider. If those counts are not present, the rollback is
+> not the lever you want; reconcile first.
+
+#### Determine state, then act
+
+| step | state to read | before | after | neither |
+| --- | --- | --- | --- | --- |
+| schema | `supabase_migrations.schema_migrations` | re-run the migration | log it done | stop — reconcile |
+| mappings | row counts in production | re-run the copy | log it done | stop — reconcile |
+| remap | the 25-row count + exceptions query | re-run `apply.sql` (safe) | log it done | stop — the guard will abort, do not hand-patch rows |
+| switch | `vercel inspect tv.creativeplatform.xyz` | promote | log it done | stop — someone else promoted |
 
 Rules for an interrupted run:
 
-- **resume from `$CUTOVER_DIR` only.** A second directory means a second plan — never mix them.
-- **re-run a step only when its evidence is absent.** The generator and its writers use exclusive create, so a
-  second `apply.sql` cannot silently overwrite a reviewed plan.
-- **stop if the log implies a step happened that its evidence contradicts**, or if a later step's evidence exists
-  while an earlier one's does not. That is an inconsistent record, and the correct move is rollback (§6) and a
-  fresh window, not an improvised partial re-run.
-- **append to `steps.log` only after confirming the evidence.** A log entry written optimistically is worse than a
-  missing one, because the next operator will trust it.
+- **resume from `$CUTOVER_DIR` only.** A second directory means a second plan.
+- **check the live state before retrying anything that writes.** Never retry on the assumption that a missing log
+  means nothing happened.
+- **ambiguous state means stop and reconcile against `plan.json`** — it holds the exact before/after identity for
+  every row, so it is the only basis for deciding whether to complete, roll back, or open a fresh window.
+- **append to `steps.log` only after confirming evidence**, and append for work discovered to have completed while
+  the shell was down — otherwise the next operator re-derives the same ambiguity.
+- **do not hand-patch rows to make a guard pass.** A row in neither state is a signal that the catalog does not
+  match the reviewed plan.
 
 ## §6 Rollback
 
