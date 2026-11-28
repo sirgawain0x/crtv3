@@ -420,25 +420,58 @@ Current state, verified from the code path rather than the dashboard: the stagin
 #### Prebuild the FrameWorks deployment so the switch is an alias move, not a build
 
 A redeploy takes minutes; the remap-to-switch gap should not. Build the deployment **without moving the alias**,
-then promote it:
+using settings scoped to that one deployment so nothing project-wide changes:
 
 ```bash
-vercel env add VIDEO_PROVIDER production        # value: frameworks — applies to the NEXT build only
-vercel deploy --prod --skip-domain              # production build, automatic promotion disabled
-# wait until the deployment reports READY
-vercel promote <deployment-url>                 # alias move: seconds, no rebuild
+# from a clean checkout of the approved commit, not the working tree
+git worktree add /tmp/cutover-build <approved-sha>
+cd /tmp/cutover-build && npm ci
+
+vercel deploy --prod --skip-domain \
+  --build-env VIDEO_PROVIDER=frameworks \
+  --env VIDEO_PROVIDER=frameworks
 ```
 
-`--skip-domain` is what keeps `tv.creativeplatform.xyz` on the current deployment while the new one builds.
-Promote only after the remap has been applied, so the window's exposed interval is the alias move rather than the
-build.
+`--skip-domain` applies to this deployment only: it disables automatic promotion, so `tv.creativeplatform.xyz`
+keeps serving the current deployment while the new one builds. `--build-env` and `--env` are per-deployment as
+well, which is why this path is preferred over writing the project setting before the window.
 
-Two cautions:
+Before deploying, and again before promoting, confirm the alias still points at the rollback target from §6:
 
-- setting the env var before the window means **any** later production build also compiles as FrameWorks. The
-  alias stays put until someone promotes, but do not leave that state unattended.
-- if the prebuild is skipped, budget the full redeploy time inside the approved window, because the 25 rows are
-  unmapped to a live provider for its duration.
+```bash
+vercel inspect tv.creativeplatform.xyz     # expect dpl_F9yyW6RZfqNffoCgto35EGHE5AyM
+```
+
+Promote only after the remap has been applied:
+
+```bash
+vercel promote <deployment-url>            # alias move: seconds, no rebuild
+```
+
+#### When to persist the project-wide setting
+
+The per-deployment flags make the switch reversible in one step, but they also mean the **next** production build
+would compile as Livepeer again — silently reverting the cutover on the first hotfix. So persist the setting, but
+only after §5.2 and §5.3 pass:
+
+```bash
+vercel env add VIDEO_PROVIDER production   # value: frameworks — applies to the next build, not the running one
+```
+
+Do this once the cutover is proven, so subsequent deploys stay on FrameWorks without per-deployment flags.
+
+#### If the cutover rolls back
+
+Promoting the old deployment is **not** sufficient on its own — it would leave the project setting in place, and
+the next build would compile as FrameWorks again:
+
+```bash
+vercel promote <rollback-deployment-url>          # 1. move the alias back
+vercel env rm VIDEO_PROVIDER production            # 2. drop the persisted setting, if it was added
+# 3. optionally redeploy so the running build matches the project setting exactly
+```
+
+Do step 2 whenever step "persist" ran, and record which of the two states the project is left in.
 
 **The remap and the switch must be adjacent.** Applying the remap first leaves 25 catalog rows pointing at
 FrameWorks asset ids while the provider still resolves to Livepeer, and those videos fail playback until the
@@ -522,6 +555,7 @@ If either §5.2 or §5.3 fails after the switch, roll back first (§6) and repor
 | identity | `rollback.sql` from the same output dir | reverses remapped identities in one transaction; **retains** `frameworks_vod_access` and import reservations |
 | database | the §1 backup | full restore; the last resort |
 | deployment | `dpl_F9yyW6RZfqNffoCgto35EGHE5AyM` (`d3a791d52`, `tv.creativeplatform.xyz`) | re-serves the pre-cutover build; re-verify with `vercel inspect` immediately before use |
+| provider setting | `vercel env rm VIDEO_PROVIDER production` | only needed if the setting was persisted after a passing §5.2/§5.3; **promoting the old deployment alone leaves it in place**, and the next build would compile as FrameWorks again |
 
 ## Status of this document
 
