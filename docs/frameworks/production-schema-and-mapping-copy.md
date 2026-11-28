@@ -114,14 +114,24 @@ because it punishes a good backup.
 
 A deploy freeze does not help: it stops deployments, not catalog edits.
 
-**Default: pause catalog writes for the duration.** The gate refuses to run unless `WRITES_PAUSED=1`, so the
-acknowledgment is deliberate rather than assumed:
+**Default: pause catalog writes for the duration — and prove it.**
+
+`WRITES_PAUSED=1` is an assertion, not a pause: the gate cannot stop the application writing. So the gate does not
+take the assertion on trust. After the dump it **re-reads production** and requires the identities to be unchanged
+from the reference:
+
+| before dump | after dump | conclusion |
+| --- | --- | --- |
+| reference | identical | the reference, the dump and the verification describe one instant |
+| reference | differs | the pause was not real — stop, and use the shared-snapshot procedure |
+
+That turns the flag from a promise into evidence, and it names the row that moved if the pause failed. The operator
+still has to make the pause real — set it before capturing, keep it until the dump finishes — but a failed pause now
+produces a stop instead of a silent phantom drift.
 
 ```bash
 export WRITES_PAUSED=1     # only once writes are actually paused
 ```
-
-Capture the reference, take the dump, then resume writes.
 
 **Alternative: one exported snapshot for both.** For automation, hold a repeatable-read session open and export its
 snapshot, then pass it to `pg_dump` while the session stays alive:

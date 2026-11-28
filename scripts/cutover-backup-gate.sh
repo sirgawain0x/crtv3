@@ -157,10 +157,26 @@ bad_ids=$(cut -f1 "$expected_tsv" | grep -cvE '^[0-9]+$' || true)
 [ "$bad_ids" = "0" ] || stop "$bad_ids catalog rows have a non-numeric id; refusing to build a query from them"
 
 id_list=$(cut -f1 "$expected_tsv" | paste -sd, -)
-psql "$SCRATCH_DB_CONN" -Atc "
-  select id, coalesce(asset_id,''), coalesce(playback_id,'')
-    from public.video_assets where id in ($id_list) order by id" \
-  | sort -n > "$actual_tsv" || stop "cannot read identities from the restored copy"
+read_identities() {  # $1 = connection, $2 = output file
+  psql "$1" -Atc "
+    select id, coalesce(asset_id,''), coalesce(playback_id,'')
+      from public.video_assets where id in ($id_list) order by id" | sort -n > "$2"
+}
+
+# --- the pause must be provable, not asserted --------------------------------
+# The operator asserts the pause with WRITES_PAUSED=1. That assertion is only worth something if the catalog
+# can be shown not to have moved: re-read production after the dump and require the identities to be
+# unchanged from the reference. Identical before/after means the reference, the dump and the verification all
+# describe one instant.
+post_dump_tsv="$CUTOVER_DIR/catalog-after-dump.tsv"
+read_identities "$PROD_DB_CONN" "$post_dump_tsv" || stop "cannot re-read the catalog from production to verify the pause"
+if ! diff -q "$expected_tsv" "$post_dump_tsv" >/dev/null; then
+  diff "$expected_tsv" "$post_dump_tsv" > "$CUTOVER_DIR/catalog-moved-during-capture.txt" 2>&1 || true
+  moved=$(grep -E '^[<>]' "$CUTOVER_DIR/catalog-moved-during-capture.txt" | head -5 | paste -sd';' - 2>/dev/null || true)
+  stop "the catalog moved while the reference and dump were captured: $moved (full diff: $CUTOVER_DIR/catalog-moved-during-capture.txt) — the pause was not real; use the shared-snapshot procedure"
+fi
+
+read_identities "$SCRATCH_DB_CONN" "$actual_tsv" || stop "cannot read identities from the restored copy"
 
 expected_rows=$(wc -l < "$expected_tsv" | tr -d ' ')
 actual_rows=$(wc -l < "$actual_tsv" | tr -d ' ')
@@ -189,7 +205,7 @@ cat > "$RESULT" <<JSON
   "restore": "completed",
   "video_assets": { "production": $prod_rows, "scratch": $scratch_rows },
   "catalog_rows_verified": $actual_rows,
-  "catalog_consistency": "writes-paused",
+  "catalog_consistency": "writes-paused, verified by identical reference before and after the dump",
   "pre_migration_schema": { "framework_tables": $ledger_tables, "identity_columns": $identity_columns },
   "scratch_target": "$scratch_display"
 }
