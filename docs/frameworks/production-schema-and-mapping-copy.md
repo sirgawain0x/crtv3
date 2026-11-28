@@ -610,6 +610,11 @@ The third row is the one that causes damage: an unreadable value does not mean t
 it as absent would delete a setting the environment relied on. Resolve it first — dashboard reveal, or
 `vercel env pull` into a temporary file that is deleted after the value is recorded.
 
+**If the window is parked and the deploy freeze lifted**, the recorded baseline stops being "immediate pre-switch":
+any later production deploy supersedes it. On resume, re-read `vercel inspect tv.creativeplatform.xyz`, record the
+new baseline, and update §6's rollback target before capturing anything else. A stale baseline is re-verifiable; a
+window that assumes it is still current is not.
+
 Then **pause other production deployments from the prebuild through the smoke tests and the provider-setting
 persistence**. A hotfix or a merge landing mid-window would build against a half-switched provider setting, and
 the smoke tests would then be measuring a deployment nobody chose. Note who owns that freeze and when it lifts.
