@@ -8,6 +8,8 @@ import {
 } from '@/lib/sdk/livepeer/studioAuth';
 import { hasLivepeerErrors } from '@/lib/livepeer/parse-view-metrics';
 import { serverLogger } from '@/lib/utils/logger';
+import { resolveVideoProviderId } from '@/lib/video-provider/config';
+import { getFrameworksViewerCount } from '@/lib/video-provider/frameworks/viewers';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,6 +38,13 @@ export async function GET(
       ), access);
     }
 
+    if (resolveVideoProviderId() === 'frameworks') {
+      const viewerCount = await getFrameworksViewerCount(playbackId);
+      return withPlatformApiPaymentHeaders(NextResponse.json(viewerCount === null
+        ? {error:'Viewership is temporarily unavailable',code:'VIEW_METRICS_UNAVAILABLE'}
+        : {success:true,playbackId,viewerCount},
+        {status:viewerCount === null ? 503 : 200,headers:noStoreHeaders}),access);
+    }
     const token = resolveLivepeerStudioAuthToken();
     if (!token) {
       serverLogger.warn('Livepeer real-time views skipped: set LIVEPEER_FULL_API_KEY or LIVEPEER_API_KEY');

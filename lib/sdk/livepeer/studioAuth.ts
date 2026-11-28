@@ -1,3 +1,5 @@
+import { resolveVideoProviderId } from '@/lib/video-provider/config';
+
 /** Strip whitespace and optional surrounding quotes from env values. */
 export function normalizeEnvSecret(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
@@ -7,6 +9,7 @@ export function normalizeEnvSecret(value: string | undefined): string | undefine
 
 /** Prefer full-access key for Studio routes; fall back to LIVEPEER_API_KEY. */
 export function resolveLivepeerStudioAuthToken(): string | undefined {
+  if (resolveVideoProviderId() === 'frameworks') return undefined;
   const full = normalizeEnvSecret(process.env.LIVEPEER_FULL_API_KEY);
   const standard = normalizeEnvSecret(process.env.LIVEPEER_API_KEY);
   return full || standard || undefined;
@@ -14,6 +17,7 @@ export function resolveLivepeerStudioAuthToken(): string | undefined {
 
 /** Private (non-CORS) key required for metrics.getViewership. */
 export function hasLivepeerPrivateApiKey(): boolean {
+  if (resolveVideoProviderId() === 'frameworks') return false;
   return Boolean(normalizeEnvSecret(process.env.LIVEPEER_FULL_API_KEY));
 }
 

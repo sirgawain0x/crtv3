@@ -1,0 +1,66 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ArchivedSource } from './archive';
+import type { ImportLedger, ImportRecord, ImportState } from './importer';
+const importColumns='livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id,provider_failure_phase,provider_failure_reason';
+/**
+ * The derivative and recovery_kind columns are created by 20261126093000_frameworks_derivative_recovery, which is
+ * deliberately outside the cutover release. A build without it must still read the recovery ledger, so the full
+ * list degrades to this legacy selection when the table reports a missing column.
+ */
+const recoveryLegacyColumns='livepeer_asset_id,livepeer_playback_id,source_sha256,source_bytes,state,frameworks_asset_id,frameworks_playback_id';
+const recoveryColumns=`${recoveryLegacyColumns},derivative_sha256,derivative_bytes,derivative_origin,recovery_kind,adopted_at`;
+
+/** Select lists must match each table's columns (failure context exists only on frameworks_asset_imports). */
+export function ledgerSelectColumns(table:'frameworks_asset_imports'|'frameworks_import_recoveries'):string {
+  return table==='frameworks_asset_imports'?importColumns:recoveryColumns;
+}
+
+/** The column set a schema without the derivative migration can serve. */
+export function legacyRecoveryColumns():string { return recoveryLegacyColumns; }
+
+/** PostgREST reports an absent column as 42703, or as 'column … does not exist' on older gateways. */
+function isMissingColumn(error:{code?:string;message?:string}|null):boolean {
+  if(!error) return false;
+  return error.code==='42703'||/column .* does not exist/i.test(error.message??'');
+}
+
+/** Supply the explicitly selected migration database, never the application's implicit production client. */
+export function createImportLedger(db: SupabaseClient,table:'frameworks_asset_imports'|'frameworks_import_recoveries'='frameworks_asset_imports'): ImportLedger {
+  let columns=ledgerSelectColumns(table);
+  const select=async(sourceId:string)=>{
+    const first=await db.from(table).select(columns).eq('livepeer_asset_id',sourceId).maybeSingle();
+    if(!first.error) return first;
+    // Degrade once, only for the recoveries table and only when the derivative columns are genuinely absent.
+    if(table!=='frameworks_import_recoveries'||columns===recoveryLegacyColumns||!isMissingColumn(first.error)) return first;
+    columns=recoveryLegacyColumns;
+    return db.from(table).select(columns).eq('livepeer_asset_id',sourceId).maybeSingle();
+  };
+  const find=async(sourceId:string):Promise<ImportRecord|null>=>{
+    const {data,error}=await select(sourceId);
+    if(error) throw new Error('Cannot read migration import ledger');
+    return data as ImportRecord|null;
+  };
+  return {find,
+    async reserve(source:ArchivedSource) {
+      const {data,error}=await db.from(table).insert({livepeer_asset_id:source.assetId,
+        livepeer_playback_id:source.playbackId,source_sha256:source.sha256,source_bytes:source.sizeBytes,state:'prepared'}).select(columns).single();
+      if(!error && data) return data as unknown as ImportRecord;
+      if(error?.code==='23505') { const existing=await find(source.assetId); if(existing) return existing; }
+      throw new Error('Cannot reserve migration import');
+    },
+    async transition(sourceId:string,expected:ImportState,next:ImportState,target?:{assetId:string;playbackId:string}) {
+      const {data,error}=await db.from(table).update({state:next,updated_at:new Date().toISOString(),
+        ...(target?{frameworks_asset_id:target.assetId,frameworks_playback_id:target.playbackId}:{})})
+        .eq('livepeer_asset_id',sourceId).eq('state',expected).select('livepeer_asset_id');
+      if(error) throw new Error('Cannot persist migration import state');
+      return data?.length===1;
+    },
+    async recordProviderFailure(sourceId:string,detail:{phase:string;reason:string}) {
+      if(table!=='frameworks_asset_imports') return;
+      const {error}=await db.from(table).update({provider_failure_phase:detail.phase,provider_failure_reason:detail.reason,
+        provider_failure_recorded_at:new Date().toISOString(),updated_at:new Date().toISOString()})
+        .eq('livepeer_asset_id',sourceId).neq('state','ready');
+      if(error) throw new Error('Cannot persist provider failure context');
+    },
+  };
+}

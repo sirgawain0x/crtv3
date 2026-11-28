@@ -53,7 +53,26 @@ Alchemy supports **Story mainnet** (network ID **1514**) for RPC and gas sponsor
 
 **Documentation:** [Story API Overview](https://www.alchemy.com/docs/chains/story/story-api-endpoints/net-version) · [Story API Quickstart](https://www.alchemy.com/docs/reference/story-api-quickstart)
 
-### 2. Livepeer Configuration
+### 2. Video provider & Livepeer / FrameWorks
+
+#### `VIDEO_PROVIDER`
+Server-side selector for the video backend: `livepeer` (default) or `frameworks`. **Leave unset or `livepeer` in production** until the FrameWorks cutover (#401); the app must behave identically until G2 flips this with explicit OK.
+
+#### FrameWorks (names only until cutover)
+Set these in Vercel only after G2 approval — do not commit values.
+
+| Variable | Purpose |
+| --- | --- |
+| `FRAMEWORKS_GRAPHQL_URL` | GraphQL bridge URL (e.g. hosted `…/graphql`) |
+| `FRAMEWORKS_API_TOKEN` | Developer API token (`Authorization: Bearer`) |
+| `FRAMEWORKS_WEBHOOK_SECRET` | Verifies inbound FrameWorks webhooks (replaces `LIVEPEER_WEBHOOK_SECRET` at cutover) |
+| `FRAMEWORKS_SIGNING_KID` / `FRAMEWORKS_SIGNING_PRIVATE_KEY` | JWT playback tokens (#405+) |
+
+**Livepeer names retained until cutover** (then retired or mapped by provider): `LIVEPEER_API_KEY`, `LIVEPEER_FULL_API_KEY`, `LIVEPEER_API_URL`, `LIVEPEER_FULL_API_URL`, `LIVEPEER_WEBHOOK_ID`, `LIVEPEER_WEBHOOK_SECRET`, `LIVEPEER_ATTESTATION_BASE`, `LIVEPEER_HERO_PLAYBACK_ID`, `LIVEPEER_FEATURED_PLAYBACK_ID`, `LIVEPEER_FETCH_TIMEOUT_MS`, `CASTABLE_LIVEPEER_HOST_SUFFIXES`.
+
+See [FrameWorks SDK guide](https://logbook.frameworks.network/builders/sdks).
+
+### 2a. Livepeer Configuration (default provider)
 
 #### `LIVEPEER_API_KEY`
 Your Livepeer API key for video streaming and processing.
@@ -75,6 +94,12 @@ Your Livepeer webhook ID for video processing callbacks.
 1. In Livepeer Studio, go to Webhooks
 2. Create a new webhook pointing to your application URL
 3. Copy the webhook ID
+
+#### `LIVEPEER_AI_CAPTIONS_ENABLED`
+Server-only gate for Livepeer AI **translation** (`translate`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound Livepeer AI calls and shows a calm “Captions coming soon” state in the upload flow. Unrecognized values are treated as `false` (fail closed) with a one-time server warning.
+
+#### `LIVEPEER_AI_TEXT_TO_IMAGE_ENABLED`
+Server-only gate for Livepeer AI **text-to-image** (`livepeerAiActions`, `textToImage`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound calls. On staging there is no UI that invokes these server actions (upload thumbnails use Gemini via `/api/ai/generate-thumbnail`). Unrecognized values fail closed with a one-time server warning. Replacement UI tracked in #432.
 
 ### 3. Supabase Configuration
 

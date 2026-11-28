@@ -1,13 +1,29 @@
 'use server';
+import {
+  isLivepeerAiTextToImageEnabled,
+  livepeerAiTextToImageDisabledResult,
+  type LivepeerAiDisabledResult,
+} from '@/lib/livepeer/livepeer-ai-gating';
 import { TextToImageParams } from 'livepeer/models/components';
 import { serverLogger } from '@/lib/utils/logger';
+
+type LivepeerAiImageSuccess = {
+  success: boolean;
+  result: unknown;
+};
 
 export const getLivepeerAiGeneratedImages = async ({
   prompt,
   modelId,
   safetyCheck,
   numImagesPerPrompt,
-}: TextToImageParams) => {
+}: TextToImageParams): Promise<
+  LivepeerAiImageSuccess | LivepeerAiDisabledResult
+> => {
+  if (!isLivepeerAiTextToImageEnabled()) {
+    return livepeerAiTextToImageDisabledResult();
+  }
+
   const myHeaders = new Headers();
   myHeaders.append('Content-Type', 'application/json');
   myHeaders.append(

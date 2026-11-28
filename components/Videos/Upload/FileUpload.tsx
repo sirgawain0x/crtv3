@@ -3,9 +3,12 @@ import React, { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Clapperboard, CopyIcon, ExternalLink } from "lucide-react";
 import {
+  abortFrameworksVodUpload,
+  completeFrameworksVodUpload,
   getLivepeerUploadUrl,
   getLivepeerAsset,
 } from "@/app/api/livepeer/assetUploadActions";
+import { uploadFileViaPresignedParts } from "@/lib/video-provider/frameworks/vod-multipart-upload";
 import * as tus from "tus-js-client";
 import PreviewVideo from "./PreviewVideo";
 import { Progress } from "@/components/ui/progress";
@@ -13,8 +16,23 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { updateVideoAsset } from "@/services/video-assets";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 // import { useTranscoder } from "@/lib/hooks/useTranscoder";
 import { logger } from "@/lib/utils/logger";
+
+function uploadAuthErrorMessage(err: unknown): string {
+  if (err instanceof Error && "status" in err) {
+    const status = (err as Error & { status?: number }).status;
+    if (status === 401) {
+      return "Wallet authentication required. Reconnect your wallet and try again.";
+    }
+    if (status === 403) {
+      return "This wallet is not authorized for this upload session.";
+    }
+  }
+  return err instanceof Error ? err.message : "Failed to upload file.";
+}
 
 const CREATIVE_PIXELS_URL =
   process.env.NEXT_PUBLIC_CREATIVE_PIXELS_URL ||
@@ -111,6 +129,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   // Use Universal Account to get smart account address (SCA), not controller wallet
   const { address, type, loading } = useUniversalAccount();
+  const { getAuthHeaders, isReady: walletAuthReady } = useWalletAuth();
 
   // Persist upload state to recover from page reloads
   useEffect(() => {
@@ -210,6 +229,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
 
+    if (!walletAuthReady) {
+      setError("Wallet authorization is still loading. Please try again in a moment.");
+      return;
+    }
+
     setError(null);
     setUploadState("loading");
     setProgress(0);
@@ -219,9 +243,20 @@ const FileUpload: React.FC<FileUploadProps> = ({
     try {
       logger.debug("Start upload - using smart account address:", address, "type:", type);
 
+      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+
       const uploadRequestResult = await getLivepeerUploadUrl(
+        auth,
         newAssetTitle || fileToUpload.name || "new file name",
-        address
+        address,
+        fileToUpload.size,
+        undefined,
+        undefined,
+        false,
+        {
+          filename: fileToUpload.name,
+          contentType: fileToUpload.type || "application/octet-stream",
+        },
       );
 
       // Store asset in both state and ref for persistence
@@ -236,8 +271,124 @@ const FileUpload: React.FC<FileUploadProps> = ({
         return;
       }
 
+      const finishSuccessfulUpload = (opts?: { skipIpfsMetadataPoll?: boolean }) => {
+        logger.debug("Upload completed");
+        setUploadComplete(true);
+        setUploadState("complete");
+
+        if (uploadRequestResult?.asset) {
+          livepeerAssetRef.current = uploadRequestResult.asset;
+        }
+
+        const uploadedAssetId = uploadRequestResult?.asset?.id;
+        if (uploadedAssetId) {
+          onFileUploaded(uploadedAssetId);
+
+          if (!opts?.skipIpfsMetadataPoll) {
+            void (async () => {
+              try {
+                const metadataUri = await pollForMetadataUri(uploadedAssetId);
+                setUploadedUri(metadataUri);
+              } catch (pollErr) {
+                logger.warn("Failed to resolve metadata URI:", pollErr);
+              }
+            })();
+          }
+
+          if (onAssetReady && uploadRequestResult?.asset) {
+            onAssetReady(uploadRequestResult.asset);
+          }
+        } else {
+          setError("Upload succeeded but asset ID is missing.");
+        }
+      };
+
+      const presignedParts = uploadRequestResult?.presignedParts;
+      if (presignedParts?.length) {
+        const uploadId = uploadRequestResult.uploadId?.trim();
+        if (!uploadId) {
+          const message =
+            "Upload session is missing an ID; the file was not registered for completion.";
+          logger.error(message, { presignedPartCount: presignedParts.length });
+          setError(message);
+          setUploadState("idle");
+          return;
+        }
+
+        const uploadTicket = uploadRequestResult.uploadTicket?.trim();
+        if (!uploadTicket) {
+          const message =
+            "Upload session is missing an ownership ticket; cannot complete securely.";
+          logger.error(message, { uploadId });
+          setError(message);
+          setUploadState("idle");
+          return;
+        }
+
+        const abortWithTicketOnly = (id: string) =>
+          abortFrameworksVodUpload(undefined, id, uploadTicket);
+
+        const uploadedParts = await uploadFileViaPresignedParts(
+          fileToUpload,
+          presignedParts,
+          {
+            partSize: uploadRequestResult.partSize,
+            uploadId,
+            onProgress: setProgress,
+            abortVodUpload: abortWithTicketOnly,
+          },
+        );
+
+        let completeAuth;
+        try {
+          completeAuth = walletAuthHeadersToArgs(await getAuthHeaders());
+        } catch (reAuthErr) {
+          try {
+            await abortWithTicketOnly(uploadId);
+          } catch (abortErr) {
+            logger.error("abortVodUpload after re-auth failure", {
+              uploadId,
+              error: abortErr instanceof Error ? abortErr.message : String(abortErr),
+            });
+          }
+          setError(uploadAuthErrorMessage(reAuthErr));
+          setUploadState("idle");
+          return;
+        }
+
+        try {
+          await completeFrameworksVodUpload(
+            completeAuth,
+            uploadId,
+            uploadedParts,
+            uploadTicket,
+          );
+        } catch (completeErr) {
+          try {
+            await abortWithTicketOnly(uploadId);
+          } catch (abortErr) {
+            logger.error("abortVodUpload after completeFrameworksVodUpload failed", {
+              uploadId,
+              error: abortErr instanceof Error ? abortErr.message : String(abortErr),
+            });
+          }
+          setError(uploadAuthErrorMessage(completeErr));
+          setUploadState("idle");
+          return;
+        }
+
+        finishSuccessfulUpload({ skipIpfsMetadataPoll: true });
+        return;
+      }
+
+      if (!uploadRequestResult?.tusEndpoint) {
+        setError("No upload endpoint returned for this provider");
+        setUploadState("idle");
+        return;
+      }
+
       const tusUpload = new tus.Upload(fileToUpload, {
-        endpoint: uploadRequestResult?.tusEndpoint,
+        endpoint: uploadRequestResult.tusEndpoint,
         retryDelays: [0, 1000, 3000, 5000], // Retry configuration for mobile reliability
         chunkSize: 5 * 1024 * 1024, // 5MB chunks for better mobile handling
         overridePatchMethod: true, // Use POST instead of PATCH for better mobile compatibility
@@ -250,7 +401,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
           logger.error("Error uploading file:", err);
           let errorMessage = "Failed to upload file. Please try again.";
 
-          // Enhance error message if possible
           if (err.originalRequest) {
             errorMessage += ` (Network error: ${err.originalRequest.status})`;
           } else if (err.message) {
@@ -265,40 +415,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setProgress(percentage);
         },
         onSuccess() {
-          logger.debug("Upload completed");
-          setUploadComplete(true);
-          setUploadState("complete");
-
-          // Ensure asset is still in ref
-          if (uploadRequestResult?.asset) {
-            livepeerAssetRef.current = uploadRequestResult.asset;
-          }
-
-          if (uploadRequestResult?.asset?.id) {
-            onFileUploaded(uploadRequestResult.asset.id);
-
-            void (async () => {
-              try {
-                const metadataUri = await pollForMetadataUri(uploadRequestResult.asset.id);
-                setUploadedUri(metadataUri);
-              } catch (pollErr) {
-                logger.warn("Failed to resolve metadata URI:", pollErr);
-              }
-            })();
-
-            if (onAssetReady && uploadRequestResult?.asset) {
-              onAssetReady(uploadRequestResult.asset);
-            }
-          } else {
-            setError("Upload succeeded but asset ID is missing.");
-          }
+          finishSuccessfulUpload();
         },
       });
 
       tusUpload.start();
     } catch (err) {
       logger.error("Error uploading file:", err);
-      setError("Failed to upload file. Please try again.");
+      setError(uploadAuthErrorMessage(err));
       setUploadState("idle");
     }
   };
@@ -310,7 +434,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
       await updateVideoAsset(dbAssetId, {
         metadata_uri: metadataUri,
         thumbnailUri: "", // update as needed
-        status: "draft",
         max_supply: null,
         price: null,
         royalty_percentage: null,

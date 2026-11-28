@@ -2,7 +2,7 @@
 import { cn } from "@/lib/utils";
 import * as React from "react";
 import { useRef, useEffect, useState } from "react";
-import { getIngest } from "@livepeer/react/external";
+import type { StreamIngestDestination } from "@/lib/video-provider/ingest-types";
 import { useBroadcast } from "@/hooks/useBroadcast";
 import { toast } from "sonner";
 import * as Popover from "@radix-ui/react-popover";
@@ -48,6 +48,7 @@ interface BroadcastProps {
   playbackId?: string | null;
   creatorAddress: string;
   saveRecording?: boolean;
+  recordingSettingsReady?: boolean;
   /** Called when stream-key heal returns fresh Livepeer credentials. */
   onCredentialsChange?: (creds: {
     streamKey: string;
@@ -105,7 +106,7 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
     body: JSON.stringify(body),
   });
   if (res.status === 409) {
-    const existing = (await res.json()) as Record<string, unknown>;
+    const existing = (await res.clone().json()) as Record<string, unknown>;
     if (existing.code === "STREAM_EXISTS") {
       return {
         streamId: existing.streamId as string,
@@ -205,6 +206,7 @@ function BroadcastWithControls({
   playbackId,
   creatorAddress,
   saveRecording = true,
+  recordingSettingsReady = true,
   onCredentialsChange,
 }: BroadcastProps) {
   const { getAuthHeaders } = useWalletAuth();
@@ -222,14 +224,17 @@ function BroadcastWithControls({
     setActivePlaybackId(playbackId ?? null);
   }, [playbackId]);
 
-  // Official getIngest base (playback.livepeer.studio/webrtc). OBS still uses RTMP.
-  const whipIngestUrl = React.useMemo(() => {
-    return (
-      getIngest(activeStreamKey) ??
-      `https://playback.livepeer.studio/webrtc/${activeStreamKey}`
-    );
-  }, [activeStreamKey]);
-  const rtmpIngestUrl = "rtmp://rtmp.livepeer.studio/live";
+  const resolveIngest = React.useCallback(async (protocol: "WHIP" | "RTMP") => {
+    const authHeaders = await getAuthHeaders();
+    const response = await fetch("/api/streams/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ creatorAddress, protocol }),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error("Could not resolve streaming destination. Try again.");
+    return response.json() as Promise<StreamIngestDestination>;
+  }, [creatorAddress, getAuthHeaders]);
 
   const refreshStreamKey = React.useCallback(async () => {
     try {
@@ -280,23 +285,33 @@ function BroadcastWithControls({
     isScreenSharing,
     toggleScreenShare
   } = useBroadcast({
-    ingestUrl: whipIngestUrl,
+    resolveIngest: () => resolveIngest("WHIP"),
     streamKey: activeStreamKey,
     refreshStreamKey,
   });
 
   const finalizeTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const broadcastSessionRef = useRef({ identity: "", reachedLive: false });
 
   // Sync is_live with DB only after Livepeer playback is ready (or warm-up budget expires).
   // Finalize recordings when broadcast ends.
   useEffect(() => {
     if (!creatorAddress) return;
 
+    const identity = `${creatorAddress}:${activeStreamId}`;
+    if (broadcastSessionRef.current.identity !== identity) {
+      broadcastSessionRef.current = { identity, reachedLive: false };
+    }
+    if (status === "live") broadcastSessionRef.current.reachedLive = true;
+    // A fresh studio, failed camera setup, or failed connection is not a stop.
+    if (status !== "live" && !broadcastSessionRef.current.reachedLive) return;
+    if (status !== "live" && status !== "idle" && status !== "error") return;
     const abort = new AbortController();
 
     const syncStatus = async () => {
       try {
         const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+        if (abort.signal.aborted) return;
         if (status === 'live') {
           if (activePlaybackId) {
             await waitForPlaybackSources(activePlaybackId, { signal: abort.signal });
@@ -312,8 +327,13 @@ function BroadcastWithControls({
             playbackId: activePlaybackId,
           });
         } else if (status === 'idle' || status === 'error') {
-          await updateStream(creatorAddress, { is_live: false, last_live_at: new Date().toISOString() }, auth);
+          await updateStream(creatorAddress, { is_live: false }, auth);
+          if (abort.signal.aborted) return;
           logger.info("Stream marked as offline in DB");
+          // Keep the session pending if Stop races a recording update. Its
+          // confirmed preference must decide whether to finalize the recording.
+          if (!recordingSettingsReady) return;
+          broadcastSessionRef.current.reachedLive = false;
           if (status === 'idle' && activeStreamId && saveRecording) {
             // Recording assets may take a minute to process; retry a few times.
             const delays = [15_000, 45_000, 120_000];
@@ -335,7 +355,7 @@ function BroadcastWithControls({
       finalizeTimeoutsRef.current.forEach(clearTimeout);
       finalizeTimeoutsRef.current = [];
     };
-  }, [status, creatorAddress, activeStreamId, activePlaybackId, getAuthHeaders, saveRecording]);
+  }, [status, creatorAddress, activeStreamId, activePlaybackId, getAuthHeaders, saveRecording, recordingSettingsReady]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -446,7 +466,7 @@ function BroadcastWithControls({
               <Settings
                 streamId={activeStreamId || ""}
                 streamKey={activeStreamKey}
-                ingestUrl={rtmpIngestUrl}
+                resolveRtmp={() => resolveIngest("RTMP")}
                 devices={devices}
                 selectedAudioDeviceId={selectedAudioDeviceId}
                 selectedVideoDeviceId={selectedVideoDeviceId}
@@ -472,7 +492,7 @@ function BroadcastWithControls({
               ) : (
                 <button
                   onClick={startBroadcast}
-                  disabled={status === 'loading'}
+                  disabled={status === 'loading' || !recordingSettingsReady}
                   className="flex items-center gap-2 bg-white hover:bg-gray-100 text-black px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50"
                 >
                   <Radio size={16} className={status === 'loading' ? 'animate-spin' : ''} />
@@ -520,7 +540,7 @@ export const BroadcastLoading = ({
 interface SettingsProps {
   streamId: string;
   streamKey?: string | null;
-  ingestUrl?: string | null;
+  resolveRtmp: () => Promise<StreamIngestDestination>;
   devices: MediaDeviceInfo[];
   selectedAudioDeviceId: string;
   selectedVideoDeviceId: string;
@@ -531,7 +551,7 @@ interface SettingsProps {
 const Settings = ({
   streamId,
   streamKey,
-  ingestUrl,
+  resolveRtmp,
   devices,
   selectedAudioDeviceId,
   selectedVideoDeviceId,
@@ -549,11 +569,46 @@ const Settings = ({
     }
   };
 
-  const rtmpServerUrl = ingestUrl && streamKey
-    ? ingestUrl.replace(streamKey, '').replace(/\/$/, '') + '/'
-    : ingestUrl
-      ? ingestUrl.split('/').slice(0, -1).join('/') + '/'
-      : null;
+  const [rtmpUrl, setRtmpUrl] = useState<string | null>(null);
+  const [rtmpError, setRtmpError] = useState<string | null>(null);
+  const [isLoadingRtmp, setIsLoadingRtmp] = useState(false);
+  const rtmpRequestRef = useRef(0);
+  useEffect(() => {
+    rtmpRequestRef.current += 1;
+    setRtmpUrl(null);
+    setRtmpError(null);
+    setIsLoadingRtmp(false);
+    return () => { rtmpRequestRef.current += 1; };
+  }, [streamId, streamKey]);
+  async function loadRtmp() {
+    const requestId = ++rtmpRequestRef.current;
+    setIsLoadingRtmp(true);
+    setRtmpUrl(null);
+    setRtmpError(null);
+    try {
+      const destination = await resolveRtmp();
+      if (!destination.rtmpUrl) throw new Error("RTMP is unavailable");
+      if (requestId === rtmpRequestRef.current) setRtmpUrl(destination.rtmpUrl);
+    } catch {
+      if (requestId === rtmpRequestRef.current) setRtmpError("Could not load streaming settings. Try again.");
+    } finally {
+      if (requestId === rtmpRequestRef.current) setIsLoadingRtmp(false);
+    }
+  }
+
+  const rtmpSettings = React.useMemo(() => {
+    if (!rtmpUrl) return null;
+    try {
+      const url = new URL(rtmpUrl);
+      const separator = url.pathname.lastIndexOf("/");
+      const key = url.pathname.slice(separator + 1);
+      if (!key) return null;
+      return {
+        server: `${url.protocol}//${url.host}${url.pathname.slice(0, separator + 1)}`,
+        key: `${decodeURIComponent(key)}${url.search}`,
+      };
+    } catch { return null; }
+  }, [rtmpUrl]);
 
   // Filter devices
   const audioDevices = devices.filter(d => d.kind === 'audioinput');
@@ -621,42 +676,27 @@ const Settings = ({
             </div>
 
             {/* Stream Info Section */}
-            {streamKey && rtmpServerUrl && (
-              <div className="rounded-md border border-white/10 bg-black/20 p-3 space-y-2">
-                <p className="text-xs font-semibold text-gray-300">
-                  OBS / RTMP Info
-                </p>
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-gray-500 uppercase">Server URL</label>
-                    <div className="flex gap-1">
-                      <input
-                        readOnly
-                        value={rtmpServerUrl}
-                        className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] font-mono text-gray-300"
-                      />
-                      <button onClick={() => copyToClipboard(rtmpServerUrl, "Server URL")} className="p-1 hover:bg-white/10 rounded">
-                        <CopyIcon size={12} />
-                      </button>
-                    </div>
+            <div className="border-t border-white/10 pt-3">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">OBS / RTMP Info</h4>
+              <button onClick={loadRtmp} disabled={isLoadingRtmp} className="text-sm text-white disabled:opacity-50">
+                {isLoadingRtmp ? "Loading…" : "Load streaming settings"}
+              </button>
+              {rtmpError && <p role="alert" className="text-sm text-red-400">{rtmpError}</p>}
+              {rtmpSettings && (
+                <div className="mt-2 space-y-2">
+                  <label className="block text-xs" htmlFor="broadcast-rtmp-server">Server URL</label>
+                  <div className="flex gap-1">
+                    <input id="broadcast-rtmp-server" readOnly value={rtmpSettings.server} className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs" />
+                    <button onClick={() => copyToClipboard(rtmpSettings.server, "Server URL")} aria-label="Copy RTMP server URL" className="p-1 hover:bg-white/10 rounded"><CopyIcon size={12} /></button>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-gray-500 uppercase">Stream Key</label>
-                    <div className="flex gap-1">
-                      <input
-                        readOnly
-                        value={streamKey}
-                        type="password"
-                        className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] font-mono text-gray-300"
-                      />
-                      <button onClick={() => copyToClipboard(streamKey, "Stream Key")} className="p-1 hover:bg-white/10 rounded">
-                        <CopyIcon size={12} />
-                      </button>
-                    </div>
+                  <label className="block text-xs" htmlFor="broadcast-rtmp-key">Stream Key</label>
+                  <div className="flex gap-1">
+                    <input id="broadcast-rtmp-key" readOnly value={rtmpSettings.key} type="password" className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs" />
+                    <button onClick={() => copyToClipboard(rtmpSettings.key, "Stream Key")} aria-label="Copy RTMP stream key" className="p-1 hover:bg-white/10 rounded"><CopyIcon size={12} /></button>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
           <Popover.Arrow className="fill-gray-900 stroke-white/20" />
         </Popover.Content>

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
-import { isLivepeerConfigured, LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
+import { resolveFrameworksPlaybackAlias } from '@/lib/video-provider/frameworks/playback-alias';
+import { getVideoProvider } from '@/lib/video-provider';
+import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
+import { handleSignJwt } from './sign-jwt-handler';
+import { resolveAuthorizedFrameworksHlsUrl } from '@/lib/video-provider/frameworks/resolve-playback';
 
 const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
 
@@ -13,9 +16,10 @@ const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
  */
 export async function handlePlaybackInfo(request: NextRequest): Promise<NextResponse> {
   try {
-    if (!isLivepeerConfigured()) {
+    const provider = getVideoProvider();
+    if (!provider.isConfigured()) {
       return NextResponse.json(
-        { error: 'Livepeer playback is not configured on this deployment', code: LIVEPEER_NOT_CONFIGURED },
+        { error: 'Video playback is not configured on this deployment', code: LIVEPEER_NOT_CONFIGURED },
         { status: 503 },
       );
     }
@@ -41,18 +45,28 @@ export async function handlePlaybackInfo(request: NextRequest): Promise<NextResp
       );
     }
 
-    const client = getFullLivepeer();
-    if (!client) {
-      return NextResponse.json(
-        {
-          error: 'Livepeer is not configured',
-          code: LIVEPEER_NOT_CONFIGURED,
-        },
-        { status: 503 },
-      );
+    let canonicalPlaybackId = playbackId;
+    if (provider.id === 'frameworks') {
+      try { canonicalPlaybackId = await resolveFrameworksPlaybackAlias(playbackId); }
+      catch { return NextResponse.json({ error: 'Playback lookup unavailable' }, { status: 503 }); }
     }
-
-    const response = await client.playback.get(playbackId);
+    // Reuse the same owner/publication/MeToken checks as the explicit token endpoint.
+    // This is an in-process call, not an HTTP request or an authorization bypass.
+    let viewerToken: string | undefined;
+    if (provider.id === 'frameworks') {
+      const authorization = await handleSignJwt(new NextRequest(request.url, {
+        method: 'POST', headers: request.headers,
+        body: JSON.stringify({ playbackId: canonicalPlaybackId,
+          companionAddress: searchParams.get('companionAddress') ?? undefined }),
+      }));
+      if (!authorization.ok) return authorization;
+      const result = await authorization.json();
+      if (typeof result.token !== 'string' || !result.token) {
+        return NextResponse.json({ error: 'Playback authorization unavailable' }, { status: 503 });
+      }
+      viewerToken = result.token;
+    }
+    const response = await provider.playback.get(canonicalPlaybackId);
 
     if (response.error) {
       return NextResponse.json(
@@ -72,7 +86,33 @@ export async function handlePlaybackInfo(request: NextRequest): Promise<NextResp
       );
     }
 
-    return NextResponse.json(response.playbackInfo);
+    if (viewerToken) {
+      const sources = response.playbackInfo.meta?.source ?? [];
+      let authorizedUrl: string | undefined;
+      try {
+        authorizedUrl = sources.length
+          ? await resolveAuthorizedFrameworksHlsUrl(canonicalPlaybackId, viewerToken, fetch, {
+              verifyDestination: process.env.FRAMEWORKS_PLAYBACK_PROBE === '1',
+              logger: serverLogger,
+              // The requesting origin, so the probe reports the CORS answer that matters to Chrome.
+              origin: new URL(request.url).origin,
+            })
+          : undefined;
+      } catch {
+        return NextResponse.json({ error: 'Playback routing unavailable', code: 'PLAYBACK_ROUTING_UNAVAILABLE' }, {
+          status: 503, headers: { 'Cache-Control': 'private, no-store' },
+        });
+      }
+      response.playbackInfo = { ...response.playbackInfo, meta: {
+        ...response.playbackInfo.meta,
+        source: sources.map(source => {
+          if (!source.url) return source;
+          return { ...source, url: authorizedUrl };
+        }),
+      } };
+    }
+    return NextResponse.json(response.playbackInfo, provider.id === 'frameworks'
+      ? { headers: { 'Cache-Control': 'private, no-store' } } : undefined);
   } catch (error: unknown) {
     serverLogger.error('Error fetching playback info:', error);
 

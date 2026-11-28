@@ -30,6 +30,15 @@ export function proxy(req: NextRequest) {
         ? ["https://tv.creativeplatform.xyz"]
         : ["http://localhost:3000"];
 
+    // NODE_ENV is production in Preview builds too. Permit the verified staging
+    // origin only when this deployment is connected to the isolated QA database.
+    if (
+      process.env.VERCEL_ENV === "preview" &&
+      process.env.NEXT_PUBLIC_SUPABASE_URL === "https://zxpobpucayevlrzdxhmr.supabase.co"
+    ) {
+      allowedOrigins.push("https://staging.tv.creativeplatform.xyz");
+    }
+
     const paidApi = isCostProtectedRoute(pathname, req.method);
     if (origin && !allowedOrigins.includes(origin) && !paidApi) {
       return new NextResponse(null, {

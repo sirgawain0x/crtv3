@@ -1,3 +1,4 @@
+import { frameworksReplayEnabled, resolveVideoProviderId } from "@/lib/video-provider/config";
 import { withPlatformApiPaymentHeaders } from "@/lib/payments/payment-response";
 import { NextRequest, NextResponse } from "next/server";
 import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
@@ -40,6 +41,13 @@ export async function POST(
         !(await isPermittedSigner(owner, caller)) &&
         !(await isPermittedSigner(caller, owner))) {
       return withPlatformApiPaymentHeaders(NextResponse.json({ error: "Not authorized to modify this stream" }, { status: 403 }), botCheck);
+    }
+
+    if (body.record && resolveVideoProviderId() === "frameworks" && !frameworksReplayEnabled()) {
+      return withPlatformApiPaymentHeaders(NextResponse.json(
+        { error: "New live stream replays are temporarily unavailable." },
+        { status: 409 },
+      ), botCheck);
     }
 
     // Never persist a preference that the provider rejected. If persistence

@@ -1,3 +1,4 @@
+import { StreamProviderMigrationRequiredError } from "@/lib/video-provider/stream-provider-guard";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -72,11 +73,43 @@ function streamRequest(body: Record<string, unknown>) {
 }
 
 describe("POST /api/livepeer/livepeer-proxy", () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireWalletAuthFor.mockResolvedValue({ address: CREATOR });
     mockResolveStreamForCreator.mockResolvedValue(null);
     process.env.LIVEPEER_FULL_API_KEY = "test-full-key";
+  });
+
+  it("rejects non-jwt playbackPolicy with 400", async () => {
+    const res = await POST(
+      streamRequest({
+        ...validBody,
+        playbackPolicy: { type: "public" },
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_REQUEST");
+    expect(mockEnsureLivepeerStreamForCreator).not.toHaveBeenCalled();
+  });
+
+  it("accepts jwt playbackPolicy", async () => {
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({
+      streamId: "stream-1",
+      playbackId: "playback-1",
+      streamKey: "secret-key",
+      reused: false,
+      replaced: false,
+    });
+
+    const res = await POST(streamRequest(validBody));
+    expect(res.status).toBe(200);
+    expect(mockEnsureLivepeerStreamForCreator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playbackPolicy: expect.objectContaining({ type: "jwt" }),
+      }),
+    );
   });
 
   it("returns MISSING_API_KEY when full key is absent", async () => {
@@ -183,4 +216,19 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
     expect(json.streamKey).toBe("new-key");
     expect(json.replaced).toBe(true);
   });
+  it("allows FrameWorks creation without a legacy Livepeer private key", async () => {
+    vi.stubEnv("VIDEO_PROVIDER", "frameworks"); delete process.env.LIVEPEER_FULL_API_KEY;
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({ streamId: "fw-stream", playbackId: "fw-playback", streamKey: "fw-test-key", reused: false, replaced: false, synced: false });
+    expect((await POST(streamRequest(validBody))).status).toBe(200);
+    expect(mockEnsureLivepeerStreamForCreator).toHaveBeenCalled();
+  });
+
+  it("returns an explicit migration conflict instead of replacing provider credentials", async () => {
+    mockResolveStreamForCreator.mockResolvedValue({ id: "row-legacy", stream_id: "legacy-stream", creator_id: CREATOR });
+    mockEnsureLivepeerStreamForCreator.mockRejectedValue(new StreamProviderMigrationRequiredError());
+    const response = await POST(streamRequest(validBody));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual(expect.objectContaining({ code: "STREAM_PROVIDER_MIGRATION_REQUIRED" }));
+  });
+
 });

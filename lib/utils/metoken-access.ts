@@ -1,15 +1,6 @@
-import { createPublicClient, erc20Abi, formatEther, getAddress, parseEther } from "viem";
-import { base } from "@account-kit/infra";
+import { erc20Abi, formatEther, getAddress, parseEther } from "viem";
+import { getBasePublicClient } from "@/lib/chain/base-transport";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
-import { getAlchemyTransport } from "@/lib/web3/alchemy-key";
-
-// Module-scope client: the transport must not throw when the API key is absent,
-// or every route importing this module fails to build ("Failed to collect
-// configuration").
-const publicClient = createPublicClient({
-  chain: base,
-  transport: getAlchemyTransport("base-mainnet"),
-});
 
 export type MeTokenAccessDenyReason =
   | "no_metoken"
@@ -81,7 +72,26 @@ export async function checkMeTokenAccess(params: {
     return { allowed: true, reason: "creator_bypass" };
   }
 
-  const required = parseEther(String(requiredAmount ?? 0));
+  let requiresPositiveBalance = false;
+  let required: bigint;
+
+  if (requiredAmount === null || requiredAmount === undefined) {
+    requiresPositiveBalance = true;
+    required = BigInt(0);
+  } else {
+    try {
+      required = parseEther(String(requiredAmount));
+    } catch {
+      return { allowed: false, reason: "insufficient_balance" };
+    }
+    if (required < BigInt(0)) {
+      return { allowed: false, reason: "insufficient_balance" };
+    }
+    if (required === BigInt(0)) {
+      requiresPositiveBalance = true;
+    }
+  }
+
   const meToken = await getMeTokenByOwner(normalizedCreator);
 
   if (!meToken?.address) {
@@ -107,7 +117,7 @@ export async function checkMeTokenAccess(params: {
   let maxBalance = BigInt(0);
   for (const viewer of normalizedViewers) {
     try {
-      const balance = await publicClient.readContract({
+      const balance = await getBasePublicClient().readContract({
         address: meToken.address as `0x${string}`,
         abi: erc20Abi,
         functionName: "balanceOf",
@@ -121,7 +131,9 @@ export async function checkMeTokenAccess(params: {
     }
   }
 
-  const allowed = maxBalance >= required;
+  const allowed = requiresPositiveBalance
+    ? maxBalance > BigInt(0)
+    : maxBalance >= required;
 
   return {
     allowed,
@@ -134,7 +146,7 @@ export async function checkMeTokenAccess(params: {
 
 export function isMeTokenGateActive(
   requiresMetoken?: boolean | null,
-  metokenPrice?: number | string | null,
+  _metokenPrice?: number | string | null,
 ): boolean {
-  return Boolean(requiresMetoken) && metokenPrice !== null && metokenPrice !== undefined;
+  return Boolean(requiresMetoken);
 }

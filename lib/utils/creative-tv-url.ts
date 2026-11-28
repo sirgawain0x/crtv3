@@ -1,3 +1,5 @@
+import { isVideoAssetId } from "@/lib/video-provider/asset-id";
+
 /** Livepeer asset UUID used in /discover/{assetId} URLs. */
 export const CREATIVE_TV_ASSET_UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -19,7 +21,7 @@ export type ParsedCreativeTVUrl =
     };
 
 const DISCOVER_PATH_REGEX =
-  /\/discover\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:[/?#]|$)/i;
+  /\/discover\/([^/?#]+)(?:[/?#]|$)/i;
 
 const WATCH_PATH_REGEX = /\/watch\/([^/?#]+)(?:[/?#]|$)/i;
 
@@ -53,7 +55,7 @@ export function parseCreativeTVUrl(
   }
 
   const discoverMatch = raw.match(DISCOVER_PATH_REGEX);
-  if (discoverMatch?.[1]) {
+  if (discoverMatch?.[1] && isVideoAssetId(discoverMatch[1])) {
     const assetId = discoverMatch[1];
     const fallbackUrl = toAbsoluteFallbackUrl(`/discover/${assetId}`, opts?.origin);
     return { kind: "discover", assetId, fallbackUrl };

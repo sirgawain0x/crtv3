@@ -1,14 +1,35 @@
 import { createBrowserClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+function readSupabaseEnv(): { url: string; anonKey: string } {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!url || !anonKey) {
+    // Thrown on first use, not at import: a build must not need credentials.
+    throw new Error('Missing Supabase environment variables');
+  }
+  return { url, anonKey };
 }
 
-// Create client-side Supabase client
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+let browserClient: SupabaseClient | undefined;
+
+function getBrowserClient(): SupabaseClient {
+  if (!browserClient) {
+    const { url, anonKey } = readSupabaseEnv();
+    browserClient = createBrowserClient(url, anonKey);
+  }
+  return browserClient;
+}
+
+// Create client-side Supabase client on first use. A Proxy keeps `supabase.from(...)`
+// working at every existing call site while deferring the env check to runtime.
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, property) {
+    const client = getBrowserClient() as unknown as Record<string | symbol, unknown>;
+    const value = client[property];
+    return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(client) : value;
+  },
+});
 
 // Types for our MeToken tables
 export interface MeToken {

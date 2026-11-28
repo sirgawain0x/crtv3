@@ -1,9 +1,11 @@
+import { resolveVideoProviderId } from '@/lib/video-provider/config';
 import type { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  if (resolveVideoProviderId() === 'frameworks') { res.status(410).json({error:'Legacy provider unavailable'}); return; }
   const { playbackId } = req.query;
   if (!playbackId || typeof playbackId !== "string") {
     res.status(400).json({ error: "Missing or invalid playbackId" });
