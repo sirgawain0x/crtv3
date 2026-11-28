@@ -456,8 +456,10 @@ Rules that decide whether the evidence counts:
 
 - **A `200` alone is not evidence.** An event type outside the business set returns `200 {"ok":true}` and
   processes nothing; the receipt and the asset row are what distinguish processing from acknowledgement.
-- **A replayed `event_id` proves nothing.** An already-recorded id returns `204`, writes no receipt and emits no
-  log line — indistinguishable in a request log from an ignored lifecycle event.
+- **A replay counts only if its `event_id` has never been recorded.** A replay carrying a fresh `webhook-id` is
+  processed normally and satisfies all three rows above; an id already in `frameworks_webhook_receipts` is a
+  duplicate — it returns `204`, writes nothing and emits no log line, indistinguishable in a request log from an
+  ignored lifecycle event. So check the id, not the fact that the delivery was a repeat.
 - **`FAILED` is terminal, and needs a new upload.** The provider exposes no reprocess operation, so a failed asset
   can never satisfy this check; a stall is remediated by a new upload with new event ids.
 - **Readiness cannot be polled.** `/api/internal/playback-info` answers with an x402 payment challenge
