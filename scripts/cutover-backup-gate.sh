@@ -11,6 +11,11 @@
 #   CUTOVER_DIR          this window's directory (created here, umask 077)
 #   EXPECTED_PROD_HOST   the hostname production must resolve to (a URI is not trusted because a name exists)
 #
+# Optional:
+#   PREFLIGHT_ONLY=1     prove the credential, TLS, host and scratch instance work, then exit without dumping.
+#                        Use it minutes before the slot: an unloaded credential is then a two-second failure
+#                        rather than a wasted window. CUTOVER_DIR is not needed in this mode.
+#
 # Consistency mode — one of, never both:
 #   CATALOG_SNAPSHOT_MODE=shared  (default) the gate exports one PostgreSQL snapshot, reads the catalog
 #                                 reference inside that transaction, and runs pg_dump with --snapshot, so
@@ -21,6 +26,11 @@
 # Usage: bash scripts/cutover-backup-gate.sh
 set -euo pipefail
 umask 077
+
+# Preflight runs against a throwaway directory: it must not consume the window directory the real run needs.
+if [ "${PREFLIGHT_ONLY:-0}" = "1" ]; then
+  CUTOVER_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cutover-preflight.XXXXXX")"
+fi
 
 : "${PROD_DB_CONN:?set PROD_DB_CONN to the production URI (sslmode=verify-full)}"
 : "${SCRATCH_DB_CONN:?set SCRATCH_DB_CONN to an isolated scratch database URI}"
@@ -106,6 +116,22 @@ scratch_tables=$(psql "$SCRATCH_DB_CONN" -Atc "
   select count(*) from information_schema.tables
    where table_schema not in ('pg_catalog','information_schema')") || stop "cannot inspect the scratch database"
 [ "$scratch_tables" = "0" ] || stop "scratch database already has $scratch_tables user tables; the restore must land in an empty instance"
+
+# --- optional preflight: stop here if asked ---------------------------------
+if [ "${PREFLIGHT_ONLY:-0}" = "1" ]; then
+  prod_major=$(psql "$PROD_DB_CONN" -Atc "select current_setting('server_version_num')::int / 10000") \
+    || stop "cannot connect to production with this credential, or cannot read its version"
+  scratch_major=$(psql "$SCRATCH_DB_CONN" -Atc "select current_setting('server_version_num')::int / 10000") \
+    || stop "cannot connect to the scratch database"
+  [ "$prod_major" = "$scratch_major" ] \
+    || stop "major version mismatch: production $prod_major, scratch $scratch_major — the restore would not predict production"
+  prod_rows=$(psql "$PROD_DB_CONN" -Atc "select count(*) from public.video_assets") \
+    || stop "connected, but public.video_assets is not readable"
+  printf 'PREFLIGHT OK: host %s (pinned) | sslmode verify-full | production major %s, %s video_assets rows | scratch major %s, 0 user tables\n' \
+    "$prod_host" "$prod_major" "$prod_rows" "$scratch_major" >&2
+  printf '%s\t%s\t%s\n' "$(date -u +%FT%TZ)" preflight "ok: production major $prod_major, $prod_rows rows" >> "$CUTOVER_DIR/steps.log"
+  exit 0
+fi
 
 # --- capture reference and dump against one instant -------------------------
 if [ "$MODE" = "shared" ]; then
