@@ -86,11 +86,17 @@ Record the `pg_stat_ssl` row and the successful `verify-full` connection. **Neve
 ### 1.0 Backup gate — runs before any DDL
 
 `scripts/cutover-backup-gate.sh` performs the dump, proves the archive parses, rehearses a restore into a scratch
-database, and records the evidence. It refuses to proceed when any of the following is true:
+database, and records the evidence.
+
+**A backup taken earlier is rehearsal evidence, not the rollback point.** Production keeps changing after any dump,
+so a pre-window run proves the path works and nothing more. Inside the window the gate runs **again for a fresh
+backup immediately before migrations are applied** — that dump is the one §6 restores, because restoring anything
+older discards every change made since. Same commands, same checks, second run. It refuses to proceed when any of the following is true:
 
 | guard | why |
 | --- | --- |
 | `PROD_DB_CONN` has no `sslmode`, a weak one, or a duplicate | a later `sslmode` could otherwise weaken the first |
+| the URI's host is not `EXPECTED_PROD_HOST` | the expected host is **pinned in the runbook** (`db.zdeiezfoemibjgrkyzvs.supabase.co`), never derived from the URI it is meant to check |
 | `SCRATCH_DB_CONN` resolves to the production host **and** database | a "successful" restore into production is worse than a failed one |
 | `$CUTOVER_DIR/backup.dump` already exists | an earlier window's evidence must not be overwritten |
 | `pg_dump`, `pg_restore` or `psql` is missing | fail before writing anything |
