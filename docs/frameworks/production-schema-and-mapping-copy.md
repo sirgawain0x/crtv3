@@ -422,12 +422,29 @@ Current state, verified from the code path rather than the dashboard: the stagin
 Two things recorded before the window opens, because neither can be reconstructed afterwards:
 
 ```bash
-vercel env ls production > cutover-*/env-before-window.txt    # capture VIDEO_PROVIDER's presence and value
-vercel inspect tv.creativeplatform.xyz                        # capture the alias target
+# only this variable, value included: the CLI's plain listing shows names, not values
+vercel env ls --json --environment production --project <project> \
+  | jq '[.envs[] | select(.key=="VIDEO_PROVIDER")]' > cutover-*/env-video-provider-before.json
+chmod 600 cutover-*/env-video-provider-before.json
+
+vercel inspect tv.creativeplatform.xyz > cutover-*/alias-before-window.txt
 ```
 
-Record explicitly whether `VIDEO_PROVIDER` was **absent** or present with a value — the rollback path differs, and
-"remove it" is wrong if it existed beforehand.
+The JSON shape is `{"envs":[…]}` and each entry carries `key` plus a readable `value`. Filtering before writing keeps
+unrelated production settings — which the same command returns — out of the window record. Keep the file in the
+authorized store, never in the repository.
+
+Read the result as three states, not two:
+
+| captured | meaning | rollback |
+| --- | --- | --- |
+| `[]` | the variable was absent | remove what the window adds |
+| entry with a `value` | present, value known | set that exact value back |
+| entry with no readable `value` | present, value hidden | **resolve it before changing anything**, then treat as the row above |
+
+The third row is the one that causes damage: an unreadable value does not mean the variable was absent, so treating
+it as absent would delete a setting the environment relied on. Resolve it first — dashboard reveal, or
+`vercel env pull` into a temporary file that is deleted after the value is recorded.
 
 Then **pause other production deployments from the prebuild through the smoke tests and the provider-setting
 persistence**. A hotfix or a merge landing mid-window would build against a half-switched provider setting, and
