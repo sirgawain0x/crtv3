@@ -83,6 +83,29 @@ Record the `pg_stat_ssl` row and the successful `verify-full` connection. **Neve
 
 ## §1 What production is missing
 
+### 1.0 Backup gate — runs before any DDL
+
+`scripts/cutover-backup-gate.sh` performs the dump, proves the archive parses, rehearses a restore into a scratch
+database, and records the evidence. It refuses to proceed when any of the following is true:
+
+| guard | why |
+| --- | --- |
+| `PROD_DB_CONN` has no `sslmode`, a weak one, or a duplicate | a later `sslmode` could otherwise weaken the first |
+| `SCRATCH_DB_CONN` resolves to the production host **and** database | a "successful" restore into production is worse than a failed one |
+| `$CUTOVER_DIR/backup.dump` already exists | an earlier window's evidence must not be overwritten |
+| `pg_dump`, `pg_restore` or `psql` is missing | fail before writing anything |
+
+It records, in `$CUTOVER_DIR/backup-result.json` and `steps.log`: dump byte size, archive entry count from
+`pg_restore --list`, restore outcome, and `video_assets` counts in production versus the restored copy — the last of
+which is what makes the rehearsal a proof rather than an exercise.
+
+```bash
+bash scripts/cutover-backup-gate.sh
+```
+
+Six guard cases are exercised without a database (missing env, absent/weak/duplicate `sslmode`, scratch equal to
+production, missing client binaries). The dump-and-restore path itself needs a live connection.
+
 ```sql
 -- Expected before this work: no rows. Any row here means the ledger is already partially present,
 -- and the drift comparison below decides what remains.
