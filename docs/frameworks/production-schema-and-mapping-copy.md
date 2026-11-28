@@ -122,16 +122,31 @@ from the reference:
 
 | before dump | after dump | conclusion |
 | --- | --- | --- |
-| reference | identical | the reference, the dump and the verification describe one instant |
+| reference | identical | no **net** change in those three fields for those rows |
 | reference | differs | the pause was not real — stop, and use the shared-snapshot procedure |
 
-That turns the flag from a promise into evidence, and it names the row that moved if the pause failed. The operator
-still has to make the pause real — set it before capturing, keep it until the dump finishes — but a failed pause now
-produces a stop instead of a silent phantom drift.
+**What those two checks do not prove.** They are detectors, not guarantees:
+
+- a transient edit that reverts (A→B→A) leaves no net trace
+- a change to any column outside `asset_id` / `playback_id` is invisible to the identity comparison
+- the write sampler polls about once a second, so a sub-second write can fall between samples
+
+**The consistency guarantee comes from exactly one of two things**, and this gate cannot manufacture either:
+
+| mechanism | guarantee | who does it |
+| --- | --- | --- |
+| a genuinely verified write pause — app write path disabled, not merely "quiet" | strong, if the verification is real | the operator |
+| one exported PostgreSQL snapshot shared by the dump **and** the reference read | strong, no coordination needed | the operator, or automation later |
+
+`WRITES_PAUSED=1` records that the operator verified the pause. The gate's checks then catch the common failure —
+someone sets the flag while writes continue — but they cannot upgrade a failed verification into a guarantee.
 
 ```bash
-export WRITES_PAUSED=1     # only once writes are actually paused
+export WRITES_PAUSED=1     # only once you have verified writes are actually paused
 ```
+
+The gate then samples `pg_stat_activity` during the dump and stops if any write statement touching `video_assets`
+is observed, recording the evidence in `writes-during-dump.log`.
 
 **Alternative: one exported snapshot for both.** For automation, hold a repeatable-read session open and export its
 snapshot, then pass it to `pg_dump` while the session stays alive:

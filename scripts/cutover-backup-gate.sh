@@ -91,6 +91,17 @@ command -v psql >/dev/null || stop "psql not found (install the postgres client:
   || stop "catalog writes are not paused — capture the reference and the dump against one instant (WRITES_PAUSED=1 once writes are paused, or use the exported-snapshot recipe in §1.0)"
 
 # --- dump -------------------------------------------------------------------
+# Sample for write statements against video_assets while the dump runs. This is a detector, not a guarantee:
+# a sub-second write can fall between samples, and a write that changes then reverts leaves no net trace.
+writes_log="$CUTOVER_DIR/writes-during-dump.log"
+( while :; do
+    psql "$PROD_DB_CONN" -Atc "select count(*) from pg_stat_activity
+      where pid <> pg_backend_pid() and state = 'active'
+        and query ~* '\\m(insert|update|delete|merge)\\M' and query ilike '%video_assets%'" 2>/dev/null || echo 0
+    sleep 1
+  done ) > "$writes_log" &
+sampler_pid=$!
+
 echo "dumping production (custom format)…"
 # Written to a temp path and moved into place only when it parses, so a failed dump cannot leave a
 # zero-byte backup.dump that then trips the fresh-directory guard on retry.
@@ -99,6 +110,12 @@ if ! pg_dump "$PROD_DB_CONN" --format=custom --no-owner --no-privileges --file "
 fi
 [ -s "$DUMP_TMP" ] || { rm -f "$DUMP_TMP"; stop "dump file is empty"; }
 mv "$DUMP_TMP" "$DUMP"
+
+kill "$sampler_pid" 2>/dev/null || true; wait "$sampler_pid" 2>/dev/null || true
+if [ -s "$writes_log" ] && grep -qvE '^0[[:space:]]*$' "$writes_log"; then
+  observed=$(grep -vcE '^0[[:space:]]*$' "$writes_log" || true)
+  stop "write activity against video_assets observed during the dump ($observed samples > 0; log: $writes_log) — the pause was not effective"
+fi
 
 dump_bytes=$(wc -c < "$DUMP" | tr -d ' ')
 
@@ -205,7 +222,7 @@ cat > "$RESULT" <<JSON
   "restore": "completed",
   "video_assets": { "production": $prod_rows, "scratch": $scratch_rows },
   "catalog_rows_verified": $actual_rows,
-  "catalog_consistency": "writes-paused, verified by identical reference before and after the dump",
+  "catalog_consistency": "writes-paused (asserted); no write statements observed during the dump; identities unchanged before/after",
   "pre_migration_schema": { "framework_tables": $ledger_tables, "identity_columns": $identity_columns },
   "scratch_target": "$scratch_display"
 }
