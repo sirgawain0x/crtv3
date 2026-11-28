@@ -108,60 +108,42 @@ bash scripts/cutover-backup-gate.sh
 
 #### The reference and the dump must describe one instant
 
-`pg_dump` is consistent with itself; the catalog reference is a separate read. A row that changes between the two
-makes a **sound** restore compare unequal, and the gate then stops on a phantom drift — the worst kind of failure,
-because it punishes a good backup.
+`pg_dump` is consistent with itself; the catalog reference is a separate read. If a row changes between the two, a
+**sound** restore compares unequal and the gate stops on phantom drift — punishing a good backup.
 
-A deploy freeze does not help: it stops deployments, not catalog edits.
+**Default: one exported PostgreSQL snapshot for both** (`CATALOG_SNAPSHOT_MODE=shared`). The gate opens a
+`REPEATABLE READ` transaction on production, exports its snapshot, reads the catalog reference inside that
+transaction, and runs `pg_dump --snapshot=<id>` before committing:
 
-**Default: pause catalog writes for the duration — and prove it.**
-
-`WRITES_PAUSED=1` is an assertion, not a pause: the gate cannot stop the application writing. So the gate does not
-take the assertion on trust. After the dump it **re-reads production** and requires the identities to be unchanged
-from the reference:
-
-| before dump | after dump | conclusion |
-| --- | --- | --- |
-| reference | identical | no **net** change in those three fields for those rows |
-| reference | differs | the pause was not real — stop, and use the shared-snapshot procedure |
-
-**What those two checks do not prove.** They are detectors, not guarantees:
-
-- a transient edit that reverts (A→B→A) leaves no net trace
-- a change to any column outside `asset_id` / `playback_id` is invisible to the identity comparison
-- the write sampler polls about once a second, so a sub-second write can fall between samples
-
-**The consistency guarantee comes from exactly one of two things**, and this gate cannot manufacture either:
-
-| mechanism | guarantee | who does it |
-| --- | --- | --- |
-| a genuinely verified write pause — app write path disabled, not merely "quiet" | strong, if the verification is real | the operator |
-| one exported PostgreSQL snapshot shared by the dump **and** the reference read | strong, no coordination needed | the operator, or automation later |
-
-`WRITES_PAUSED=1` records that the operator verified the pause. The gate's checks then catch the common failure —
-someone sets the flag while writes continue — but they cannot upgrade a failed verification into a guarantee.
-
-```bash
-export WRITES_PAUSED=1     # only once you have verified writes are actually paused
 ```
-
-The gate then samples `pg_stat_activity` during the dump and stops if any write statement touching `video_assets`
-is observed, recording the evidence in `writes-during-dump.log`.
-
-**Alternative: one exported snapshot for both.** For automation, hold a repeatable-read session open and export its
-snapshot, then pass it to `pg_dump` while the session stays alive:
-
-```sql
 BEGIN ISOLATION LEVEL REPEATABLE READ;
-SELECT pg_export_snapshot();          -- keep the session open while pg_dump runs
-```
-```bash
-pg_dump "$PROD_DB_CONN" --snapshot='<exported-id>' --format=custom --file backup.dump
+SELECT pg_export_snapshot();      -- session stays open while pg_dump runs
 ```
 
-The reference must then be read inside that same session, before it commits — which is why this is documented rather
-than automated: the fifo handoff is easy to get subtly wrong, and a backup gate that fails silently is worse than one
-an operator drives.
+No write pause is involved, so production keeps serving normally. The restored copy is therefore **one coherent
+instant**, not a torn read.
+
+**Alternative: a verified write pause** (`CATALOG_SNAPSHOT_MODE=paused`, `WRITES_PAUSED=1`, plus
+`CATALOG_REFERENCE`). The gate then samples `pg_stat_activity` for writes during the dump and re-reads the catalog
+afterwards, stopping if identities moved. Both checks are detectors, not guarantees — a sub-second write can fall
+between samples and a reverting write leaves no net trace.
+
+#### Rehearsed against PostgreSQL 17, not only stubbed
+
+Both modes were exercised end to end on local PostgreSQL 17 with `sslmode=verify-full` and a self-signed CA
+(connections without the CA are refused, so the TLS guard is genuinely enforced):
+
+| scenario | result |
+| --- | --- |
+| shared mode, no concurrent writes | passed — snapshot exported, reference read in-transaction, restore matched, 4/4 identities |
+| **shared mode while a writer updated a row continuously** | **passed** — production ended at `concurrent-39`, the restored copy held `concurrent-34`: one instant, no false drift |
+| paused mode under the same writer | **stopped**, naming the row: `paused-31` vs `paused-36` — the pause was not real |
+
+That contrast is the point of the mode: the snapshot survives concurrent writes, the pause assertion does not.
+
+One implementation note worth keeping: `psql -A` separates fields with `|`, not a tab. Every multi-column read now
+pins `-F $'\t'`, because a pipe-delimited restore silently compares unequal to a tab-delimited reference — which
+looks exactly like drift.
 
 #### Inputs
 
