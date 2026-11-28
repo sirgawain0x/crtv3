@@ -99,6 +99,7 @@ describe('identityStatePredicates against Postgres', () => {
 
     // The apostrophe survived quoting: the predicate still matches the row carrying "legacy'play".
     expect(row.before).toContain("'legacy''play'");
+    expect(row.before).toContain('id=145');
     expect(await count(db, `playback_id = 'legacy''play' AND ${row.before}`)).toBe(1);
 
     // What string interpolation would have produced for the null field, and why it is wrong:
@@ -113,5 +114,30 @@ describe('identityStatePredicates against Postgres', () => {
 
     expect(await count(db, row.before)).toBe(0);
     expect(await count(db, row.after)).toBe(0);
+  });
+});
+
+describe('predicate scoping', () => {
+  it('reports neither state for the target when a different row carries the planned values', async () => {
+    const [row] = identityStatePredicates(plan);
+    const db = await scratch();
+
+    // Target row drifts to a third state...
+    await db.exec("update public.video_assets set frameworks_asset_id = 'someone-elses-asset' where id = 145;");
+    // ...while a different row independently holds exactly the planned after values.
+    await db.exec(`
+      insert into public.video_assets values (
+        999, 'fw-asset-202611280133060c818dff6b2c412c', 'jZaV9t7k0yxBZVhm', 'frameworks',
+        '11111111-1111-1111-1111-111111111111', 'legacy''play',
+        'fw-asset-202611280133060c818dff6b2c412c', 'jZaV9t7k0yxBZVhm');
+    `);
+
+    // The predicates are row-scoped, so row 999 cannot stand in for row 145.
+    expect(await count(db, row.before)).toBe(0);
+    expect(await count(db, row.after)).toBe(0);
+
+    // An unscoped comparison would have matched the impostor row and reported "applied".
+    const unscoped = row.after.replace(/^id=\d+ AND /, '');
+    expect(await count(db, unscoped)).toBe(1);
   });
 });

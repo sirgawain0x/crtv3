@@ -117,12 +117,17 @@ function condition(table: IdentityPatch['table'], values: Values): string {
  * NULL field becomes `= 'null'` and an untouched legacy row is misread as ambiguous.
  */
 export function identityStatePredicates(plan: RemapPlan): { table: string; id: string; before: string; after: string }[] {
-  return plan.patches.map(patch => ({
-    table: patch.table,
-    id: String(patch.id),
-    before: condition(patch.table, patch.before),
-    after: condition(patch.table, patch.after),
-  }));
+  return plan.patches.map(patch => {
+    // Scope to the planned row with the same literal handling apply.sql uses. Without this, a count over the
+    // table can match a different row carrying the same values and report the plan as applied to the wrong one.
+    const rowId = `id=${literal(patch.id)}`;
+    return {
+      table: patch.table,
+      id: String(patch.id),
+      before: `${rowId} AND ${condition(patch.table, patch.before)}`,
+      after: `${rowId} AND ${condition(patch.table, patch.after)}`,
+    };
+  });
 }
 
 /** Transactional, guarded SQL only; a separate operator action is required to apply it. */

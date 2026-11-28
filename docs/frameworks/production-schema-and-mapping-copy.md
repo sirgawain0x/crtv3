@@ -735,7 +735,9 @@ function that decides whether a row may be updated decides whether it has alread
 `= 'null'`, which matches nothing. Every untouched row would then read as ambiguous. The generator emits
 `IS NOT DISTINCT FROM NULL`, which matches.
 
-Verified against PGlite (real Postgres semantics) with a legacy row containing nulls and an apostrophe:
+Each predicate is **scoped to its planned row id** with the same literal handling `apply.sql` uses, so a count over
+the table cannot be satisfied by a different row. Verified against PGlite (real Postgres semantics) with a legacy row
+containing nulls and an apostrophe, plus a second row carrying the planned values:
 
 | row state | before predicate | after predicate | reading |
 | --- | --- | --- | --- |
@@ -744,8 +746,11 @@ Verified against PGlite (real Postgres semantics) with a legacy row containing n
 | `frameworks_asset_id = 'null'` (hand-rolled) | 0 | 0 | **misreads as ambiguous** |
 | after apply | 0 | 1 | applied |
 | drifted value | 0 | 0 | genuinely ambiguous — stop |
+| target drifted while another row holds the planned values | 0 | 0 | **still ambiguous** — the impostor cannot stand in for the planned row |
+| the same predicate with `id=` removed | — | 1 | what an unscoped count would have matched |
 
-For each line, count the rows in that table matching the `before` condition and the `after` condition:
+For each line, count the rows matching the `before` predicate and the `after` predicate — no `where id=…` is needed
+at the call site, because the predicate carries it:
 
 | before | after | reading |
 | --- | --- | --- |
