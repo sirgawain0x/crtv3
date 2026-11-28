@@ -19,6 +19,7 @@ umask 077
 : "${CUTOVER_DIR:?set CUTOVER_DIR to the window directory}"
 
 DUMP="$CUTOVER_DIR/backup.dump"
+DUMP_TMP="$CUTOVER_DIR/.backup.dump.tmp"
 LIST="$CUTOVER_DIR/backup.list"
 RESULT="$CUTOVER_DIR/backup-result.json"
 
@@ -52,18 +53,27 @@ prod_target=$(parse "$PROD_DB_CONN")
 scratch_target=$(parse "$SCRATCH_DB_CONN")
 [ "$prod_target" != "$scratch_target" ] || stop "SCRATCH_DB_CONN resolves to the production database ($prod_target)"
 
-# Never overwrite an earlier window's evidence.
+# Never overwrite an earlier window's evidence, and clear a failed run's leftovers.
 [ ! -e "$DUMP" ] || stop "$DUMP already exists — use a fresh CUTOVER_DIR"
+rm -f "$DUMP_TMP"
 
-command -v pg_dump >/dev/null || stop "pg_dump not found on PATH"
-command -v pg_restore >/dev/null || stop "pg_restore not found on PATH"
-command -v psql >/dev/null || stop "psql not found on PATH"
+# Homebrew keeps libpq keg-only, so the client tools exist without being on PATH.
+for candidate in /opt/homebrew/opt/libpq/bin /usr/local/opt/libpq/bin; do
+  [ -x "$candidate/pg_dump" ] && PATH="$candidate:$PATH" && export PATH && break
+done
+command -v pg_dump >/dev/null || stop "pg_dump not found (install the postgres client: brew install libpq)"
+command -v pg_restore >/dev/null || stop "pg_restore not found (install the postgres client: brew install libpq)"
+command -v psql >/dev/null || stop "psql not found (install the postgres client: brew install libpq)"
 
 # --- dump -------------------------------------------------------------------
 echo "dumping production (custom format)…"
-pg_dump "$PROD_DB_CONN" --format=custom --no-owner --no-privileges --file "$DUMP" \
-  || stop "pg_dump failed; nothing recorded"
-[ -s "$DUMP" ] || stop "dump file is empty"
+# Written to a temp path and moved into place only when it parses, so a failed dump cannot leave a
+# zero-byte backup.dump that then trips the fresh-directory guard on retry.
+if ! pg_dump "$PROD_DB_CONN" --format=custom --no-owner --no-privileges --file "$DUMP_TMP"; then
+  rm -f "$DUMP_TMP"; stop "pg_dump failed; nothing recorded"
+fi
+[ -s "$DUMP_TMP" ] || { rm -f "$DUMP_TMP"; stop "dump file is empty"; }
+mv "$DUMP_TMP" "$DUMP"
 
 dump_bytes=$(wc -c < "$DUMP" | tr -d ' ')
 
