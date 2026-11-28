@@ -618,11 +618,17 @@ first:
 2. read `VIDEO_PROVIDER`'s presence **and** value in production (`vercel env ls --json`)
 3. refresh §6's rollback target and the baseline in this document to the deployment found in step 1
 4. **reinstate the deploy freeze** — from here until the provider setting is persisted
-5. re-take the pre-switch capture (provider state, alias snapshot) into a fresh window directory
+5. re-take the pre-switch capture (provider state, alias snapshot) into a fresh window directory, and **re-read the
+   alias as part of that capture**: it must still be the deployment recorded in step 3. A deploy that landed between
+   steps 1 and 5 shows up here — if the values differ, go back to step 1 rather than capturing a baseline that is
+   already stale
 6. run the backup gate; schema, mappings, remap and the provider setting wait behind it
 
 A stale baseline is re-verifiable; a window that assumes it is still current is not. And a window that resumes
 without reinstating the freeze has no protection against a deploy landing between the capture and the switch.
+
+Step 5's comparison is the one check that catches all three hazards at once: a deploy during steps 1–3, a freeze that
+was declared but not applied, and a capture taken against a different deployment than the one recorded for rollback.
 
 Then **pause other production deployments from the prebuild through the smoke tests and the provider-setting
 persistence**. A hotfix or a merge landing mid-window would build against a half-switched provider setting, and
