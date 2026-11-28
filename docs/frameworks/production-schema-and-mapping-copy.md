@@ -422,17 +422,69 @@ Current state, verified from the code path rather than the dashboard: the stagin
 Two things recorded before the window opens, because neither can be reconstructed afterwards:
 
 ```bash
-# only this variable, value included: the CLI's plain listing shows names, not values
-vercel env ls --json --environment production --project <project> \
-  | jq '[.envs[] | select(.key=="VIDEO_PROVIDER")]' > cutover-*/env-video-provider-before.json
-chmod 600 cutover-*/env-video-provider-before.json
-
-vercel inspect tv.creativeplatform.xyz > cutover-*/alias-before-window.txt
+set -euo pipefail          # a failed vercel call or a broken pipe must not be recorded as a result
+umask 077                  # every file created below is owner-only from the moment it exists
+CUTOVER_DIR="${CUTOVER_DIR:?set CUTOVER_DIR to this window's output directory}"
+VERCEL_PROJECT="${VERCEL_PROJECT:?set VERCEL_PROJECT to the project name or id}"
+mkdir -p "$CUTOVER_DIR"
 ```
 
-The JSON shape is `{"envs":[…]}` and each entry carries `key` plus a readable `value`. Filtering before writing keeps
-unrelated production settings — which the same command returns — out of the window record. Keep the file in the
-authorized store, never in the repository.
+Capture, validating the response before any conclusion is drawn from it:
+
+```bash
+capture_provider_setting() {
+  local out="$CUTOVER_DIR/env-video-provider-before.json"
+  local tmp="$CUTOVER_DIR/.env-video-provider-before.json.tmp"
+  local raw count
+  rm -f "$tmp"
+
+  if ! raw="$(vercel env ls --json --environment production --project "$VERCEL_PROJECT")"; then
+    echo "STOP: vercel env ls failed; nothing captured" >&2; return 1
+  fi
+  # A malformed payload is not evidence of absence.
+  if ! printf '%s' "$raw" | jq -e 'type=="object" and has("envs") and (.envs|type=="array")' >/dev/null 2>&1; then
+    echo "STOP: unexpected response shape; nothing captured" >&2; return 1
+  fi
+  # Store only the provider setting; the raw response carries every production value and stays in memory.
+  if ! printf '%s' "$raw" | jq '[.envs[] | select(.key=="VIDEO_PROVIDER")]' > "$tmp"; then
+    rm -f "$tmp"; echo "STOP: could not write the capture" >&2; return 1
+  fi
+  if ! count="$(jq 'length' "$tmp")"; then
+    rm -f "$tmp"; echo "STOP: capture unreadable" >&2; return 1
+  fi
+  case "$count" in
+    0) echo "VIDEO_PROVIDER: ABSENT — envs parsed, no match" ;;
+    1) if ! jq -e '.[0] | has("value") and (.value|type=="string") and ((.value|length)>0)' "$tmp" >/dev/null; then
+         rm -f "$tmp"; echo "STOP: VIDEO_PROVIDER exists but its value is unreadable" >&2; return 1
+       fi
+       echo "VIDEO_PROVIDER: present, value captured" ;;
+    *) rm -f "$tmp"; echo "STOP: $count VIDEO_PROVIDER entries; unusable" >&2; return 1 ;;
+  esac
+  mv "$tmp" "$out"          # committed only after every check passed
+}
+capture_provider_setting
+
+vercel inspect tv.creativeplatform.xyz > "$CUTOVER_DIR/alias-before-window.txt"
+```
+
+The capture is written to a temporary file and moved into place only after validation, so **a failed capture leaves
+no record that could later be read as a result.** Exercised against eight stubbed responses before being written
+here:
+
+| stub response | exit | record left |
+| --- | --- | --- |
+| envs array, no `VIDEO_PROVIDER` | 0 | `[]` — a validated absence |
+| envs array with a value | 0 | entry with the value |
+| `VIDEO_PROVIDER` present, no value | 1 | **none** |
+| `VIDEO_PROVIDER` present, empty value | 1 | **none** |
+| object without `envs` | 1 | **none** |
+| non-JSON / timeout text | 1 | **none** |
+| CLI exits non-zero | 1 | **none** |
+| duplicate `VIDEO_PROVIDER` entries | 1 | **none** |
+
+Only an empty array from a parsed `envs` payload records absence. If the value is hidden, resolve it before
+anything changes: dashboard reveal, or `vercel env pull` into a temporary file deleted once recorded. Keep
+`$CUTOVER_DIR` in the authorized store, never in the repository.
 
 Read the result as three states, not two:
 
